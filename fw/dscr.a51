@@ -57,9 +57,9 @@ _dev_dscr:
 	.db	0xff					  ; protocol (vendor specific)
 	.db	64						  ; packet size (ep0)
 	.dw	0xB404					  ; vendor id 
-	.dw	0x1386					  ; product id
+	.dw	0x0410					  ; product id
 	.dw	0x0100					  ; version id
-	.db	0		                  ; manufacturure str idx				
+	.db	1		                  ; manufacturure str idx
 	.db	2				          ; product str idx	
 	.db	0				          ; serial str idx 
 	.db	1			              ; n configurations
@@ -98,43 +98,16 @@ highspd_dscr_end:
 	.db	DSCR_INTERFACE_TYPE
 	.db	0				 ; index
 	.db	0				 ; alt setting idx
-	.db	6				 ; n endpoints	
+	.db	2				 ; n endpoints
 	.db	0xff			 ; class
 	.db	0xff
 	.db	0xff
-	.db	0	             ; string index	
-
-; endpoint 1 out
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x01				;  ep1 dir=out and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x00				; max packet LSB
-	.db	0x02				; max packet size=512 bytes
-	.db	0x00				; polling interval
-      
-; endpoint 1 in 
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x81				;  ep1 dir=in and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x00				; max packet LSB
-	.db	0x02				; max packet size=512 bytes
-	.db	0x00				; polling interval
+	.db	3	             ; string index
 
 ; endpoint 2 out
 	.db	DSCR_ENDPOINT_LEN
 	.db	DSCR_ENDPOINT_TYPE
 	.db	0x02				;  ep2 dir=OUT and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x00				; max packet LSB
-	.db	0x02				; max packet size=512 bytes
-	.db	0x00				; polling interval
-
-; endpoint 4 out
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x04				;  ep4 dir=OUT and address
 	.db	ENDPOINT_TYPE_BULK	; type
 	.db	0x00				; max packet LSB
 	.db	0x02				; max packet size=512 bytes
@@ -149,14 +122,6 @@ highspd_dscr_end:
 	.db	0x02				; max packet size=512 bytes
 	.db	0x00				; polling interval
 
-; endpoint 8 in
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x88				;  ep8 dir=in and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x00				; max packet LSB
-	.db	0x02				; max packet size=512 bytes
-	.db	0x00				; polling interval
 highspd_dscr_realend:
 
 .even
@@ -181,43 +146,16 @@ fullspd_dscr_end:
 	.db	DSCR_INTERFACE_TYPE
 	.db	0				 ; index
 	.db	0				 ; alt setting idx
-	.db	6				 ; n endpoints	
+	.db	2				 ; n endpoints
 	.db	0xff			 ; class
 	.db	0xff
 	.db	0xff
-	.db	0	             ; string index	
-
-; endpoint 1 out
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x01				;  ep1 dir=out and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x40				; max packet LSB
-	.db	0x00				; max packet size=64 bytes
-	.db	0x00				; polling interval
-      
-; endpoint 1 in 
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x81				;  ep1 dir=in and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x40				; max packet LSB
-	.db	0x00				; max packet size=64 bytes
-	.db	0x00				; polling interval
+	.db	3	             ; string index
 
 ; endpoint 2 out
 	.db	DSCR_ENDPOINT_LEN
 	.db	DSCR_ENDPOINT_TYPE
 	.db	0x02				;  ep2 dir=OUT and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x40				; max packet LSB
-	.db	0x00				; max packet size=64 bytes
-	.db	0x00				; polling interval
-
-; endpoint 4 out
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x04				;  ep4 dir=OUT and address
 	.db	ENDPOINT_TYPE_BULK	; type
 	.db	0x40				; max packet LSB
 	.db	0x00				; max packet size=64 bytes
@@ -231,14 +169,7 @@ fullspd_dscr_end:
 	.db	0x40				; max packet LSB
 	.db	0x00				; max packet size=64 bytes
 	.db	0x00				; polling interval
-; endpoint 6 in
-	.db	DSCR_ENDPOINT_LEN
-	.db	DSCR_ENDPOINT_TYPE
-	.db	0x88				;  ep6 dir=in and address
-	.db	ENDPOINT_TYPE_BULK	; type
-	.db	0x40				; max packet LSB
-	.db	0x00				; max packet size=64 bytes
-	.db	0x00				; polling interval
+
 fullspd_dscr_realend:
 
 .even
@@ -251,6 +182,44 @@ _string0:
 string0end:
 ; add more strings here
 
+_string1:
+    .db string1end-_string1
+    .db DSCR_STRING_TYPE
+    .ascii 'H'
+    .db 0
+    .ascii 'i'
+    .db 0
+string1end:
+
+_string2:
+    .db string2end-_string2
+    .db DSCR_STRING_TYPE
+    .ascii 'T'
+    .db 0
+    .ascii 'h'
+    .db 0
+    .ascii 'e'
+    .db 0
+    .ascii 'r'
+    .db 0
+    .ascii 'e'
+    .db 0
+string2end:
+
+_string3:
+    .db string3end-_string3
+    .db DSCR_STRING_TYPE
+    .ascii 'i'
+    .db 0
+    .ascii 'F'
+    .db 0
+    .ascii 'a'
+    .db 0
+    .ascii 'c'
+    .db 0
+    .ascii 'e'
+    .db 0
+string3end:
 
 _dev_strings_end:
-    .dw 0x0000  ; in case you wanted to look at memory between _dev_strings and _dev_strings_end
+    .dw 0x0000   ; just in case someone passes an index higher than the end to the firmware

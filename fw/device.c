@@ -45,7 +45,8 @@
 #endif
 
 BOOL handle_get_descriptor(void) {
-
+ // your custom descriptor handler code here..
+ return FALSE; // FALSE = fall back to default handler
 }
 
 //************************** Configuration Handlers *****************************
