@@ -1,4 +1,5 @@
 ; Copyright (C) 2009 Ubixum, Inc.
+; Copyright (C) 2022 Kipp Cannon
 ;
 ; This library is free software; you can redistribute it and/or
 ; modify it under the terms of the GNU Lesser General Public
@@ -14,11 +15,14 @@
 ; License along with this library; if not, write to the Free Software
 ; Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-; this is a the default
-; full speed and high speed
-; descriptors found in the TRM
-; change however you want but leave
-; the descriptor pointers so the setupdat.c file works right
+
+; NOTES:
+;
+; - the descriptor pointer names must match what setupdat.c has been written
+;   to expect
+; - for multi-byte words, the lowest order byte is first.
+; - strings are Unicode UTF16LE (each character is a two-byte word, note
+;   order)
 
 
 .module DEV_DSCR
@@ -43,6 +47,7 @@ ENDPOINT_TYPE_BULK=2
 ENDPOINT_TYPE_INT=3
 
 .globl _dev_dscr, _dev_qual_dscr, _highspd_dscr, _fullspd_dscr, _dev_strings, _dev_strings_end
+
 ; These need to be in code memory.  If
 ; they aren't you'll have to manully copy them somewhere
 ; in code memory otherwise SUDPTRH:L don't work right
@@ -91,35 +96,32 @@ _highspd_dscr:
 highspd_dscr_end:
 
 ; all the interfaces next
-; NOTE the default TRM actually has more alt interfaces
-; but you can add them back in if you need them.
-; here, we just use the default alt setting 1 from the trm
 	.db	DSCR_INTERFACE_LEN
 	.db	DSCR_INTERFACE_TYPE
 	.db	0			; index
 	.db	0			; alt setting idx
 	.db	2			; n endpoints
-	.db	0xff			; class
-	.db	0xff
-	.db	0xff
+	.db	0xff			; class (vendor specific)
+	.db	0xff			; subclass (vendor specific)
+	.db	0xff			; protocol (vendor specific)
 	.db	3			; string index
 
 ; endpoint 2 out
 	.db	DSCR_ENDPOINT_LEN
 	.db	DSCR_ENDPOINT_TYPE
-	.db	0x02			;  ep2 dir=OUT and address
+	.db	0x02			; ep2 dir=OUT and address
 	.db	ENDPOINT_TYPE_BULK	; type
 	.db	0x00			; max packet LSB
-	.db	0x02			; max packet size=512 bytes
+	.db	0x02			; max packet MSB (size=512 bytes)
 	.db	0x00			; polling interval
 
 ; endpoint 6 in
 	.db	DSCR_ENDPOINT_LEN
 	.db	DSCR_ENDPOINT_TYPE
-	.db	0x86			;  ep6 dir=in and address
+	.db	0x86			; ep6 dir=in and address
 	.db	ENDPOINT_TYPE_BULK	; type
 	.db	0x00			; max packet LSB
-	.db	0x02			; max packet size=512 bytes
+	.db	0x02			; max packet MSB (size=512 bytes)
 	.db	0x00			; polling interval
 
 highspd_dscr_realend:
@@ -139,85 +141,126 @@ _fullspd_dscr:
 fullspd_dscr_end:
 
 ; all the interfaces next
-; NOTE the default TRM actually has more alt interfaces
-; but you can add them back in if you need them.
-; here, we just use the default alt setting 1 from the trm
 	.db	DSCR_INTERFACE_LEN
 	.db	DSCR_INTERFACE_TYPE
 	.db	0			; index
 	.db	0			; alt setting idx
 	.db	2			; n endpoints
-	.db	0xff			; class
-	.db	0xff
-	.db	0xff
+	.db	0xff			; class (vendor specific)
+	.db	0xff			; subclass (vendor specific)
+	.db	0xff			; protocol (vendor specific)
 	.db	3			; string index
 
 ; endpoint 2 out
 	.db	DSCR_ENDPOINT_LEN
 	.db	DSCR_ENDPOINT_TYPE
-	.db	0x02			;  ep2 dir=OUT and address
+	.db	0x02			; ep2 dir=OUT and address
 	.db	ENDPOINT_TYPE_BULK	; type
 	.db	0x40			; max packet LSB
-	.db	0x00			; max packet size=64 bytes
+	.db	0x00			; max packet MSB (size=64 bytes)
 	.db	0x00			; polling interval
 
 ; endpoint 6 in
 	.db	DSCR_ENDPOINT_LEN
 	.db	DSCR_ENDPOINT_TYPE
-	.db	0x86			;  ep6 dir=in and address
+	.db	0x86			; ep6 dir=in and address
 	.db	ENDPOINT_TYPE_BULK	; type
 	.db	0x40			; max packet LSB
-	.db	0x00			; max packet size=64 bytes
+	.db	0x00			; max packet MSB (size=64 bytes)
 	.db	0x00			; polling interval
 
 fullspd_dscr_realend:
 
 .even
 _dev_strings:
-; sample string
+; first string descriptor contains 1 or more 2-byte language IDs
 _string0:
 	.db	string0end-_string0	; len
 	.db	DSCR_STRING_TYPE
-	.db	0x09, 0x04 ; 0x0409 is the language code for English.  Possible to add more codes after this.
+	.db	0x09, 0x10		; 0x1009 = Canadian English
 string0end:
 ; add more strings here
 
 _string1:
 	.db	string1end-_string1
 	.db	DSCR_STRING_TYPE
-	.ascii	'H'
+	.ascii	'K'
 	.db	0
 	.ascii	'i'
+	.db	0
+	.ascii	'p'
+	.db	0
+	.ascii	'p'
+	.db	0
+	.ascii	' '
+	.db	0
+	.ascii	'C'
+	.db	0
+	.ascii	'a'
+	.db	0
+	.ascii	'n'
+	.db	0
+	.ascii	'n'
+	.db	0
+	.ascii	'o'
+	.db	0
+	.ascii	'n'
 	.db	0
 string1end:
 
 _string2:
 	.db	string2end-_string2
 	.db	DSCR_STRING_TYPE
-	.ascii	'T'
+	.ascii	'A'
 	.db	0
-	.ascii	'h'
+	.ascii	'L'
 	.db	0
-	.ascii	'e'
+	.ascii	'L'
 	.db	0
-	.ascii	'r'
+	.ascii	'P'
 	.db	0
-	.ascii	'e'
+	.ascii	'R'
+	.db	0
+	.ascii	'O'
+	.db	0
+	.ascii	'8'
+	.db	0
+	.ascii	'8'
+	.db	0
+	.ascii	' '
+	.db	0
+	.ascii	'U'
+	.db	0
+	.ascii	'S'
+	.db	0
+	.ascii	'B'
 	.db	0
 string2end:
 
 _string3:
 	.db	string3end-_string3
 	.db	DSCR_STRING_TYPE
-	.ascii	'i'
+	.ascii	'C'
 	.db	0
-	.ascii	'F'
+	.ascii	'o'
+	.db	0
+	.ascii	'm'
+	.db	0
+	.ascii	'm'
 	.db	0
 	.ascii	'a'
 	.db	0
-	.ascii	'c'
+	.ascii	'n'
 	.db	0
-	.ascii	'e'
+	.ascii	'd'
+	.db	0
+	.ascii	' '
+	.db	0
+	.ascii	'I'
+	.db	0
+	.ascii	'/'
+	.db	0
+	.ascii	'O'
 	.db	0
 string3end:
 
