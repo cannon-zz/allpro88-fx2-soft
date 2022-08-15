@@ -44,55 +44,96 @@
 #define printf(...)
 #endif
 
-BOOL handle_get_descriptor(void) {
- // your custom descriptor handler code here..
- return FALSE; // FALSE = fall back to default handler
-}
 
-//************************** Configuration Handlers *****************************
+/*
+ * ============================================================================
+ *
+ *                            USB Event Callbacks
+ *
+ * ============================================================================
+ */
 
-// change to support as many interfaces as you need
-//volatile xdata BYTE interface=0;
-//volatile xdata BYTE alt=0; // alt interface
 
-// set *alt_ifc to the current alt interface for ifc
-BOOL handle_get_interface(BYTE ifc, BYTE* alt_ifc) {
-// *alt_ifc=alt;
- return TRUE;
-}
-// return TRUE if you set the interface requested
-// NOTE this function should reconfigure and reset the endpoints
-// according to the interface descriptors you provided.
-BOOL handle_set_interface(BYTE ifc,BYTE alt_ifc) {  
- printf ( "Set Interface.\n" );
- //interface=ifc;
- //alt=alt_ifc;
- return TRUE;
-}
+/*
+ * handle "get descriptor" requests.  return FALSE to fall back to the
+ * default handler, which returns the contents of the dscr.a51 file.
+ */
 
-// handle getting and setting the configuration
-// 1 is the default.  If you support more than one config
-// keep track of the config number and return the correct number
-// config numbers are set int the dscr file.
-//volatile BYTE config=1;
-BYTE handle_get_configuration(void) { 
- return 1;
-}
 
-// NOTE changing config requires the device to reset all the endpoints
-BOOL handle_set_configuration(BYTE cfg) {
- printf ( "Set Configuration.\n" );
- //config=cfg;
- return TRUE;
+BOOL handle_get_descriptor(void)
+{
+	return FALSE;
 }
 
 
-//******************* VENDOR COMMAND HANDLERS **************************
+/*
+ * handle "get interface" requests.  set *alt_ifc to the index of the
+ * current alternate setting for interface ifc.  return TRUE to report
+ * that *alt_ifc has been set.
+ */
 
 
-BOOL handle_vendorcommand(BYTE cmd) {
- // your custom vendor handler code here..
- return FALSE; // not handled by handlers
+BOOL handle_get_interface(BYTE ifc, BYTE *alt_ifc)
+{
+	(void) ifc;	/* silence unused argument warning */
+	/* we only support one setting, index 0 */
+	*alt_ifc = 0;
+	return TRUE;
+}
+
+
+/*
+ * handle "set interface" requests.  selects from among several alternate
+ * settings for an interface.  must reconfigure and reset the endpoints to
+ * match the interface descriptor for this interface entry in the
+ * descriptor that was provided, even if nothing changes.  return TRUE to
+ * report that it was done.
+ */
+
+
+BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
+{
+	(void) ifc;	/* silence unused argument warning */
+	/* we only support one inteface, index 0 */
+	return alt_ifc == 0;
+}
+
+
+/*
+ * handle "get configuration" requests.  return the current configuration.
+ */
+
+
+BYTE handle_get_configuration(void)
+{
+	/* we only support one configuration, number 1 */
+	return 1;
+}
+
+
+/*
+ * handle "set configuration" requests.  return TRUE if it was successful.
+ * NOTE that all endpoints must be reset when the configuration changes.
+ */
+
+
+BOOL handle_set_configuration(BYTE cfg)
+{
+	/* we only support one configuration, number 1 */
+	return cfg == 1;
+}
+
+
+/*
+ * handle "vendor command".
+ */
+
+
+BOOL handle_vendorcommand(BYTE cmd)
+{
+	(void) cmd;	/* silence unused argument warning */
+	/* no vendor commands supported */
+	return FALSE;
 }
 
 
