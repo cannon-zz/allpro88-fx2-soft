@@ -284,6 +284,8 @@ void allpro88_write(WORD addr, BYTE data)
 
 void allpro88_reset(void)
 {
+	WORD addr;
+
 	/* hold /RESET low */
 	ALLPRO88_NRESET = 0;
 	/* set /RD, /WR high (order doesn't matter) */
@@ -304,6 +306,12 @@ void allpro88_reset(void)
 	 * reset line resets all the latches but doesn't modify the pin
 	 * driver DACs.  they should be put into a known state before doing
 	 * other configuration */
+	/* FIXME: I don't know if this is needed, but this will ensure all
+	 * the DACs are 0 and everything is "disabled" */
+	for(addr = 0; addr < 0x0800; addr++)
+		allpro88_write(addr, 0);
+	for(addr = 0; addr < 0x0800; addr++)
+		allpro88_write(addr, 0);
 }
 
 
@@ -323,6 +331,42 @@ enum ALLPRO88_PCR_BITS {
 };
 
 
+enum ALLPRO88_PINCON_BITS {
+	PINCON_DISABLE = 0x00,
+	PINCON_GND = 0x01,
+	PINCON_VDAC = 0x02,
+	PINCON_VTST = 0x04,
+	PINCON_LOGICH = 0x08,
+	PINCON_PULLUP = 0x10,
+	PINCON_LOGICL = 0x20,
+	PINCON_POSCLK = 0x40,
+	PINCON_NEGCLK = 0x60,
+	PINCON_PULLDN = 0x80
+};
+
+
+/*
+ * in bit-bang mode, the polarity bit sets the state of the timer output.
+ * otherwise, according to kevtris the polarity bit sets the state of timer
+ * output when it is not toggling (don't know what that means).  FIXME:
+ * figure out what that means.
+ */
+
+
+enum ALLPRO88_TIMER_MODE {
+	TIMER_MODE_DISABLE = 0x00,
+	TIMER_MODE_BITBANG = 0x01,
+	TIMER_MODE_4MHZ = 0x02,
+	TIMER_MODE_2MHZ = 0x03,
+	TIMER_MODE_1MHZ = 0x04,
+	TIMER_MODE_500KHZ = 0x05,
+	TIMER_MODE_250KHZ = 0x06,
+	/* NOTE:  setting mode 0x07 enables both high and low output
+	 * drivers and will damage the circuit */
+	TIMER_MODE_POLARITY = 0x80
+};
+
+
 /*
  * set the PCR (power supply control register)
  */
@@ -331,6 +375,157 @@ enum ALLPRO88_PCR_BITS {
 static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
 {
 	allpro88_write(0x030c, val);
+}
+
+
+/*
+ * set the VADJ voltage DAC.  the output voltage will be
+ *
+ * VADJ =  0.8598 + (dac * 0.119036) + (dac**2. * -0.0000115199973)
+ *
+ * NOTE:  VADJ must be at least 1 or 2 volts above the highest of all of
+ * the pin DAC voltages, VPUL, VTST and VPIN because is supplies all of
+ * these.
+ */
+
+
+static void allpro88_set_VADJ(BYTE vdac)
+{
+	allpro88_write(0x0302, vdac);
+}
+
+
+/*
+ * set the VPIN voltage DAC.  the voltage will be
+ *
+ * VPIN = 0.1 * vdac
+ */
+
+
+static void allpro88_set_VPIN(BYTE vdac)
+{
+	allpro88_write(0x0301, vdac);
+}
+
+
+/*
+ * set the VPUL voltage DAC.  the output voltage will be
+ *
+ * VPUL = -0.54392 + (dac * 0.100723) + (dac ^ 2 * 0.000000000497)
+ *
+ * NOTE:  the change does not take effect until the PINDAC xfer resgister
+ * is written to.  see allpro88_xfer_PINDACs().
+ */
+
+
+static void allpro88_set_VPUL(BYTE vdac)
+{
+	allpro88_write(0x0305, vdac);
+}
+
+
+/*
+ * set the VTST current and voltage DACs.
+ *
+ * IDAC = Iout in millamperes,
+ *
+ * EDAC = (Eout - 0.408 - (0.003855 * IDAC)) / 0.10151
+ */
+
+
+static void allpro88_set_VTST(BYTE vdac, BYTE idac)
+{
+	allpro88_write(0x0386, vdac);
+	allpro88_write(0x0387, idac);
+}
+
+
+/*
+ * start address for the control registers for a pin
+ */
+
+
+static WORD allpro88_pin_addr(BYTE pin)
+{
+	/* pin 0 starts at 0x0000, 1 at 0x0010, etc., up to pin 0x27 which
+	 * starts at 0x0270, then pin 0x28 starts at 0x0400, and they
+	 * continue in order from there */
+	if(pin > 0x27)
+		pin += 0x18;
+	return (WORD) pin << 4;
+}
+
+
+/*
+ * set the PINCON register for a pin.
+ */
+
+
+static void allpro88_set_PINCON(BYTE pin, enum ALLPRO88_PINCON_BITS val)
+{
+	/* FIXME add safety check for valid values to avoid damage */
+
+	/* config register is at offset 0 from the start of the register
+	 * group for each pin */
+	allpro88_write(allpro88_pin_addr(pin), val);
+}
+
+
+/*
+ * set the DAC register for a pin.  the voltage will be
+ *
+ * VDAC = -0.5 + (0.1 * dac)
+ *
+ * NOTE:  the change does not take effect until the PINDAC xfer resgister
+ * is written to.  see allpro88_xfer_PINDACs().
+ */
+
+
+static void allpro88_set_PINDAC(BYTE pin, BYTE val)
+{
+	/* DAC register is at offset 3 from the start of the register group
+	 * for each pin */
+	allpro88_write(allpro88_pin_addr(pin) + 3, val);
+}
+
+
+/*
+ * load all pin DACs and VPUL DAC from their registers.  this causes the
+ * DAC value set for each pin and for VPUL to take effect.
+ */
+
+
+static void allpro88_xfer_PINDACs(void)
+{
+	allpro88_write(0x308, 0);
+}
+
+
+/*
+ * enable/disable the bypass capacitor for a pin.  only pins < 0x30 have
+ * bypass capacitors.
+ */
+
+
+static void allpro88_set_PINBYPASS(BYTE pin, BOOL enable)
+{
+	if(pin < 0x28)
+		allpro88_write(0x0280 + pin, enable);
+	else if(pin < 0x30)
+		allpro88_write(0x02c0 - 0x28 + pin, enable);
+}
+
+
+/*
+ * read pin state
+ */
+
+
+static BOOL allpro88_get_PINSTATE(BYTE pin)
+{
+	/* the pin state (above/below VPIN threshold) is read at offset 0
+	 * from the start of the register group for each pin */
+	return allpro88_read(allpro88_pin_addr(pin));
 }
 
 
@@ -422,6 +617,63 @@ static void blink_busy_1hz(void)
 
 
 /*
+ * sets the test voltage to 3 V, current limit 5 mA.  sets all pins of the
+ * ALLPRO88 to "logic low" = 50 Ohm resistor to GND, except pin 1 which is
+ * toggled between the test voltage and "logic low" at 1 Hz.  this should
+ * blink an LED inserted into pins 1 and 2 of the ZIF socket at 1 Hz.
+ */
+
+
+static void blink_pin1_1hz(void)
+{
+	unsigned char pin;
+
+	/* set VADJ to 5 V.  this is the supply voltage to the DAC outputs.
+	 * it needs to be something about 2 V above what VTST will be set
+	 * to.  as long as it's not too high the value doesn't matter (the
+	 * higher it gets the more heat needs to be dissipated by the
+	 * linear pin driver power supplies) */
+
+	/*allpro88_set_VADJ(35);*/
+	allpro88_set_VADJ(255);
+
+	/* configure VTST.  see the function's documentation for the
+	 * formulae.  we want Eout = 3 V.  26 is rounded up, so the voltage
+	 * will be a bit more than 3 V. */
+
+	/*allpro88_set_VTST(26, 5);*/
+	allpro88_set_VTST(128, 255);
+
+	/* enable all power supplies */
+
+	allpro88_set_PCR(PCR_ENABLE);
+
+	/* configure the pins.  first set all to logic low, wait 500 ms,
+	 * then set pin 1 to (current-limited) VTST, and wait 500 ms.
+	 * NOTE: pin 1 of the ZIF socket is pin driver channel 60 (ALLPRO's
+	 * service manual numbers channels from 1, so in their
+	 * documentation this is channel 61) */
+
+#if 0
+	for(pin = 0; pin < 88; pin++)
+		allpro88_set_PINCON(pin, PINCON_LOGICL);
+	allpro88_write(0x0308, 0);
+	delay(500);
+	allpro88_set_PINCON(60, PINCON_VTST);
+	allpro88_write(0x0308, 0);
+	delay(500);
+#endif
+
+	for(pin = 0; pin < 88; pin++)
+		allpro88_set_PINCON(pin, PINCON_VTST);
+	delay(1000);
+	for(pin = 0; pin < 88; pin++)
+		allpro88_set_PINCON(pin, PINCON_LOGICL);
+	delay(1000);
+}
+
+
+/*
  * ============================================================================
  *
  *                                 Main Loop
@@ -439,5 +691,10 @@ void main_loop(void)
 
 	/* uncomment to blink the busy LED at 1 Hz */
 
-	blink_busy_1hz();
+	/*blink_busy_1hz();*/
+
+	/* uncomment this to blink an LED connected to pins 1 and 2 of the
+	 * ZIF socket at 1 Hz */
+
+	blink_pin1_1hz();
 }
