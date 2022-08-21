@@ -153,6 +153,52 @@ BOOL handle_vendorcommand(BYTE cmd)
  * Port D[7] = /RD
  * Port D[6] = /WR
  * Port D[5] = /RESET
+ *
+ * the address and control lines are wired into the inputs of SN74LS244N
+ * bus driver chips, and the data bus into an SN74LS245N bi-directional bus
+ * driver.  those chips are gauranteed to recognize anything over 2 V as a
+ * logic high level, so they should provide the required level shifting
+ * from the FX2's 3.3 V logic outputs to 5 V logic inside the programmer,
+ * and for the 5 V output of the 245N on the data bus when reading, the
+ * FX2's documentation claims it has 5 V tolerant inputs.  the /RD line
+ * controls the direction of the 245N, so be careful not to pull /RD low
+ * while driving the data bus.
+ *
+ * NOTE:  I measure 200 Ohm between every I/O line and both +5 V and GND
+ * inside the programmer.  I don't understand this.  there are Vishay
+ * MDP1605 331/471G resistor arrays on the board beside the ribbon cable
+ * pin header which I assume are terminating the cable.  they should have
+ * 330 Ohm / 470 Ohm 2% resistors in them, one to +5 V and one to GND.  I'm
+ * not sure which is which, but neither should be only 200 Ohm.  in any
+ * case, there are termination resistors to both the positive supply rail
+ * and ground, so regardless of what the values are there are a number of
+ * consequences:
+ *
+ * 1.  with the FX2 chip powered down, all I/O lines should be pulled to
+ * approximately 2.5 V by these resistors.  that is a problem for the FX2,
+ * whose inputs must not be driven when the chip is powered off.
+ * Therefore: ALWAYS APPLY POWER TO THE FX2 BOARD BEFORE APPLYING POWER TO
+ * THE PROGRAMMER, AND ALWAYS REMOVE POWER FROM THE PROGRAMMER BEFORE
+ * REMOVING POWER FROM THE FX2 BOARD.
+ *
+ * 2.  when an FX2 output pin is pulled low, there is only a 200 Ohm
+ * resistor between it and a +5 V rail, so 25 mA of current will flow.
+ * when pulled high, to about 3 V, it's only between 0.25 V and 0.5 V above
+ * the potential of that node in the termination resitor array, with a 200
+ * Ohm resistance to ground, so much less current will flow, about 2 mA.
+ * the chip can only source or sink a maximum of 4 mA on any GPIO pin, so
+ * it should have no trouble pulling the programmer's inputs to logic high
+ * levels, but will not be able to pull them to logic low levels.  even if
+ * I'm wrong about the resistances, and the resistor package markings give
+ * the correct values, the difference is only about a factor of 2, so the
+ * chip must still sink about 12 mA and source 1 mA, so no matter what it
+ * will struggle to pull pins to logic low.  to work with an unmodified
+ * ALLPRO88 programmer, buffer circuits will be needed.  alternatively, the
+ * termination resistors could be removed from the ALLPRO's motherboard
+ * altogether, maybe replaced with something comfortably above 1.3 kOhm.
+ * although the Vishay datasheet says there are resistor arrays in all
+ * kinds of values, neither digikey, nor mouser, nor marutsu sells the
+ * MDP1605 configuration in higher than a 680 Ohm / 680 Ohm variant.
  */
 
 
@@ -182,37 +228,6 @@ static void ALLPRO88_ADDR_SET(WORD addr)
  * functions below for explanations of the delays that get inserted. */
 
 #define ALLPRO88_SYNC	SYNCDELAY6	/* 0.5 us @ 48 MHz CPU clock */
-
-
-
-/*
- * reset the ALLPRO 88 device
- */
-
-
-void allpro88_reset(void)
-{
-	/* hold /RESET low */
-	ALLPRO88_NRESET = 0;
-	/* set /RD, /WR high (order doesn't matter) */
-	ALLPRO88_NRD = ALLPRO88_NWR = 1;
-	/* zero the address bus */
-	ALLPRO88_ADDR_SET(0);
-	/* set data bus to all zero */
-	ALLPRO88_DATA = 0;
-	ALLPRO88_DATA_DRIVE;
-	/* wait a while (10 ms) */
-	delay(10);	/* FIXME:  what delay is required?  */
-	/* raise /RESET */
-	ALLPRO88_NRESET = 1;
-
-	/* FIXME:  kevtris recommends 0'ing all pin-driver DACs *before*
-	 * reset.  really?  maybe after ...?  in any case this code doesn't
-	 * do that (yet?), maybe it should.  his documentation says the
-	 * reset line resets all the latches but doesn't modify the pin
-	 * driver DACs.  they should be put into a known state before doing
-	 * other configuration */
-}
 
 
 /*
@@ -259,6 +274,63 @@ void allpro88_write(WORD addr, BYTE data)
 	ALLPRO88_SYNC;	/* hold it to make sure it takes */
 	/* raise /WR */
 	ALLPRO88_NWR = 1;
+}
+
+
+/*
+ * reset the ALLPRO 88 device
+ */
+
+
+void allpro88_reset(void)
+{
+	/* hold /RESET low */
+	ALLPRO88_NRESET = 0;
+	/* set /RD, /WR high (order doesn't matter) */
+	ALLPRO88_NRD = ALLPRO88_NWR = 1;
+	/* zero the address bus */
+	ALLPRO88_ADDR_SET(0);
+	/* set data bus to all zero */
+	ALLPRO88_DATA = 0;
+	ALLPRO88_DATA_DRIVE;
+	/* wait a while (10 ms) */
+	delay(10);	/* FIXME:  what delay is required?  */
+	/* raise /RESET */
+	ALLPRO88_NRESET = 1;
+
+	/* FIXME:  kevtris recommends 0'ing all pin-driver DACs *before*
+	 * reset.  really?  maybe after ...?  in any case this code doesn't
+	 * do that (yet?), maybe it should.  his documentation says the
+	 * reset line resets all the latches but doesn't modify the pin
+	 * driver DACs.  they should be put into a known state before doing
+	 * other configuration */
+}
+
+
+/*
+ * ============================================================================
+ *
+ *                        AllPro88 Programmer Control
+ *
+ * ============================================================================
+ */
+
+
+enum ALLPRO88_PCR_BITS {
+	PCR_DISABLE = 0x00,
+	PCR_ENABLE = 0x01,
+	PCR_AUX = 0x02	/* unused open collector output to socket board */
+};
+
+
+/*
+ * set the PCR (power supply control register)
+ */
+
+
+static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
+{
+	allpro88_write(0x030c, val);
 }
 
 
@@ -312,6 +384,46 @@ void main_init(void)
 /*
  * ============================================================================
  *
+ *                               Debug Helpers
+ *
+ * ============================================================================
+ */
+
+
+/*
+ * blinks an LED connected in series with a current limit resistor between
+ * the !RESET line and GND at 1 Hz.
+ */
+
+
+static void blink_nreset_1hz(void)
+{
+	ALLPRO88_NRESET = 0;
+	delay(500);
+	ALLPRO88_NRESET = 1;
+	delay(500);
+}
+
+
+/*
+ * blinks the busy LED at 1 Hz.  the busy LED is tied to the "power
+ * supplies enable" bit.  turning the power supplies on and off blinks the
+ * LED.
+ */
+
+
+static void blink_busy_1hz(void)
+{
+	allpro88_set_PCR(PCR_ENABLE);
+	delay(500);
+	allpro88_set_PCR(PCR_DISABLE);
+	delay(500);
+}
+
+
+/*
+ * ============================================================================
+ *
  *                                 Main Loop
  *
  * ============================================================================
@@ -320,8 +432,12 @@ void main_init(void)
 
 void main_loop(void)
 {
-	ALLPRO88_NRESET = 0;
-	delay(500);
-	ALLPRO88_NRESET = 1;
-	delay(500);
+	/* uncomment this to blink an LED connected to the !RESET line at
+	 * 1 Hz */
+
+	/*blink_nreset_1hz();*/
+
+	/* uncomment to blink the busy LED at 1 Hz */
+
+	blink_busy_1hz();
 }
