@@ -19,6 +19,7 @@
 
 #include <delay.h>
 #include <fx2macros.h>
+#include <eputils.h>
 
 
 /*
@@ -93,9 +94,23 @@ BOOL handle_get_interface(BYTE ifc, BYTE *alt_ifc)
 
 BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
 {
-	(void) ifc;	/* silence unused argument warning */
-	/* we only support one inteface, index 0 */
-	return alt_ifc == 0;
+	/* we only support one inteface, index 0, and one alternate
+	 * setting, setting 0  */
+	if(ifc == 0 && alt_ifc == 0) {
+		/* reset toggles */
+		RESETTOGGLE(0x02);
+		RESETTOGGLE(0x86);
+		/* reconfigure the end points */
+		RESETFIFO(0x02);
+		EP2BCL=0x80;
+		SYNCDELAY;
+		EP2BCL=0X80;
+		SYNCDELAY;
+		RESETFIFO(0x86);
+		return TRUE;
+	}
+
+	return FALSE;
 }
 
 
