@@ -140,6 +140,97 @@ BOOL handle_vendorcommand(BYTE cmd)
 /*
  * ============================================================================
  *
+ *                               C-ish Library
+ *
+ * ============================================================================
+ */
+
+/*
+ * TRUE = an error occured in a function call
+ */
+
+
+static BOOL errno = FALSE;
+
+
+/*
+ * convert base 16 strings of various fixed lengths to numerical values
+ */
+
+
+static BYTE hex_to_val(char digit)
+{
+	digit -= '0';
+	if((signed char) digit < 0)
+		goto error;
+	if(digit > 9) {
+		/* map 'a' through 'f' to upper case */
+		digit &= ~0x20;
+		/* convert to value */
+		digit -= 'A' - '0';
+		if((signed char) digit < 0)
+			goto error;
+		digit += 10;
+		if(digit > 0xf)
+			goto error;
+	}
+	return digit;
+error:
+	errno = TRUE;
+	return 0;
+}
+
+
+static BYTE str_to_byte(const char *str)
+{
+	return hex_to_val(str[0]) << 4 | hex_to_val(str[1]);
+}
+
+
+static WORD str_to_word(const char *str)
+{
+	return MAKEWORD(str_to_byte(str), str_to_byte(str + 2));
+}
+
+
+/*
+ * write a null-terminated string without the terminator character.
+ * assumes AUTOPTR2 is set to the destination.
+ */
+
+
+static void puts(const char *str)
+{
+	BYTE i;
+	for(i = 0; str[i]; i++)
+		XAUTODAT2 = str[i];
+}
+
+
+/*
+ * write integers to base 16 strings of various fixed lengths.  assumes
+ * AUTOPTR2 is set to the destination.
+ */
+
+
+static void puts_byte(BYTE val)
+{
+	static const char hex_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+	XAUTODAT2 = hex_digit[val >> 4];
+	XAUTODAT2 = hex_digit[val & 0xf];
+}
+
+
+static void puts_word(WORD val)
+{
+	puts_byte(MSB(val));
+	puts_byte(LSB(val));
+}
+
+
+/*
+ * ============================================================================
+ *
  *                           AllPro88 I/O Sequences
  *
  * ============================================================================
@@ -635,6 +726,183 @@ void main_init(void)
 
 	arm_out_endpoint();
 	arm_out_endpoint();
+
+	/* enable autopointers.  for both, increment on access. */
+
+	AUTOPTRSETUP = 0x07;
+}
+
+
+/*
+ * ============================================================================
+ *
+ *                             Command Processor
+ *
+ * ============================================================================
+ */
+
+
+/*
+ * return TRUE if the "out" (data from the computer) end-point's buffer is
+ * not empty (one or more commands are waiting to be processed)
+ */
+
+
+static BOOL out_buffer_not_empty(void)
+{
+	return !(EP2468STAT & bmEP2EMPTY);
+}
+
+
+/*
+ * return TRUE if the "in" (data to the computer) end-point's buffer is not
+ * full, i.e., can accept more data.
+ */
+
+
+static BOOL in_buffer_not_full(void)
+{
+	return !(EP2468STAT & bmEP6FULL);
+}
+
+
+/*
+ * command parser state.  global variable (lazy).
+ */
+
+
+static struct parse_state {
+	char command[8];
+	BYTE command_idx;
+} parse_state = {
+	.command = {0},
+	.command_idx = 0,
+};
+
+
+/*
+ * parse commands from "out" end-point
+ *
+ * command format.  all numbers are in hexadecimal, and they must be the
+ * width indicated.  all commands are terminated by newline, \n, 0x0a.
+ * CTRL-C resets the parser (aborts partial command).  all other whitespace
+ * is ignored.  commands may straddle packet boundaries.
+ *
+ * EXXXX	echo the hex number XXXX (loop-back test)
+ * =XXXXYY	write YY to address XXXX
+ * ?XXXX	read address XXXX, display value
+ * DXX=YY	set pin XX's VDAC to YY
+ * PXX=Y	set pin XX's config to Y
+ *
+ * returns the number of bytes of response data written to the in buffer
+ */
+
+
+static void do_command(void)
+{
+	errno = FALSE;
+	switch(parse_state.command[0]) {
+	case 'E': {
+		/* loop-back test */
+		WORD addr = str_to_word(&parse_state.command[1]);
+		/* check for error and correct end of string */
+		if(errno || parse_state.command[5])
+			goto error;
+		puts_word(addr);
+		break;
+	}
+
+	case '=': {
+		/* address write operation */
+		WORD addr = str_to_word(&parse_state.command[1]);
+		BYTE val = str_to_byte(&parse_state.command[5]);
+		/* check for error and correct end of string */
+		if(errno || parse_state.command[7])
+			goto error;
+		allpro88_write(addr, val);
+		break;
+	}
+
+	case '?': {
+		/* address read operation */
+		WORD addr = str_to_word(&parse_state.command[1]);
+		/* check for error and correct end of string */
+		if(errno || parse_state.command[5])
+			goto error;
+		puts_byte(allpro88_read(addr));
+		break;
+	}
+
+	/* FIXME: add extra commands */
+
+	default:
+		/* unrecognized command */
+		break;
+	}
+
+error:
+	return;
+}
+
+
+static void parse_out_buffer(void)
+{
+	WORD n;
+
+	/* initialize autopointer 1 to the start address of end-point 2's
+	 * ("out") buffer and autopointer 2 to the start address of
+	 * end-point 6's ("in") * buffer */
+
+	AUTOPTRH1 = MSB(EP2FIFOBUF);
+	AUTOPTRL1 = LSB(EP2FIFOBUF);
+	AUTOPTRH2 = MSB(EP6FIFOBUF);
+	AUTOPTRL2 = LSB(EP6FIFOBUF);
+
+	/* loop over contents of out buffer.  some commands produce output
+	 * that is put into the in buffer.  the maximum length of any
+	 * command's output is shorter than the shortest command, therefore
+	 * we assume the output of all commands in a single packet will fit
+	 * into a single packet and don't bother including any logic to
+	 * handle otherwise */
+
+	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--) {
+		/* retrieve the next character */
+		char next = XAUTODAT1;
+		if(next == '\n') {
+			/* end of command.  null terminate the command
+			 * buffer and interpret its contents */
+			parse_state.command[parse_state.command_idx] = 0;
+			do_command();
+			/* reset state for next command */
+			parse_state.command[0] = 0;
+			parse_state.command_idx = 0;
+		} else if(next == 0x03) {
+			/* CTRL-C */
+			/* reset state for next command */
+			parse_state.command[0] = 0;
+			parse_state.command_idx = 0;
+		} else if(next < 0x21) {
+			/* other white space, ignore */
+		} else if(parse_state.command_idx > 6) {
+			/* if command buffer is full, an error has occured,
+			 * reset */
+			parse_state.command[0] = 0;
+			parse_state.command_idx = 0;
+		} else {
+			/* append character to command buffer */
+			parse_state.command[parse_state.command_idx++] = next;
+		}
+	}
+
+	/* arm the in end-point to send it to the host.  we do this even if
+	 * it's empty (byte count = 0) so that code running on the host
+	 * always gets a response for every packet it sends.  */
+
+	arm_in_endpoint();
+
+	/* re-arm the "out" end-point so we can receive another buffer */
+
+	arm_out_endpoint();
 }
 
 
@@ -758,5 +1026,11 @@ void main_loop(void)
 	/* uncomment this to blink an LED connected to pins 1 and 2 of the
 	 * ZIF socket at 1 Hz */
 
-	blink_pin1_1hz();
+	/*blink_pin1_1hz();*/
+
+	/* if command data is available and there is room for output,
+	 * process */
+
+	if(out_buffer_not_empty() && in_buffer_not_full())
+		parse_out_buffer();
 }
