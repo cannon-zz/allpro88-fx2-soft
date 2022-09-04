@@ -263,11 +263,10 @@ BYTE allpro88_read(WORD addr)
 
 void allpro88_write(WORD addr, BYTE data)
 {
-	/* set data bus for output */
-	ALLPRO88_DATA_DRIVE;
 	/* drive address and data bus */
 	ALLPRO88_ADDR_SET(addr);
 	ALLPRO88_DATA = data;
+	ALLPRO88_DATA_DRIVE;
 	ALLPRO88_SYNC;	/* allow the buses to settle */
 	/* pull /WR low */
 	ALLPRO88_NWR = 0;
