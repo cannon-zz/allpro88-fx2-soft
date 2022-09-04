@@ -5,7 +5,7 @@ buf = usb.core.array.array("B", (0,) * 512)
 
 device = usb.core.find(idVendor = 0x04b4, idProduct = 0x1004)
 
-#device.set_configuration()
+device.set_configuration()
 
 def read_response():
 	n = device.read(0x86, buf)
