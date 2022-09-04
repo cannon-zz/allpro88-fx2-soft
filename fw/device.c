@@ -49,112 +49,6 @@
 /*
  * ============================================================================
  *
- *                            USB Event Callbacks
- *
- * ============================================================================
- */
-
-
-/*
- * handle "get descriptor" requests.  return FALSE to fall back to the
- * default handler, which returns the contents of the dscr.a51 file.
- */
-
-
-BOOL handle_get_descriptor(void)
-{
-	return FALSE;
-}
-
-
-/*
- * handle "get interface" requests.  set *alt_ifc to the index of the
- * current alternate setting for interface ifc.  return TRUE to report
- * that *alt_ifc has been set.
- */
-
-
-BOOL handle_get_interface(BYTE ifc, BYTE *alt_ifc)
-{
-	(void) ifc;	/* silence unused argument warning */
-	/* we only support one setting, index 0 */
-	*alt_ifc = 0;
-	return TRUE;
-}
-
-
-/*
- * handle "set interface" requests.  selects from among several alternate
- * settings for an interface.  must reconfigure and reset the endpoints to
- * match the interface descriptor for this interface entry in the
- * descriptor that was provided, even if nothing changes.  return TRUE to
- * report that it was done.
- */
-
-
-BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
-{
-	/* we only support one inteface, index 0, and one alternate
-	 * setting, setting 0  */
-	if(ifc == 0 && alt_ifc == 0) {
-		/* reset toggles */
-		RESETTOGGLE(0x02);
-		RESETTOGGLE(0x86);
-		/* reconfigure the end points */
-		RESETFIFO(0x02);
-		EP2BCL=0x80;
-		SYNCDELAY;
-		EP2BCL=0X80;
-		SYNCDELAY;
-		RESETFIFO(0x86);
-		return TRUE;
-	}
-
-	return FALSE;
-}
-
-
-/*
- * handle "get configuration" requests.  return the current configuration.
- */
-
-
-BYTE handle_get_configuration(void)
-{
-	/* we only support one configuration, number 1 */
-	return 1;
-}
-
-
-/*
- * handle "set configuration" requests.  return TRUE if it was successful.
- * NOTE that all endpoints must be reset when the configuration changes.
- */
-
-
-BOOL handle_set_configuration(BYTE cfg)
-{
-	/* we only support one configuration, number 1 */
-	return cfg == 1;
-}
-
-
-/*
- * handle "vendor command".
- */
-
-
-BOOL handle_vendorcommand(BYTE cmd)
-{
-	(void) cmd;	/* silence unused argument warning */
-	/* no vendor commands supported */
-	return FALSE;
-}
-
-
-/*
- * ============================================================================
- *
  *                               C-ish Library
  *
  * ============================================================================
@@ -745,6 +639,121 @@ void main_init(void)
 	/* enable autopointers.  for both, increment on access. */
 
 	AUTOPTRSETUP = 0x07;
+}
+
+
+/*
+ * ============================================================================
+ *
+ *                            USB Event Callbacks
+ *
+ * ============================================================================
+ */
+
+
+/*
+ * handle "get descriptor" requests.  return FALSE to fall back to the
+ * default handler, which returns the contents of the dscr.a51 file.
+ */
+
+
+BOOL handle_get_descriptor(void)
+{
+	return FALSE;
+}
+
+
+/*
+ * handle "get interface" requests.  set *alt_ifc to the index of the
+ * current alternate setting for interface ifc.  return TRUE to report
+ * that *alt_ifc has been set.
+ */
+
+
+BOOL handle_get_interface(BYTE ifc, BYTE *alt_ifc)
+{
+	(void) ifc;	/* silence unused argument warning */
+	/* we only support one setting, index 0 */
+	*alt_ifc = 0;
+	return TRUE;
+}
+
+
+/*
+ * handle "set interface" requests.  selects from among several alternate
+ * settings for an interface.  must reconfigure and reset the endpoints to
+ * match the interface descriptor for this interface entry in the
+ * descriptor that was provided, even if nothing changes.  return TRUE to
+ * report that it was done.
+ */
+
+
+BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
+{
+	/* we only support one interface, index 0, and one alternate
+	 * setting, setting 0  */
+	if(ifc == 0 && alt_ifc == 0) {
+		/* reset toggles */
+		RESETTOGGLE(0x02);
+		RESETTOGGLE(0x86);
+		/* reset and re-arm the end-point fifos */
+		RESETFIFO(0x02);
+		arm_out_endpoint();
+		arm_out_endpoint();
+		RESETFIFO(0x86);
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+
+/*
+ * handle "get configuration" requests.  return the current configuration.
+ */
+
+
+BYTE handle_get_configuration(void)
+{
+	/* we only support one configuration, number 1 */
+	return 1;
+}
+
+
+/*
+ * handle "set configuration" requests.  return TRUE if it was successful.
+ * NOTE that all endpoints must be reset when the configuration changes.
+ */
+
+
+BOOL handle_set_configuration(BYTE cfg)
+{
+	/* we only support one configuration, number 1 */
+	if(cfg == 1) {
+		/* reset toggles */
+		RESETTOGGLE(0x02);
+		RESETTOGGLE(0x86);
+		/* reset and re-arm the end-point fifos */
+		RESETFIFO(0x02);
+		arm_out_endpoint();
+		arm_out_endpoint();
+		RESETFIFO(0x86);
+		return TRUE;
+	}
+	return FALSE;
+}
+
+
+/*
+ * handle "vendor command".
+ */
+
+
+BOOL handle_vendorcommand(BYTE cmd)
+{
+	(void) cmd;	/* silence unused argument warning */
+	/* no vendor commands supported */
+	return FALSE;
 }
 
 
