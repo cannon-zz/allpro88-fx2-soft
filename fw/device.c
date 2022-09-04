@@ -537,6 +537,35 @@ static BOOL allpro88_get_PINSTATE(BYTE pin)
  */
 
 
+static void arm_out_endpoint(void)
+{
+	/* arm endpoint 2.  an out end-point is armed by writing any value
+	 * to the byte-count low byte.  with AUTOOUT=0, the high bit is the
+	 * "SKIP" bit, indicating whether the FIFO system should skip the
+	 * last received packet or send it to the outside world via the
+	 * FIFO interface.  we aren't using the FIFO interface, we're using
+	 * the pins for GPIO, so we must always set this bit to 1 when
+	 * re-arming. */
+	SYNCDELAY;
+	EP2BCL = 0x80;
+	SYNCDELAY;
+}
+
+
+static void arm_in_endpoint(void)
+{
+	/* arm end-point 6 setting the byte count to the offset of autoptr2
+	 * from the start of the buffer.  write byte-count high byte first.
+	 * end-point is armed when low byte is written */
+	WORD n = MAKEWORD(AUTOPTRH2, AUTOPTRL2) - EP6FIFOBUF;
+	SYNCDELAY;
+	EP6BCH = MSB(n);
+	SYNCDELAY;
+	EP6BCL = LSB(n);
+	SYNCDELAY;
+}
+
+
 void main_init(void)
 {
 	/* set both IFCLK and CPU CLK to 48 MHz */
@@ -564,14 +593,48 @@ void main_init(void)
 	/* programmer reset sequence (finalizes port initialization) */
 	allpro88_reset();
 
-	/* disables auto-arming of the endpoints when AUTOOUT transitions
-	 * from 0 to 1.  allow CPU to edit/source in and out packets */
-	REVCTL = 3;
+	/* I can't figure out what to set this to.  the documentation says
+	 * over and over that for basically every configuration you can
+	 * imagine this must be set to 3.  it says the only affect of
+	 * setting bit 0 to 1 is to enable some additional features related
+	 * to packet handling, while setting bit 1 to 1 only affects the
+	 * behaviour when AUTOOUT is switched states, but this code doesn't
+	 * ever change the AUTOOUT state.  it seems neither bit should have
+	 * any affect for the purposes of this code, and yet only a value
+	 * 0 allows this code to work.  also the bulkloop example provided
+	 * with the original code sets it to 0 (which is where I got the
+	 * idea to try this to figure out WTF is going on).  so I have no
+	 * idea.  all I know is 0 works, 1 doesn't, 2 works, 3 doesn't. */
+	SYNCDELAY;
+	REVCTL = 0;
+	SYNCDELAY;
 
-	/* endpoints 2 and 6 enabled, 1, 4 and 8 disabled */
-	EP1OUTCFG = EP1INCFG = EP4CFG = EP8CFG = 0;
-	EP2CFG = 0xa0;	/* valid, out, bulk (max packet = 512 bytes) */
-	EP6CFG = 0xe0;	/* valid, in, bulk (max packet = 512 bytes) */
+	/* endpoints 2 and 6 enabled, 1, 4 and 8 disabled.  at power-on all
+	 * FIFO's default to AUTOIN=0 / AUTOOUT=0 meaning the CPU must
+	 * explicitly re-arm them for each packet.  that's what we want */
+	/*EP1OUTCFG = EP1INCFG = EP4CFG = EP8CFG = 0;*/
+	EP1OUTCFG = 0;
+	SYNCDELAY;
+	EP1INCFG = 0;
+	SYNCDELAY;
+	EP4CFG = 0;
+	SYNCDELAY;
+	EP8CFG = 0;
+	SYNCDELAY;
+	EP2CFG = 0b10100010;	/* valid, out, bulk, 512 bytes, dbl buff'd */
+	SYNCDELAY;
+	EP6CFG = 0b11100010;	/* valid, in, bulk, 512 bytes, dbl buff'd */
+	SYNCDELAY;
+
+	/* arm end-point 2.  I don't know why this has to be done twice.  I
+	 * think it's because the chip boots up believing the buffers are
+	 * already full of received data and we have to, in effect, clock
+	 * both of the buffers through the system before it believes it can
+	 * receive new data.  doing it once doesn't work, and the examples
+	 * show this being done twice at start-up. */
+
+	arm_out_endpoint();
+	arm_out_endpoint();
 }
 
 
