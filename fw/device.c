@@ -291,9 +291,9 @@ void allpro88_reset(void)
 	ALLPRO88_NRD = ALLPRO88_NWR = 1;
 	/* zero the address bus */
 	ALLPRO88_ADDR_SET(0);
-	/* set data bus to all zero */
+	/* set data bus to all zero, but float it */
 	ALLPRO88_DATA = 0;
-	ALLPRO88_DATA_DRIVE;
+	ALLPRO88_DATA_FLOAT;
 	/* wait a while (10 ms) */
 	delay(10);	/* FIXME:  what delay is required?  */
 	/* raise /RESET */
