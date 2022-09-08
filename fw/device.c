@@ -54,6 +54,7 @@
  * ============================================================================
  */
 
+
 /*
  * TRUE = an error occured in a function call
  */
@@ -573,14 +574,14 @@ void main_init(void)
 	SETCPUFREQ(CLK_48M);
 	SETIF48MHZ();
 
-	/* clear bits 0 and 1:  I/O pins are I/O ports */
+	/* clear bits 0 and 1:  ports B and D are I/O ports, not FIFO data
+	 * bus */
 	IFCONFIG &= ~0x03;
 
-	/* port A all pins for I/O port, disable alternate functions.
-	 * not needed for B and D because no altnerate functions. */
+	/* port A all pins for I/O port, disable alternate functions. */
 	PORTACFG = 0;
 
-	/* zero all ports.  includes /RESET. */
+	/* zero all ports.  asserts ALLPRO88 /RESET. */
 	IOA = IOB = IOD = 0;
 	/* set /RD, /WR high (order doesn't matter) */
 	ALLPRO88_NRD = ALLPRO88_NWR = 1;
@@ -813,13 +814,16 @@ static struct parse_state {
  * CTRL-C resets the parser (aborts partial command).  all other whitespace
  * is ignored.  commands may straddle packet boundaries.
  *
- * EXXXX	echo the hex number XXXX (loop-back test)
+ * EXXXX	echo the number XXXX (loop-back test)
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
  * DXX=YY	set pin XX's VDAC to YY
  * PXX=Y	set pin XX's config to Y
  *
- * returns the number of bytes of response data written to the in buffer
+ * response format.  all numbers are in hexadecimal format.  responses are
+ * separated by newline, \n, 0x0a, characters.  each packet of commands
+ * produces one packet of responses, which might be empty (zero length).
+ * the responses are in the order of the commands that produced them.
  */
 
 
@@ -827,33 +831,49 @@ static void do_command(void)
 {
 	errno = FALSE;
 	switch(parse_state.command[0]) {
-	case 'E': {
-		/* loop-back test */
+	/*
+	 * loop-back test
+	 */
+
+	case 'E':
+	case 'e': {
+		/* decode the 16 bit number to echo */
 		WORD addr = str_to_word(&parse_state.command[1]);
 		/* check for error and correct end of string */
 		if(errno || parse_state.command[5])
 			goto error;
+		/* echo the number */
 		puts_word(addr);
 		break;
 	}
 
+	/*
+	 * write byte to address
+	 */
+
 	case '=': {
-		/* address write operation */
+		/* decode address and byte */
 		WORD addr = str_to_word(&parse_state.command[1]);
 		BYTE val = str_to_byte(&parse_state.command[5]);
 		/* check for error and correct end of string */
 		if(errno || parse_state.command[7])
 			goto error;
+		/* write byte to address */
 		allpro88_write(addr, val);
 		break;
 	}
 
+	/*
+	 * read byte from address
+	 */
+
 	case '?': {
-		/* address read operation */
+		/* decode address */
 		WORD addr = str_to_word(&parse_state.command[1]);
 		/* check for error and correct end of string */
 		if(errno || parse_state.command[5])
 			goto error;
+		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
 		break;
 	}
@@ -921,7 +941,7 @@ static void parse_out_buffer(void)
 
 	/* arm the in end-point to send it to the host.  we do this even if
 	 * it's empty (byte count = 0) so that code running on the host
-	 * always gets a response for every packet it sends.  */
+	 * always gets a response for every packet it sends. */
 
 	arm_in_endpoint();
 
