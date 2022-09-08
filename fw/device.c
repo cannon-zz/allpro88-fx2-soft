@@ -241,7 +241,7 @@ static void ALLPRO88_ADDR_SET(WORD addr)
  */
 
 
-BYTE allpro88_read(WORD addr)
+static BYTE allpro88_read(WORD addr)
 {
 	BYTE data;
 
@@ -267,7 +267,7 @@ BYTE allpro88_read(WORD addr)
  */
 
 
-void allpro88_write(WORD addr, BYTE data)
+static void allpro88_write(WORD addr, BYTE data)
 {
 	/* drive address and data bus */
 	ALLPRO88_ADDR_SET(addr);
