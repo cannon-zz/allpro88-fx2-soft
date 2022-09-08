@@ -39,13 +39,6 @@
 #define SYNCDELAY SYNCDELAY3
 
 
-#ifdef DEBUG_FIRMWARE
-#include <stdio.h>
-#else
-#define printf(...)
-#endif
-
-
 /*
  * ============================================================================
  *
