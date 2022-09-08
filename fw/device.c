@@ -1047,15 +1047,13 @@ static void blink_pin1_1hz(void)
 	 * higher it gets the more heat needs to be dissipated by the
 	 * linear pin driver power supplies) */
 
-	/*allpro88_set_VADJ(35);*/
-	allpro88_set_VADJ(255);
+	allpro88_set_VADJ(35);
 
 	/* configure VTST.  see the function's documentation for the
 	 * formulae.  we want Eout = 3 V.  26 is rounded up, so the voltage
 	 * will be a bit more than 3 V. */
 
-	/*allpro88_set_VTST(26, 5);*/
-	allpro88_set_VTST(128, 255);
+	allpro88_set_VTST(26, 5);
 
 	/* enable all power supplies */
 
@@ -1067,7 +1065,6 @@ static void blink_pin1_1hz(void)
 	 * service manual numbers channels from 1, so in their
 	 * documentation this is channel 61) */
 
-#if 0
 	for(pin = 0; pin < 88; pin++)
 		allpro88_set_PINCON(pin, PINCON_LOGICL);
 	allpro88_write(0x0308, 0);
@@ -1075,14 +1072,6 @@ static void blink_pin1_1hz(void)
 	allpro88_set_PINCON(60, PINCON_VTST);
 	allpro88_write(0x0308, 0);
 	delay(500);
-#endif
-
-	for(pin = 0; pin < 88; pin++)
-		allpro88_set_PINCON(pin, PINCON_VTST);
-	delay(1000);
-	for(pin = 0; pin < 88; pin++)
-		allpro88_set_PINCON(pin, PINCON_LOGICL);
-	delay(1000);
 }
 
 
