@@ -287,10 +287,8 @@ static void allpro88_write(WORD addr, BYTE data)
  */
 
 
-void allpro88_reset(void)
+static void allpro88_hard_reset(void)
 {
-	WORD addr;
-
 	/* hold /RESET low */
 	ALLPRO88_NRESET = 0;
 	/* set /RD, /WR high (order doesn't matter) */
@@ -304,19 +302,6 @@ void allpro88_reset(void)
 	delay(10);	/* FIXME:  what delay is required?  */
 	/* raise /RESET */
 	ALLPRO88_NRESET = 1;
-
-	/* FIXME:  kevtris recommends 0'ing all pin-driver DACs *before*
-	 * reset.  really?  maybe after ...?  in any case this code doesn't
-	 * do that (yet?), maybe it should.  his documentation says the
-	 * reset line resets all the latches but doesn't modify the pin
-	 * driver DACs.  they should be put into a known state before doing
-	 * other configuration */
-	/* FIXME: I don't know if this is needed, but this will ensure all
-	 * the DACs are 0 and everything is "disabled" */
-	for(addr = 0; addr < 0x0800; addr++)
-		allpro88_write(addr, 0);
-	for(addr = 0; addr < 0x0800; addr++)
-		allpro88_write(addr, 0);
 }
 
 
@@ -535,6 +520,37 @@ static BOOL allpro88_get_PINSTATE(BYTE pin)
 
 
 /*
+ * clear the ALLPRO 88 state back to "all off, all disabled"
+ */
+
+
+static void allpro88_soft_reset(void)
+{
+	BYTE pin;
+
+	/* FIXME:  kevtris recommends 0'ing all pin-driver DACs *before*
+	 * reset.  really?  maybe after ...?  in any case this code doesn't
+	 * do that (yet?), maybe it should.  his documentation says the
+	 * reset line resets all the latches but doesn't modify the pin
+	 * driver DACs.  they should be put into a known state before doing
+	 * other configuration */
+
+	for(pin = 0; pin < 88; pin++) {
+		allpro88_set_PINCON(pin, PINCON_DISABLE);
+		allpro88_set_PINDAC(pin, 0);
+		allpro88_set_PINBYPASS(pin, FALSE);
+	}
+	allpro88_xfer_PINDACs();
+
+	allpro88_set_PCR(PCR_DISABLE);
+	allpro88_set_VADJ(0);
+	allpro88_set_VPIN(0);
+	allpro88_set_VPUL(0);
+	allpro88_set_VTST(0, 0);
+}
+
+
+/*
  * ============================================================================
  *
  *                                   Setup
@@ -594,8 +610,11 @@ void main_init(void)
 	ALLPRO88_DATA_FLOAT;
 	ALLPRO88_ADDRCTRL_DRIVE;
 
-	/* programmer reset sequence (finalizes port initialization) */
-	allpro88_reset();
+	/* programmer hardware reset (finalizes I/O port initialization) */
+	allpro88_hard_reset();
+
+	/* clear programmer state */
+	allpro88_soft_reset();
 
 	/* I can't figure out what to set this to.  the documentation says
 	 * over and over that for basically every configuration you can
