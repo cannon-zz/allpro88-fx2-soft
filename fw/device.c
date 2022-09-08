@@ -139,6 +139,17 @@ static void puts_word(WORD val)
 
 
 /*
+ * write a newline character.  assumes AUTOPTR2 is set to the destination.
+ */
+
+
+static void newline(void)
+{
+	XAUTODAT2 = '\n';
+}
+
+
+/*
  * ============================================================================
  *
  *                           AllPro88 I/O Sequences
@@ -842,6 +853,7 @@ static void do_command(void)
 			goto error;
 		/* echo the number */
 		puts_word(addr);
+		newline();
 		break;
 	}
 
@@ -873,6 +885,7 @@ static void do_command(void)
 			goto error;
 		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
+		newline();
 		break;
 	}
 
