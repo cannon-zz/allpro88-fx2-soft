@@ -865,6 +865,7 @@ static struct parse_state {
  * EXXXX	echo the number XXXX (loop-back test)
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
+ * R		reset programmer
  * DXX=YY	set pin XX's VDAC to YY
  * PXX=Y	set pin XX's config to Y
  *
@@ -927,6 +928,16 @@ static void do_command(void)
 		newline();
 		break;
 	}
+
+	/*
+	 * reset programmer
+	 */
+
+	case 'R':
+	case 'r':
+		allpro88_hard_reset();
+		allpro88_soft_reset();
+		break;
 
 	/* FIXME: add extra commands */
 

@@ -45,6 +45,10 @@ class allpro88(object):
 			# echo 4 digit number (USB loop-back test)
 			assert val is None
 			cmd = "E%04X\n" % addr
+		elif verb == "R":
+			# reset
+			assert addr is None and val is None
+			cmd = "R\n"
 		else:
 			raise ValueError("invalid command \"%s\"" % cmd)
 		self.device.write(self.ep_addr_out, cmd.encode("ascii"))
