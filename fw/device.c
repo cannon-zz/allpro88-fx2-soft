@@ -662,6 +662,35 @@ void main_init(void)
  */
 
 
+static void reset_fifos(void)
+{
+#if 0
+	/* NOTE:  the technical reference manual has inconsistent
+	 * information in it about the FIFORESET register.  the
+	 * RESETFIFO() macro does the sequence of writes described
+	 * in the technical reference manual in its description of
+	 * the register, but this fails to reset the fifo.  section
+	 * 9.3.13 explains how to abort packets in the fifo when in
+	 * autoin mode, and it explains you first switch out of
+	 * autoin mode, then do a sequence of writes to FIFORESET.
+	 * that sequence of writes is not what the register
+	 * documentation shows but in my experiments it *does*
+	 * reset the fifo */
+	RESETFIFO(0x02);
+	RESETFIFO(0x06);
+#else
+	FIFORESET = 0x80;
+	SYNCDELAY;
+	FIFORESET = 0x06;
+	SYNCDELAY;
+	FIFORESET = 0x02;
+	SYNCDELAY;
+	FIFORESET = 0x00;
+	SYNCDELAY;
+#endif
+}
+
+
 /*
  * handle "get descriptor" requests.  return FALSE to fall back to the
  * default handler, which returns the contents of the dscr.a51 file.
@@ -708,10 +737,9 @@ BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
 		RESETTOGGLE(0x02);
 		RESETTOGGLE(0x86);
 		/* reset and re-arm the end-point fifos */
-		RESETFIFO(0x02);
+		reset_fifos();
 		arm_out_endpoint();
 		arm_out_endpoint();
-		RESETFIFO(0x86);
 		return TRUE;
 	}
 
@@ -745,10 +773,9 @@ BOOL handle_set_configuration(BYTE cfg)
 		RESETTOGGLE(0x02);
 		RESETTOGGLE(0x86);
 		/* reset and re-arm the end-point fifos */
-		RESETFIFO(0x02);
+		reset_fifos();
 		arm_out_endpoint();
 		arm_out_endpoint();
-		RESETFIFO(0x86);
 		return TRUE;
 	}
 	return FALSE;

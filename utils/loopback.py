@@ -19,6 +19,4 @@ while True:
 	# end-point 6 has address 0x86
 	device.write(0x02, ("E%04X\n" % x).encode("ascii"))
 	y = read_response()
-	if y != x:
-		y = read_response()
 	assert y == x
