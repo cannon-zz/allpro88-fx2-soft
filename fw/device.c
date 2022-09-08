@@ -208,12 +208,13 @@ static void puts_word(WORD val)
 #define ALLPRO88_ADDRCTRL_DRIVE do {OEB = OED = 0xff; } while(0)
 static void ALLPRO88_ADDR_SET(WORD addr)
 {
-	IOB = addr & 0xff;
-	addr >>= 8;
-	PD0 = (BYTE) addr & 0x01;
-	PD1 = (BYTE) addr & 0x02;
-	PD2 = (BYTE) addr & 0x04;
-	PD3 = (BYTE) addr & 0x10;
+	BYTE msb;
+	IOB = LSB(addr);
+	msb = MSB(addr);
+	PD0 = msb & 0x01;
+	PD1 = msb & 0x02;
+	PD2 = msb & 0x04;
+	PD3 = msb & 0x08;
 }
 
 #define ALLPRO88_NRD    PD7
