@@ -436,7 +436,7 @@ static WORD allpro88_pin_addr(BYTE pin)
 {
 	/* pin 0 starts at 0x0000, 1 at 0x0010, etc., up to pin 0x27 which
 	 * starts at 0x0270, then pin 0x28 starts at 0x0400, and they
-	 * continue in order from there */
+	 * continue in order from there, upto and including pin 0x57 */
 	if(pin > 0x27)
 		pin += 0x18;
 	return (WORD) pin << 4;
