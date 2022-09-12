@@ -749,6 +749,11 @@ BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
 		reset_fifos();
 		arm_out_endpoint();
 		arm_out_endpoint();
+		/* reset the programmer and command processor */
+		allpro88_hard_reset();
+		allpro88_soft_reset();
+		/* FIXME: enable this */
+		/*parser_state_reset();*/
 		return TRUE;
 	}
 
@@ -785,6 +790,11 @@ BOOL handle_set_configuration(BYTE cfg)
 		reset_fifos();
 		arm_out_endpoint();
 		arm_out_endpoint();
+		/* reset the programmer and command processor */
+		allpro88_hard_reset();
+		allpro88_soft_reset();
+		/* FIXME: enable this */
+		/*parser_state_reset();*/
 		return TRUE;
 	}
 	return FALSE;
