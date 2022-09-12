@@ -70,11 +70,8 @@ static BYTE hex_to_val(char digit)
 		/* map 'a' through 'f' to upper case */
 		digit &= ~0x20;
 		/* convert to value */
-		digit -= 'A' - '0';
-		if((signed char) digit < 0)
-			goto error;
-		digit += 10;
-		if(digit > 0xf)
+		digit -= 'A' - '0' - 10;
+		if((signed char) digit < 10 || digit > 0xf)
 			goto error;
 	}
 	return digit;
