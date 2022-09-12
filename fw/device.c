@@ -845,13 +845,25 @@ static BOOL in_buffer_not_full(void)
  */
 
 
-static struct parse_state {
+static struct parser_state {
 	char command[8];
 	BYTE command_idx;
-} parse_state = {
+} parser_state = {
 	.command = {0},
 	.command_idx = 0,
 };
+
+
+/*
+ * reset the command parser's state.
+ */
+
+
+static void parser_state_reset(void)
+{
+	parser_state.command[0] = 0;
+	parser_state.command_idx = 0;
+}
 
 
 /*
@@ -879,7 +891,7 @@ static struct parse_state {
 static void do_command(void)
 {
 	errno = FALSE;
-	switch(parse_state.command[0]) {
+	switch(parser_state.command[0]) {
 	/*
 	 * loop-back test
 	 */
@@ -887,9 +899,9 @@ static void do_command(void)
 	case 'E':
 	case 'e': {
 		/* decode the 16 bit number to echo */
-		WORD addr = str_to_word(&parse_state.command[1]);
+		WORD addr = str_to_word(&parser_state.command[1]);
 		/* check for error and correct end of string */
-		if(errno || parse_state.command[5])
+		if(errno || parser_state.command[5])
 			goto error;
 		/* echo the number */
 		puts_word(addr);
@@ -903,10 +915,10 @@ static void do_command(void)
 
 	case '=': {
 		/* decode address and byte */
-		WORD addr = str_to_word(&parse_state.command[1]);
-		BYTE val = str_to_byte(&parse_state.command[5]);
+		WORD addr = str_to_word(&parser_state.command[1]);
+		BYTE val = str_to_byte(&parser_state.command[5]);
 		/* check for error and correct end of string */
-		if(errno || parse_state.command[7])
+		if(errno || parser_state.command[7])
 			goto error;
 		/* write byte to address */
 		allpro88_write(addr, val);
@@ -919,9 +931,9 @@ static void do_command(void)
 
 	case '?': {
 		/* decode address */
-		WORD addr = str_to_word(&parse_state.command[1]);
+		WORD addr = str_to_word(&parser_state.command[1]);
 		/* check for error and correct end of string */
-		if(errno || parse_state.command[5])
+		if(errno || parser_state.command[5])
 			goto error;
 		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
@@ -977,26 +989,23 @@ static void parse_out_buffer(void)
 		if(next == '\n') {
 			/* end of command.  null terminate the command
 			 * buffer and interpret its contents */
-			parse_state.command[parse_state.command_idx] = 0;
+			parser_state.command[parser_state.command_idx] = 0;
 			do_command();
 			/* reset state for next command */
-			parse_state.command[0] = 0;
-			parse_state.command_idx = 0;
+			parser_state_reset();
 		} else if(next == 0x03) {
 			/* CTRL-C */
 			/* reset state for next command */
-			parse_state.command[0] = 0;
-			parse_state.command_idx = 0;
+			parser_state_reset();
 		} else if(next < 0x21) {
 			/* other white space, ignore */
-		} else if(parse_state.command_idx > 6) {
+		} else if(parser_state.command_idx > 6) {
 			/* if command buffer is full, an error has occured,
 			 * reset */
-			parse_state.command[0] = 0;
-			parse_state.command_idx = 0;
+			parser_state_reset();
 		} else {
 			/* append character to command buffer */
-			parse_state.command[parse_state.command_idx++] = next;
+			parser_state.command[parser_state.command_idx++] = next;
 		}
 	}
 
