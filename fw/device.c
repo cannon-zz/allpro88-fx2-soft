@@ -314,7 +314,8 @@ static void allpro88_hard_reset(void)
 enum ALLPRO88_PCR_BITS {
 	PCR_DISABLE = 0x00,
 	PCR_ENABLE = 0x01,
-	PCR_AUX = 0x02	/* unused open collector output to socket board */
+	/* open collector output to socket board, drives green idle LED */
+	PCR_NIDLE = 0x02
 };
 
 
@@ -1069,7 +1070,7 @@ static void blink_nreset_1hz(void)
 
 static void blink_busy_1hz(void)
 {
-	allpro88_set_PCR(PCR_ENABLE);
+	allpro88_set_PCR(PCR_NIDLE | PCR_ENABLE);
 	delay(500);
 	allpro88_set_PCR(PCR_DISABLE);
 	delay(500);
