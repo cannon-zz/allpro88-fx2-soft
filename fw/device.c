@@ -583,12 +583,8 @@ static void arm_in_endpoint(void)
 }
 
 
-void main_init(void)
+static void io_init(void)
 {
-	/* set both IFCLK and CPU CLK to 48 MHz */
-	SETCPUFREQ(CLK_48M);
-	SETIF48MHZ();
-
 	/* clear bits 0 and 1:  ports B and D are I/O ports, not FIFO data
 	 * bus */
 	IFCONFIG &= ~0x03;
@@ -596,18 +592,30 @@ void main_init(void)
 	/* port A all pins for I/O port, disable alternate functions. */
 	PORTACFG = 0;
 
-	/* zero all ports.  asserts ALLPRO88 /RESET. */
-	IOA = IOB = IOD = 0;
-	/* set /RD, /WR high (order doesn't matter) */
-	ALLPRO88_NRD = ALLPRO88_NWR = 1;
+	/* ALLPRO88:  zero data bus, address bus, pull /RESET low, and set
+	 * /RD and /WR high. */
+	IOA = 0x00;
+	IOB = 0x00;
+	IOD = 0xc0;
 
 	/* float the data bus pins in case the programmer is driving them.
 	 * set address and control bus pins for output (pulls /RESET low,
 	 * putting programmer into reset state) */
 	ALLPRO88_DATA_FLOAT;
 	ALLPRO88_ADDRCTRL_DRIVE;
+}
 
-	/* programmer hardware reset (finalizes I/O port initialization) */
+
+void main_init(void)
+{
+	/* set both IFCLK and CPU CLK to 48 MHz */
+	SETCPUFREQ(CLK_48M);
+	SETIF48MHZ();
+
+	/* configure I/O ports (leaves programmer in hardware reset) */
+	io_init();
+
+	/* programmer hardware reset */
 	allpro88_hard_reset();
 
 	/* clear programmer state */
