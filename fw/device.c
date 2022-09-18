@@ -244,13 +244,11 @@ static void newline(void)
 #define ALLPRO88_ADDRCTRL_DRIVE do {OEB = OED = 0xff; } while(0)
 static void ALLPRO88_ADDR_SET(WORD addr)
 {
-	BYTE msb;
+	/* the low byte of the 12 bit address */
 	IOB = LSB(addr);
-	msb = MSB(addr);
-	PD0 = msb & 0x01;
-	PD1 = msb & 0x02;
-	PD2 = msb & 0x04;
-	PD3 = msb & 0x08;
+	/* /RD, /WR and /RESET are set high, and combined with the high
+	 * nibble of the 12 bit address */
+	IOD = 0xe0 | MSB(addr);
 }
 
 #define ALLPRO88_NRD    PD7
@@ -324,15 +322,13 @@ static void allpro88_hard_reset(void)
 	ALLPRO88_NRESET = 0;
 	/* set /RD, /WR high (order doesn't matter) */
 	ALLPRO88_NRD = ALLPRO88_NWR = 1;
-	/* zero the address bus */
-	ALLPRO88_ADDR_SET(0);
 	/* set data bus to all zero, but float it */
-	ALLPRO88_DATA = 0;
 	ALLPRO88_DATA_FLOAT;
+	ALLPRO88_DATA = 0;
 	/* wait a while (10 ms) */
 	delay(10);	/* FIXME:  what delay is required?  */
-	/* raise /RESET */
-	ALLPRO88_NRESET = 1;
+	/* zero the address bus (raises /RESET) */
+	ALLPRO88_ADDR_SET(0);
 }
 
 
