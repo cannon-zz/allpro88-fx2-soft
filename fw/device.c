@@ -355,15 +355,15 @@ enum ALLPRO88_PCR_BITS {
 
 enum ALLPRO88_PINCON_BITS {
 	PINCON_DISABLE = 0x00,
-	PINCON_GND = 0x01,
-	PINCON_VDAC = 0x02,
-	PINCON_VTST = 0x04,
-	PINCON_LOGICH = 0x08,
-	PINCON_PULLUP = 0x10,
+	PINCON_GND = 0x01,	/* "Ground Driver" */
+	PINCON_VDAC = 0x02,	/* "Power Source Driver" */
+	PINCON_VTST = 0x04,	/* "Current Source Driver" */
+	PINCON_LOGICH = 0x08,	/* "Logic (TTL) High Driver" */
+	PINCON_PULLUP = 0x10,	/* "Pull-up Driver" */
 	PINCON_LOGICL = 0x20,
 	PINCON_POSCLK = 0x40,
 	PINCON_NEGCLK = 0x60,
-	PINCON_PULLDN = 0x80
+	PINCON_PULLDN = 0x80	/* "Pull-down Driver" */
 };
 
 
