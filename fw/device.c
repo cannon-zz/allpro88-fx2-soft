@@ -1,4 +1,21 @@
 /**
+ * Copyright (C) 2020-2022 Kipp Cannon
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+ * Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Portions of this program carried the following copyright notice:
+ *
  * Copyright (C) 2009 Ubixum, Inc. 
  *
  * This library is free software; you can redistribute it and/or modify it
@@ -95,7 +112,8 @@ static WORD str_to_word(const char *str)
 
 /*
  * write a null-terminated string without the terminator character.
- * assumes AUTOPTR2 is set to the destination.
+ * assumes AUTOPTR2 is set to the destination.  the length of the string
+ * including its null terminator must be less than 256 characters.
  */
 
 
@@ -160,21 +178,23 @@ static void newline(void)
  * bus driver chips, and the data bus into an SN74LS245N bi-directional bus
  * driver.  those chips are gauranteed to recognize anything over 2 V as a
  * logic high level, so they should provide the required level shifting
- * from the FX2's 3.3 V logic outputs to 5 V logic inside the programmer,
- * and for the 5 V output of the 245N on the data bus when reading, the
- * FX2's documentation claims it has 5 V tolerant inputs.  the /RD line
- * controls the direction of the 245N, so be careful not to pull /RD low
- * while driving the data bus.
+ * from the FX2's 3.3 V logic outputs to 5 V logic inside the programmer.
+ * the FX2's documentation says it has 5 V tolerant inputs, so the 5 V
+ * output of the 245N on the data bus during read operations is
+ * acceptable.  no level shifting is required to connect the FX2 directly
+ * to the ALLPRO88's interface.  from the ALLPRO88's service manual, the
+ * /RD line controls the direction of the 245N, so be careful not to pull
+ * /RD low while driving the data bus.
  *
  * NOTE:  I measure 200 Ohm between every I/O line and both +5 V and GND
  * inside the programmer.  I don't understand this.  there are Vishay
  * MDP1605 331/471G resistor arrays on the board beside the ribbon cable
  * pin header which I assume are terminating the cable.  they should have
  * 330 Ohm / 470 Ohm 2% resistors in them, one to +5 V and one to GND.  I'm
- * not sure which is which, but neither should be only 200 Ohm.  in any
- * case, there are termination resistors to both the positive supply rail
- * and ground, so regardless of what the values are there are a number of
- * consequences:
+ * not sure which resistor goes in which direction, but neither should be
+ * only 200 Ohm.  in any case, there are termination resistors to both the
+ * positive supply rail and ground, so regardless of what the values are
+ * there are a number of consequences:
  *
  * 1.  with the FX2 chip powered down, all I/O lines should be pulled to
  * approximately 2.5 V by these resistors.  that is a problem for the FX2,
@@ -193,14 +213,28 @@ static void newline(void)
  * levels, but will not be able to pull them to logic low levels.  even if
  * I'm wrong about the resistances, and the resistor package markings give
  * the correct values, the difference is only about a factor of 2, so the
- * chip must still sink about 12 mA and source 1 mA, so no matter what it
- * will struggle to pull pins to logic low.  to work with an unmodified
- * ALLPRO88 programmer, buffer circuits will be needed.  alternatively, the
+ * chip must still sink about 12 mA and source 1 mA on every GPIO line, so
+ * no matter what the correct resistance really is the chip will struggle
+ * to pull pins to logic low.  to work with an unmodified ALLPRO88
+ * programmer, buffer circuits will be needed.  alternatively, the
  * termination resistors could be removed from the ALLPRO's motherboard
  * altogether, maybe replaced with something comfortably above 1.3 kOhm.
- * although the Vishay datasheet says there are resistor arrays in all
- * kinds of values, neither digikey, nor mouser, nor marutsu sells the
- * MDP1605 configuration in higher than a 680 Ohm / 680 Ohm variant.
+ * the Vishay datasheet says there are resistor arrays in all kinds of
+ * values, but neither digikey, nor mouser, nor marutsu sells the MDP1605
+ * configuration in higher than a 680 Ohm / 680 Ohm variant, which would
+ * still not be high enough.
+ *
+ * I removed the termination resistors from my unit.  I replaced them with
+ * sockets, so they can be re-installed or removed again easily.  they are
+ * not needed in my case, anyway, because I have connected the FX2 board
+ * directly to the pin header on the ALLPRO's motherboard, inside the unit,
+ * so there's no ribbon cable inductance or capacitance, and only a short
+ * physical signal path between the FX2's GPIO pins and the ALLPRO's bus
+ * interface chips.  this also means I don't have to worry about the order
+ * in which I apply power to things.  the 74LS series bus driver chips
+ * tolerate normal input voltages even without power supplied to the chips,
+ * so the FX2 can be powered on and driving the ALLPRO's inputs without
+ * damaging them even when the ALLPRO is powered off.
  */
 
 
@@ -372,7 +406,7 @@ static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
  * VADJ =  0.8598 + (dac * 0.119036) + (dac**2. * -0.0000115199973)
  *
  * NOTE:  VADJ must be at least 1 or 2 volts above the highest of all of
- * the pin DAC voltages, VPUL, VTST and VPIN because is supplies all of
+ * the pin DAC voltages, VPUL, VTST and VPIN because it supplies all of
  * these.
  */
 
@@ -518,7 +552,13 @@ static BOOL allpro88_get_PINSTATE(BYTE pin)
 
 
 /*
- * clear the ALLPRO 88 state back to "all off, all disabled"
+ * clear the ALLPRO 88 voltage DACs back to "all off, all disabled"
+ *
+ * kevtris' documentation says the reset line (what the hard reset code has
+ * done) resets all the latches but doesn't modify the pin driver DACs nor
+ * VPUL DAC, so we should 0 them explicitly.  that's the reason for this
+ * function, a sort of software reset.  we 0 all the other voltage output
+ * DACs, too, because why not.
  */
 
 
@@ -526,12 +566,8 @@ static void allpro88_soft_reset(void)
 {
 	BYTE pin;
 
-	/* FIXME:  kevtris recommends 0'ing all pin-driver DACs *before*
-	 * reset.  really?  maybe after ...?  in any case this code doesn't
-	 * do that (yet?), maybe it should.  his documentation says the
-	 * reset line resets all the latches but doesn't modify the pin
-	 * driver DACs.  they should be put into a known state before doing
-	 * other configuration */
+	/* NOTE:  kevtris recommends 0'ing all pin-driver DACs *before*
+	 * hardware reset.  really?  I do this after a hardware reset. */
 
 	for(pin = 0; pin < 88; pin++) {
 		allpro88_set_PINCON(pin, PINCON_DISABLE);
@@ -894,8 +930,6 @@ static void parser_state_reset(void)
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
  * R		reset programmer
- * DXX=YY	set pin XX's VDAC to YY
- * PXX=Y	set pin XX's config to Y
  *
  * response format.  all numbers are in hexadecimal format.  responses are
  * separated by newline, \n, 0x0a, characters.  each packet of commands
@@ -967,10 +1001,11 @@ static void do_command(void)
 		allpro88_soft_reset();
 		break;
 
-	/* FIXME: add extra commands */
+	/*
+	 * unrecognized command
+	 */
 
 	default:
-		/* unrecognized command */
 		break;
 	}
 
