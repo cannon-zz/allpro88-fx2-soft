@@ -1142,20 +1142,18 @@ static void blink_pin1_1hz(void)
 
 	/* enable all power supplies */
 
-	allpro88_set_PCR(PCR_ENABLE);
+	allpro88_set_PCR(PCR_NIDLE | PCR_ENABLE);
 
-	/* configure the pins.  first set all to logic low, wait 500 ms,
-	 * then set pin 1 to (current-limited) VTST, and wait 500 ms.
-	 * NOTE: pin 1 of the ZIF socket is pin driver channel 60 (ALLPRO's
-	 * service manual numbers channels from 1, so in their
-	 * documentation this is channel 61) */
+	/* configure the pins.  first set all to ground, wait 500 ms, then
+	 * set pin 1 to (current-limited) VTST, and wait 500 ms.  NOTE: pin
+	 * 1 of the ZIF socket is pin driver channel 40 (ALLPRO's service
+	 * manual numbers channels from 1, so in their documentation this
+	 * is channel 41) */
 
 	for(pin = 0; pin < 88; pin++)
-		allpro88_set_PINCON(pin, PINCON_LOGICL);
-	allpro88_write(0x0308, 0);
+		allpro88_set_PINCON(pin, PINCON_GND);
 	delay(500);
-	allpro88_set_PINCON(60, PINCON_VTST);
-	allpro88_write(0x0308, 0);
+	allpro88_set_PINCON(40, PINCON_VTST);
 	delay(500);
 }
 
