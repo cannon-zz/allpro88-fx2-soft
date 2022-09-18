@@ -574,13 +574,15 @@ static void allpro88_soft_reset(void)
 		allpro88_set_PINDAC(pin, 0);
 		allpro88_set_PINBYPASS(pin, FALSE);
 	}
-	allpro88_xfer_PINDACs();
 
-	allpro88_set_PCR(PCR_DISABLE);
 	allpro88_set_VADJ(0);
 	allpro88_set_VPIN(0);
 	allpro88_set_VPUL(0);
 	allpro88_set_VTST(0, 0);
+
+	allpro88_xfer_PINDACs();
+
+	allpro88_set_PCR(PCR_DISABLE);
 }
 
 
