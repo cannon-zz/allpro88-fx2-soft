@@ -134,3 +134,31 @@ class allpro88(object):
 	def pop_all(self):
 		while self.in_queue:
 			yield self.pop()
+
+	#
+	# higher level interface
+	#
+
+	@property
+	def socket_id(self):
+		socket_id, = self.write_command("?", 0x0280)
+		return socket_id
+
+	@property
+	def system_id(self):
+		# in the allpro88 documentation some command line
+		# diagnostic tools are shown producing example output
+		# reporting a "system ID" of 0x3 and "adapter ID" of 0x11.
+		# other examples show an "analog ID" of 0x03.  the "adapter
+		# ID" is the socket board ID, and mine is 0x11, like the
+		# examples (kevtris' is 0x81).  but where do the "system
+		# ID" and "analog ID" come from?  are they synonyms for the
+		# same number?  kevtris' documentation describes an A1STAT
+		# register, whose low nibble he says is hard-wired to
+		# report 0x03, curiously the same as the ID in the examples
+		# in the documentation.  my unit also reports 0x03 in that
+		# nibble.  is this the "system ID" and/or "analog ID"?  are
+		# they synonyms?  I'm guessing they are, and it is, and
+		# that's what this returns.  but, I'm just making this up.
+		system_id, = self.write_command("?", 0x0300)
+		return system_id & 0xf
