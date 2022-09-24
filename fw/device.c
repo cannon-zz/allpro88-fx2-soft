@@ -343,8 +343,9 @@ static void allpro88_hard_reset(void)
 
 enum ALLPRO88_PCR_BITS {
 	PCR_DISABLE = 0x00,
+	/* enables power supplies, and lights red busy LED on socket board */
 	PCR_ENABLE = 0x01,
-	/* open collector output to socket board, drives green idle LED */
+	/* turns off green idle LED on socket board */
 	PCR_NIDLE = 0x02
 };
 
@@ -658,7 +659,7 @@ void main_init(void)
 
 	/* I can't figure out what to set this to.  the documentation says
 	 * over and over that for basically every configuration you can
-	 * imagine this must be set to 3.  it says the only affect of
+	 * imagine this must be set to 3.  it says the only effect of
 	 * setting bit 0 to 1 is to enable some additional features related
 	 * to packet handling, while setting bit 1 to 1 only affects the
 	 * behaviour when AUTOOUT is switched states, but this code doesn't
@@ -675,7 +676,6 @@ void main_init(void)
 	/* endpoints 2 and 6 enabled, 1, 4 and 8 disabled.  at power-on all
 	 * FIFO's default to AUTOIN=0 / AUTOOUT=0 meaning the CPU must
 	 * explicitly re-arm them for each packet.  that's what we want */
-	/*EP1OUTCFG = EP1INCFG = EP4CFG = EP8CFG = 0;*/
 	EP1OUTCFG = 0;
 	SYNCDELAY;
 	EP1INCFG = 0;
@@ -694,7 +694,10 @@ void main_init(void)
 	 * already full of received data and we have to, in effect, clock
 	 * both of the buffers through the system before it believes it can
 	 * receive new data.  doing it once doesn't work, and the examples
-	 * show this being done twice at start-up. */
+	 * show this being done twice at start-up.  if my belief is
+	 * correct, the correct number of times to do this is not
+	 * necessarily 2, but however many -uple's worth of buffering you
+	 * have configured the chip for (duoble, quadruple, etc.). */
 
 	arm_out_endpoint();
 	arm_out_endpoint();
@@ -718,16 +721,18 @@ static void reset_fifos(void)
 {
 #if 0
 	/* NOTE:  the technical reference manual has inconsistent
-	 * information in it about the FIFORESET register.  the
-	 * RESETFIFO() macro does the sequence of writes described
-	 * in the technical reference manual in its description of
-	 * the register, but this fails to reset the fifo.  section
-	 * 9.3.13 explains how to abort packets in the fifo when in
-	 * autoin mode, and it explains you first switch out of
-	 * autoin mode, then do a sequence of writes to FIFORESET.
-	 * that sequence of writes is not what the register
-	 * documentation shows but in my experiments it *does*
-	 * reset the fifo */
+	 * information in it about the FIFORESET register.  the RESETFIFO()
+	 * macro that's part of this firmware library does the sequence of
+	 * writes described in the technical reference manual in its
+	 * description of the register, but the macro fails to reset the
+	 * fifo.  section 9.3.13 explains how to abort packets in the fifo
+	 * when in autoin mode, and it explains you first switch out of
+	 * autoin mode, then do a sequence of writes to FIFORESET.  that
+	 * sequence of writes is not what the register documentation shows
+	 * but in my experiments it *does* reset the fifo.  this firmware
+	 * never puts the chip into autoin mode, so switching out and back
+	 * into that mode is not done here, but still the reset sequence
+	 * works (it's the only thing I've found that works). */
 	RESETFIFO(0x02);
 	RESETFIFO(0x06);
 #else
@@ -891,7 +896,7 @@ static BOOL in_buffer_not_full(void)
 
 
 /*
- * command parser state.  global variable (lazy).
+ * command parser state.
  */
 
 
@@ -1027,10 +1032,10 @@ static void parse_out_buffer(void)
 
 	/* loop over contents of out buffer.  some commands produce output
 	 * that is put into the in buffer.  the maximum length of any
-	 * command's output is shorter than the shortest command, therefore
-	 * we assume the output of all commands in a single packet will fit
-	 * into a single packet and don't bother including any logic to
-	 * handle otherwise */
+	 * command's output is shorter than the shortest output-generating
+	 * command, therefore we assume the output of all commands in a
+	 * single packet will fit into a single packet and don't bother
+	 * including any logic to handle otherwise */
 
 	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--) {
 		/* retrieve the next character */
