@@ -1051,15 +1051,18 @@ static void parse_out_buffer(void)
 
 /*
  * blinks an LED connected in series with a current limit resistor between
- * the !RESET line and GND at 1 Hz.
+ * VCC and port A bit 0 (ALLPRO 88 data bus bit 0) at 1 Hz.  some FX2
+ * development boards include such an LED.  it might need to be enabled
+ * using a jumper.
  */
 
 
-static void blink_nreset_1hz(void)
+static void blink_data0_1hz(void)
 {
-	ALLPRO88_NRESET = 0;
+	ALLPRO88_DATA_DRIVE;
+	ALLPRO88_DATA = 0;
 	delay(500);
-	ALLPRO88_NRESET = 1;
+	ALLPRO88_DATA = 1;
 	delay(500);
 }
 
@@ -1089,10 +1092,10 @@ static void blink_idle_1hz(void)
 
 void main_loop(void)
 {
-	/* uncomment this to blink an LED connected to the !RESET line at
-	 * 1 Hz */
+	/* uncomment this to blink an LED connected to bit 0 of the ALLPRO
+	 * 88 data bus at 1 Hz */
 
-	/*blink_nreset_1hz();*/
+	/*blink_data0_1hz();*/
 
 	/* uncomment to blink the green idle LED at 1 Hz */
 
