@@ -139,6 +139,17 @@ class allpro88(object):
 	# higher level interface
 	#
 
+	@staticmethod
+	def pin_addr(pin):
+		"""
+		Returns the start address of the register group
+		corresponding to the given pin number.
+		"""
+		assert 0 <= pin < 88
+		if pin > 0x27:
+			pin += 0x18
+		return pin << 4
+
 	@property
 	def socket_id(self):
 		socket_id, = self.write_command("?", 0x0280)
