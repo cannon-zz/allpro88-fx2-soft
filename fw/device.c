@@ -1065,15 +1065,13 @@ static void blink_nreset_1hz(void)
 
 
 /*
- * blinks the busy LED at 1 Hz.  the busy LED is tied to the "power
- * supplies enable" bit.  turning the power supplies on and off blinks the
- * LED.
+ * blinks the ALLRPO 88's green idle LED at 1 Hz.
  */
 
 
-static void blink_busy_1hz(void)
+static void blink_idle_1hz(void)
 {
-	allpro88_set_PCR(PCR_NIDLE | PCR_ENABLE);
+	allpro88_set_PCR(PCR_NIDLE);
 	delay(500);
 	allpro88_set_PCR(PCR_DISABLE);
 	delay(500);
@@ -1096,9 +1094,9 @@ void main_loop(void)
 
 	/*blink_nreset_1hz();*/
 
-	/* uncomment to blink the busy LED at 1 Hz */
+	/* uncomment to blink the green idle LED at 1 Hz */
 
-	/*blink_busy_1hz();*/
+	/*blink_idle_1hz();*/
 
 	/* if command data is available and there is room for output,
 	 * process */
