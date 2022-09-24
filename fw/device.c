@@ -1111,50 +1111,6 @@ static void blink_busy_1hz(void)
 
 
 /*
- * sets the test voltage to 3 V, current limit 5 mA.  sets all pins of the
- * ALLPRO88 to "logic low" = 50 Ohm resistor to GND, except pin 1 which is
- * toggled between the test voltage and "logic low" at 1 Hz.  this should
- * blink an LED inserted into pins 1 and 2 of the ZIF socket at 1 Hz.
- */
-
-
-static void blink_pin1_1hz(void)
-{
-	unsigned char pin;
-
-	/* set VADJ to 5 V.  this is the supply voltage to the DAC outputs.
-	 * it needs to be something about 2 V above what VTST will be set
-	 * to.  as long as it's not too high the value doesn't matter (the
-	 * higher it gets the more heat needs to be dissipated by the
-	 * linear pin driver power supplies) */
-
-	allpro88_set_VADJ(35);
-
-	/* configure VTST.  see the function's documentation for the
-	 * formulae.  we want Eout = 3 V.  26 is rounded up, so the voltage
-	 * will be a bit more than 3 V. */
-
-	allpro88_set_VTST(26, 5);
-
-	/* enable all power supplies */
-
-	allpro88_set_PCR(PCR_NIDLE | PCR_ENABLE);
-
-	/* configure the pins.  first set all to ground, wait 500 ms, then
-	 * set pin 1 to (current-limited) VTST, and wait 500 ms.  NOTE: pin
-	 * 1 of the ZIF socket is pin driver channel 40 (ALLPRO's service
-	 * manual numbers channels from 1, so in their documentation this
-	 * is channel 41) */
-
-	for(pin = 0; pin < 88; pin++)
-		allpro88_set_PINCON(pin, PINCON_GND);
-	delay(500);
-	allpro88_set_PINCON(40, PINCON_VTST);
-	delay(500);
-}
-
-
-/*
  * ============================================================================
  *
  *                                 Main Loop
@@ -1173,11 +1129,6 @@ void main_loop(void)
 	/* uncomment to blink the busy LED at 1 Hz */
 
 	/*blink_busy_1hz();*/
-
-	/* uncomment this to blink an LED connected to pins 1 and 2 of the
-	 * ZIF socket at 1 Hz */
-
-	/*blink_pin1_1hz();*/
 
 	/* if command data is available and there is room for output,
 	 * process */
