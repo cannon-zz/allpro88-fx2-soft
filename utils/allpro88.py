@@ -1,4 +1,50 @@
+from enum import IntEnum
 import usb.core
+
+
+class PCR(IntEnum):
+	# power supplies off, red busy LED off, green idle LED on
+	DISABLE = 0x00
+	# enables power supplies, and lights red busy LED
+	ENABLE = 0x01
+	# turns off green idle LED
+	NIDLE = 0x02
+
+
+class PINCON(IntEnum):
+	DISABLE = 0x00
+	# "Ground Driver"
+	GND = 0x01
+	# "Power Source Driver"
+	VDAC = 0x02
+	# "Current Source Driver"
+	VTST = 0x04
+	# "Logic (TTL) High Driver"
+	LOGICH = 0x08
+	# "Pull-up Driver"
+	PULLUP = 0x10
+	LOGICL = 0x20
+	POSCLK = 0x40
+	NEGCLK = 0x60
+	# "Pull-down Driver"
+	PULLDN = 0x80
+
+
+class TIMER_MODE(IntEnum):
+	# in bit-bang mode, the polarity bit sets the state of the timer
+	# output.  otherwise, according to kevtris the polarity bit sets
+	# the state of timer output when it is not toggling (don't know
+	# what that means).  FIXME:  figure out what that means.
+	DISABLE = 0x00
+	BITBANG = 0x01
+	CLK_4MHZ = 0x02
+	CLK_2MHZ = 0x03
+	CLK_1MHZ = 0x04
+	CLK_500KHZ = 0x05
+	CLK_250KHZ = 0x06
+	# NOTE:  setting mode 0x07 enables both high and low output drivers
+	# and will damage the circuit
+	POLARITY = 0x80
 
 
 class command(object):

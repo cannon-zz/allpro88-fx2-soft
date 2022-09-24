@@ -365,28 +365,6 @@ enum ALLPRO88_PINCON_BITS {
 
 
 /*
- * in bit-bang mode, the polarity bit sets the state of the timer output.
- * otherwise, according to kevtris the polarity bit sets the state of timer
- * output when it is not toggling (don't know what that means).  FIXME:
- * figure out what that means.
- */
-
-
-enum ALLPRO88_TIMER_MODE {
-	TIMER_MODE_DISABLE = 0x00,
-	TIMER_MODE_BITBANG = 0x01,
-	TIMER_MODE_4MHZ = 0x02,
-	TIMER_MODE_2MHZ = 0x03,
-	TIMER_MODE_1MHZ = 0x04,
-	TIMER_MODE_500KHZ = 0x05,
-	TIMER_MODE_250KHZ = 0x06,
-	/* NOTE:  setting mode 0x07 enables both high and low output
-	 * drivers and will damage the circuit */
-	TIMER_MODE_POLARITY = 0x80
-};
-
-
-/*
  * set the PCR (power supply control register)
  */
 
@@ -532,19 +510,6 @@ static void allpro88_set_PINBYPASS(BYTE pin, BOOL enable)
 		allpro88_write(0x0280 + pin, enable);
 	else if(pin < 0x30)
 		allpro88_write(0x02c0 - 0x28 + pin, enable);
-}
-
-
-/*
- * read pin state
- */
-
-
-static BOOL allpro88_get_PINSTATE(BYTE pin)
-{
-	/* the pin state (above/below VPIN threshold) is read at offset 0
-	 * from the start of the register group for each pin */
-	return allpro88_read(allpro88_pin_addr(pin));
 }
 
 
