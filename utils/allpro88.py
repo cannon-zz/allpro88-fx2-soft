@@ -97,6 +97,30 @@ class command(object):
 		return self.cmd
 
 
+class dacregister(object):
+	def __init__(self, address):
+		self.address = address
+		# store a local copy of the value to emulate read-back
+		# ability (the programmer does not provide read access to
+		# the DAC registers.  assume the programmer's firmware sets
+		# all DACs to 0 on reset.
+		self.dac = 0
+
+	def __set__(self, obj, dac):
+		# safety check input
+		dac = int(dac)
+		if not 0 <= dac <= 255:
+			raise ValueError("0 <= dac <= 255:  %d" % dac)
+		# save local copy
+		self.dac = dac
+		# write value to programmer register
+		obj.write_command("=", self.address, dac)
+
+	def __get__(self, obj, cls):
+		# return local copy
+		return self.dac
+
+
 class allpro88(object):
 	idVendor = 0x04b4
 	idProduct = 0x1004
@@ -219,3 +243,14 @@ class allpro88(object):
 		# that's what this returns.  but, I'm just making this up.
 		system_id, = self.write_command("?", 0x0300)
 		return system_id & 0xf
+
+	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
+
+	vpin = dacregister(0x0301)
+	vadj = dacregister(0x0302)
+	vpul = dacregister(0x0305)	# must call .load_dacs()
+	vtst = dacregister(0x0386)
+	itst = dacregister(0x0387)
+
+	def load_dacs(self):
+		self.write_command("=", 0x0308, 0)
