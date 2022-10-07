@@ -894,9 +894,9 @@ static void parser_state_reset(void)
  * CTRL-C resets the parser (aborts partial command).  all other whitespace
  * is ignored.  commands may straddle packet boundaries.
  *
- * EXXXX	echo the number XXXX (loop-back test)
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
+ * EXXXX	echo the number XXXX (loop-back test)
  * R		reset programmer
  *
  * response format.  all numbers are in hexadecimal format.  responses are
@@ -910,23 +910,6 @@ static void do_command(void)
 {
 	errno = FALSE;
 	switch(parser_state.command[0]) {
-	/*
-	 * loop-back test
-	 */
-
-	case 'E':
-	case 'e': {
-		/* decode the 16 bit number to echo */
-		WORD addr = str_to_word(&parser_state.command[1]);
-		/* check for error and correct end of string */
-		if(errno || parser_state.command[5])
-			goto error;
-		/* echo the number */
-		puts_word(addr);
-		newline();
-		break;
-	}
-
 	/*
 	 * write byte to address
 	 */
@@ -955,6 +938,23 @@ static void do_command(void)
 			goto error;
 		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
+		newline();
+		break;
+	}
+
+	/*
+	 * loop-back test
+	 */
+
+	case 'E':
+	case 'e': {
+		/* decode the 16 bit number to echo */
+		WORD addr = str_to_word(&parser_state.command[1]);
+		/* check for error and correct end of string */
+		if(errno || parser_state.command[5])
+			goto error;
+		/* echo the number */
+		puts_word(addr);
 		newline();
 		break;
 	}
