@@ -261,14 +261,7 @@ class allpro88(object):
 		Use bisection search with VPIN to measure the voltage on a
 		pin.  NOTE:  this scrambles VPIN.
 		"""
-		vpin = 0
-		test_bit = 0x80
-		while test_bit:
-			self.vpin = vpin | test_bit
-			if self.write_command("?", self.pin_addr(pin))[0] & 1:
-				vpin |= test_bit
-			test_bit >>= 1
-		return vpin / 10.
+		return self.write_command("M", pin)[0] / 10.
 
 
 class socket_adapter(object):

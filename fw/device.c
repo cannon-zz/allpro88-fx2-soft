@@ -549,6 +549,27 @@ static void allpro88_soft_reset(void)
 
 
 /*
+ * use a bisection search with VPIN to measure the voltage on a pin
+ *
+ * NOTE:  VPIN is, obviously, left modified by this operation
+ */
+
+
+static BYTE allpro88_measure_pin_voltage(BYTE pin)
+{
+	WORD addr = allpro88_pin_addr(pin);
+	BYTE vdac = 0;
+	BYTE test_bit;
+	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
+		allpro88_set_VPIN(vdac | test_bit);
+		if(allpro88_read(addr) & 1)
+			vdac |= test_bit;
+	}
+	return vdac;
+}
+
+
+/*
  * ============================================================================
  *
  *                                   Setup
@@ -897,6 +918,7 @@ static void parser_state_reset(void)
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
  * EXXXX	echo the number XXXX (loop-back test)
+ * MXX		run voltage measurement sequence on channel XX, report VPIN DAC
  * R		reset programmer
  *
  * response format.  all numbers are in hexadecimal format.  responses are
@@ -955,6 +977,23 @@ static void do_command(void)
 			goto error;
 		/* echo the number */
 		puts_word(addr);
+		newline();
+		break;
+	}
+
+	/*
+	 * voltage measurement
+	 */
+
+	case 'M':
+	case 'm': {
+		/* decode the 8 bit channel number */
+		BYTE pin = str_to_byte(&parser_state.command[1]);
+		/* check for error and correct end of string */
+		if(errno || parser_state.command[3])
+			goto error;
+		/* measure the voltage, report the VPIN DAC value */
+		puts_byte(allpro88_measure_pin_voltage(pin));
 		newline();
 		break;
 	}
