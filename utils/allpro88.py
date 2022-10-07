@@ -244,13 +244,16 @@ class allpro88(object):
 		system_id, = self.write_command("?", 0x0300)
 		return system_id & 0xf
 
+
 	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
+
 
 	vpin = dacregister(0x0301)
 	vadj = dacregister(0x0302)
 	vpul = dacregister(0x0305)	# must call .load_dacs()
 	vtst = dacregister(0x0386)
 	itst = dacregister(0x0387)
+
 
 	def load_dacs(self):
 		self.write_command("=", 0x0308, 0)
