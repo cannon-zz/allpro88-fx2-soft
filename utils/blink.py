@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 programmer = allpro88.allpro88()
 
-print("system ID = 0x%X\nsocket adapter ID = 0x%X" % (programmer.system_id, programmer.socket_id))
+print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name))
 
 def blink_idle():
 	for i in tqdm(range(10), desc = "blink IDLE LED"):

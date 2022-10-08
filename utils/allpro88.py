@@ -47,6 +47,134 @@ class TIMER_MODE(IntEnum):
 	POLARITY = 0x80
 
 
+class socket_module(object):
+	name = None
+
+
+class socket_module_AP88_PLCC(socket_module):
+	name = "AP88 PLCC"
+
+	# 48-pin ZIF socket, pin # to channel # mapping
+	socket_48 = {
+		1:	40,
+		2:	41,
+		3:	42,
+		4:	43,
+		5:	32,
+		6:	33,
+		7:	34,
+		8:	35,
+		9:	24,
+		10:	25,
+		11:	26,
+		12:	27,
+		13:	16,
+		14:	17,
+		15:	18,
+		16:	19,
+		17:	8,
+		18:	9,
+		19:	10,
+		20:	11,
+		21:	0,
+		22:	1,
+		23:	2,
+		24:	3,
+		25:	4,
+		26:	5,
+		27:	6,
+		28:	7,
+		29:	12,
+		30:	13,
+		31:	14,
+		32:	15,
+		33:	20,
+		34:	21,
+		35:	22,
+		36:	23,
+		37:	28,
+		38:	29,
+		39:	30,
+		40:	31,
+		41:	36,
+		42:	37,
+		43:	38,
+		44:	39,
+		45:	44,
+		46:	45,
+		47:	46,
+		48:	47
+	}
+
+
+class socket_module_DIP_MODULE(socket_module):
+	name = "DIP MODULE"
+
+
+class socket_module_TMS370(socket_module):
+	name = "TMS370"
+
+
+class socket_module_2708_EAROM(socket_module):
+	name = "2708 / EAROM"
+
+
+class socket_module_PAC1000(socket_module):
+	name = "PAC1000"
+
+
+class socket_module_8789(socket_module):
+	name = "8789"
+
+
+class socket_module_1702A(socket_module):
+	name = "1702A"
+
+
+class socket_module_68HC11(socket_module):
+	name = "68HC11"
+
+
+class socket_module_68701(socket_module):
+	name = "68701"
+
+
+class socket_module_68705(socket_module):
+	name = "68705"
+
+
+class socket_module_68HC705(socket_module):
+	name = "68HC705"
+
+
+class socket_module_1468705(socket_module):
+	name = "1468705"
+
+
+class socket_module_68HC11F1(socket_module):
+	name = "68HC11F1"
+
+
+socket_modules = {
+	0x11: socket_module_AP88_PLCC,
+	0x02: socket_module_DIP_MODULE,
+	0x04: socket_module_TMS370,
+	# Logical Devices' documentation lists two different adapters for
+	# code 0x03:  something called "2708" and something called "EAROM",
+	# so I've combined their names
+	0x03: socket_module_2708_EAROM,
+	0x07: socket_module_PAC1000,
+	0x05: socket_module_8789,
+	0x98: socket_module_1702A,
+	0x06: socket_module_68HC11,
+	0xc6: socket_module_68701,
+	0x86: socket_module_68705,
+	0xf6: socket_module_68HC705,
+	0xe6: socket_module_1468705,
+	0xd6: socket_module_68HC11F1
+}
+
+
 class command(object):
 	"""
 	Device for constructing a command string from a verb and optional
@@ -226,9 +354,17 @@ class allpro88(object):
 		return pin << 4
 
 	@property
-	def socket_id(self):
+	def socket_module(self):
+		"""
+		Raises KeyError if an unrecognized module, or no module at
+		all is installed in the programmer.
+		"""
+		# the module ID read-back returns 0xff when no module is
+		# installed, which could be used to distinguish between the
+		# "no module" and "unrecognized module" cases if that
+		# proves to be useful.
 		socket_id, = self.write_command("?", 0x0280)
-		return socket_id
+		return socket_modules[socket_id]
 
 	@property
 	def system_id(self):
@@ -270,61 +406,3 @@ class allpro88(object):
 		pin.  NOTE:  this scrambles VPIN.
 		"""
 		return self.write_command("M", pin)[0] / 10.
-
-
-class socket_adapter(object):
-	pass
-
-
-class socket_adapter_0x11(socket_adapter):
-	# 48-pin ZIF socket, pin # to channel # mapping
-	socket_48 = {
-		1:	40,
-		2:	41,
-		3:	42,
-		4:	43,
-		5:	32,
-		6:	33,
-		7:	34,
-		8:	35,
-		9:	24,
-		10:	25,
-		11:	26,
-		12:	27,
-		13:	16,
-		14:	17,
-		15:	18,
-		16:	19,
-		17:	8,
-		18:	9,
-		19:	10,
-		20:	11,
-		21:	0,
-		22:	1,
-		23:	2,
-		24:	3,
-		25:	4,
-		26:	5,
-		27:	6,
-		28:	7,
-		29:	12,
-		30:	13,
-		31:	14,
-		32:	15,
-		33:	20,
-		34:	21,
-		35:	22,
-		36:	23,
-		37:	28,
-		38:	29,
-		39:	30,
-		40:	31,
-		41:	36,
-		42:	37,
-		43:	38,
-		44:	39,
-		45:	44,
-		46:	45,
-		47:	46,
-		48:	47
-	}

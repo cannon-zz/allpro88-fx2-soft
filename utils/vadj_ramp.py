@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 programmer = allpro88.allpro88()
 
-print("system ID = 0x%X\nsocket adapter ID = 0x%X" % (programmer.system_id, programmer.socket_id))
+print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name))
 
 # PCR enable
 programmer.pcr_enable = True
