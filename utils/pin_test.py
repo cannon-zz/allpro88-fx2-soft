@@ -15,7 +15,7 @@ programmer.vadj = 255
 
 # ensure all pins are disabled (off)
 for pin in range(88):
-	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.GND)
+	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.DISABLE)
 
 def test_logich(programmer, pin, trials = 40, max_lo = 0.2, min_hi = 3.9):
 	"""
@@ -49,22 +49,69 @@ def test_vpul_ramp(programmer, pin):
 	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.PULLUP)
 	max_residual = 0.
 	rms_residual = 0.
-	for vpul in range(256):
-		programmer.vpul = vpul
+	for vdac in range(256):
+		programmer.vpul = vdac
 		programmer.load_dacs()
-		expected = -0.54392 + (vpul * 0.100723) + (vpul**2. * 0.000000000497)
+		expected = -0.54392 + (vdac * 0.100723) + (vdac**2. * 0.000000000497)
 		measured = programmer.measure_pin_voltage(pin)
 		residual = abs(measured - expected)
 		if residual > max_residual:
 			max_residual = residual
 		rms_residual += residual**2.
-		#print("pin %d:  vpul %d, measured %g V, expected %g V" % (pin, vpul, measured, expected))
+		#print("pin %d:  VPUL %d, measured %.3g V, expected %.3g V" % (pin, vdac, measured, expected))
 	rms_residual = rms_residual**0.5 / 256.
-	print("pin %d VPUL ramp max residual = %g V, RMS residual = %g V" % (pin, max_residual, rms_residual))
+	print("pin %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V" % (pin, max_residual, rms_residual))
 	if rms_residual > 0.010:
 		print("\t ^^ large RMS residual for pin %d" % pin)
 	programmer.vpul = 0
 	programmer.load_dacs()
+	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.DISABLE)
+
+
+def test_vdac_ramp(programmer, pin):
+	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.VDAC)
+	max_residual = 0.
+	rms_residual = 0.
+	for vdac in range(256):
+		programmer.write_command("=", programmer.pin_addr(pin) + 3, vdac)
+		programmer.load_dacs()
+		expected = max(0., -0.5 + 0.1 * vdac)
+		measured = programmer.measure_pin_voltage(pin)
+		residual = abs(measured - expected)
+		if residual > max_residual:
+			max_residual = residual
+		rms_residual += residual**2.
+		#print("pin %d:  VDAC %d, measured %.3g V, expected %.3g V" % (pin, vdac, measured, expected))
+	rms_residual = rms_residual**0.5 / 256.
+	print("pin %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V" % (pin, max_residual, rms_residual))
+	if rms_residual > 0.020:
+		print("\t ^^ large RMS residual for pin %d" % pin)
+	programmer.write_command("=", programmer.pin_addr(pin) + 3, 0)
+	programmer.load_dacs()
+	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.DISABLE)
+
+
+def test_vtst_ramp(programmer, pin):
+	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.VTST)
+	max_residual = 0.
+	rms_residual = 0.
+	idac = 10
+	for vdac in range(256):
+		programmer.vtst = vdac
+		programmer.itst = idac
+		expected = 0.408 + (0.003855 * idac) + (0.10151 * vdac)
+		measured = programmer.measure_pin_voltage(pin)
+		residual = abs(measured - expected)
+		if residual > max_residual:
+			max_residual = residual
+		rms_residual += residual**2.
+		#print("pin %d:  VTST %d, measured %.3g V, expected %.3g V" % (pin, vdac, measured, expected))
+	rms_residual = rms_residual**0.5 / 256.
+	print("pin %d VTST ramp max residual = %.3g V, RMS residual = %.3g V" % (pin, max_residual, rms_residual))
+	if rms_residual > 0.03:
+		print("\t ^^ large RMS residual for pin %d" % pin)
+	programmer.vtst = 0
+	programmer.itst = 0
 	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.DISABLE)
 
 
@@ -78,8 +125,18 @@ try:
 			highest_lo = b
 	print("\noverall highest GND voltage = %g V, lowest LOGICH voltage = %g V" % (highest_lo, lowest_hi))
 
+	print("\n")
 	for pin in range(48):
 		test_vpul_ramp(programmer, pin)
+
+	print("\n")
+	for pin in range(48):
+		test_vdac_ramp(programmer, pin)
+
+	print("\n")
+	for pin in range(48):
+		test_vtst_ramp(programmer, pin)
+
 except ValueError as e:
 	print(e)
 	pass
