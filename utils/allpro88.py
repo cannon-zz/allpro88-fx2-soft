@@ -423,4 +423,5 @@ class allpro88(object):
 		Use bisection search with VPIN to measure the voltage on a
 		pin.  NOTE:  this scrambles VPIN.
 		"""
-		return self.write_command("M", pin)[0] / 10.
+		vdac, = self.write_command("M", pin)
+		return vdac / 10.
