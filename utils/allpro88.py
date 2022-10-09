@@ -2,6 +2,15 @@ from enum import IntEnum
 import usb.core
 
 
+#
+# NOTE NOTE NOTE:  in all of what follows, "channel number" means a pin
+# channel number according to my numbering convention, NOT any of the
+# channel numbering conventions shown in the ALLPRO88 technical
+# documentation.  by my convention channels are numbered sequentially from
+# 0 in the order of their control register addresses.
+#
+
+
 class PCR(IntEnum):
 	# power supplies off, red busy LED off, green idle LED on
 	DISABLE = 0x00
