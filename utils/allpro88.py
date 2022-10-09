@@ -49,10 +49,15 @@ class TIMER_MODE(IntEnum):
 
 class socket_module(object):
 	name = None
+	module_id = None
+
+	def __init__(self, programmer):
+		self.programmer = programmer
 
 
 class socket_module_AP88_PLCC(socket_module):
 	name = "AP88 PLCC"
+	module_id = 0x11
 
 	# 48-pin ZIF socket, pin # to channel # mapping
 	socket_48 = {
@@ -109,70 +114,65 @@ class socket_module_AP88_PLCC(socket_module):
 
 class socket_module_DIP_MODULE(socket_module):
 	name = "DIP MODULE"
+	module_id = 0x02
 
 
 class socket_module_TMS370(socket_module):
 	name = "TMS370"
+	module_id = 0x04
 
 
 class socket_module_2708_EAROM(socket_module):
 	name = "2708 / EAROM"
+	# Logical Devices' documentation lists two different adapters for
+	# code 0x03:  something called "2708" and something called "EAROM",
+	# so I've combined their names
+	module_id = 0x03
 
 
 class socket_module_PAC1000(socket_module):
 	name = "PAC1000"
+	module_id = 0x07
 
 
 class socket_module_8789(socket_module):
 	name = "8789"
+	module_id = 0x05
 
 
 class socket_module_1702A(socket_module):
 	name = "1702A"
+	module_id = 0x98
 
 
 class socket_module_68HC11(socket_module):
 	name = "68HC11"
+	module_id = 0x06
 
 
 class socket_module_68701(socket_module):
 	name = "68701"
+	module_id = 0xc6
 
 
 class socket_module_68705(socket_module):
 	name = "68705"
+	module_id = 0x86
 
 
 class socket_module_68HC705(socket_module):
 	name = "68HC705"
+	module_id = 0xf6
 
 
 class socket_module_1468705(socket_module):
 	name = "1468705"
+	module_id = 0xe6
 
 
 class socket_module_68HC11F1(socket_module):
 	name = "68HC11F1"
-
-
-socket_modules = {
-	0x11: socket_module_AP88_PLCC,
-	0x02: socket_module_DIP_MODULE,
-	0x04: socket_module_TMS370,
-	# Logical Devices' documentation lists two different adapters for
-	# code 0x03:  something called "2708" and something called "EAROM",
-	# so I've combined their names
-	0x03: socket_module_2708_EAROM,
-	0x07: socket_module_PAC1000,
-	0x05: socket_module_8789,
-	0x98: socket_module_1702A,
-	0x06: socket_module_68HC11,
-	0xc6: socket_module_68701,
-	0x86: socket_module_68705,
-	0xf6: socket_module_68HC705,
-	0xe6: socket_module_1468705,
-	0xd6: socket_module_68HC11F1
-}
+	module_id = 0xd6
 
 
 class command(object):
@@ -265,6 +265,8 @@ class allpro88(object):
 
 	command_queue_size = 64	# commands
 
+	socket_modules = dict((cls.module_id, cls) for cls in (socket_module_AP88_PLCC, socket_module_DIP_MODULE, socket_module_TMS370, socket_module_2708_EAROM, socket_module_PAC1000, socket_module_8789, socket_module_1702A, socket_module_68HC11, socket_module_68701, socket_module_68705, socket_module_68HC705, socket_module_1468705, socket_module_68HC11F1))
+
 	def __init__(self):
 		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
@@ -277,6 +279,17 @@ class allpro88(object):
 		# command queues
 		self.out_queue = []
 		self.in_queue = []
+
+		# configure for the installed socket module
+		try:
+			self.socket_module = self.socket_modules[self.socket_module_id](self)
+		except KeyError as e:
+			if self.socket_module_id == 0xff:
+				print("warning:  no socket module detected")
+			else:
+				print("warning:  unrecognized socket module ID 0x%02X" % self.socket_module_id)
+			self.socket_module = None
+
 
 	def read_responses(self):
 		n = self.device.read(self.ep_addr_in, self.buf)
@@ -354,17 +367,13 @@ class allpro88(object):
 		return pin << 4
 
 	@property
-	def socket_module(self):
+	def socket_module_id(self):
 		"""
-		Raises KeyError if an unrecognized module, or no module at
-		all is installed in the programmer.
+		Returns the ID of the socket module installed in the
+		programmer, or 0xff is no module is installed.
 		"""
-		# the module ID read-back returns 0xff when no module is
-		# installed, which could be used to distinguish between the
-		# "no module" and "unrecognized module" cases if that
-		# proves to be useful.
 		socket_id, = self.write_command("?", 0x0280)
-		return socket_modules[socket_id]
+		return socket_id
 
 	@property
 	def system_id(self):
