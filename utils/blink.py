@@ -42,6 +42,6 @@ def blink_zif_pin1():
 	# PCR disable
 	programmer.pcr_enable = False
 
-#blink_idle()
+blink_idle()
 
 blink_zif_pin1()
