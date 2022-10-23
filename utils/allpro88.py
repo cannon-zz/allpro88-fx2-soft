@@ -57,67 +57,96 @@ class TIMER_MODE(IntEnum):
 
 
 class socket_module(object):
+	#
+	# subclasses over-ride these
+	#
+
 	name = None
 	module_id = None
+	sockets = {}
 
 	def __init__(self, programmer):
 		self.programmer = programmer
+
+		#
+		# convert socket pin mapping look-up table from class
+		# attribute to instance attribute.  also convert socket pin
+		# mappings in the look-up table from integer pin number
+		# -to- integer channel mappings to integer pin number -to-
+		# channel_proxy mappings.
+		#
+
+		self.sockets = dict((name, self.get_channel_proxies(programmer, pin_mapping)) for name, pin_mapping in self.sockets.items())
+
+
+	@staticmethod
+	def get_channel_proxies(programmer, pin_to_channel_mapping):
+		"""
+		From a dictionary mapping integer socket pin number to
+		integer programmer channel number, construct and return a
+		dictionary mapping integer socket pin number to programmer
+		channel_proxy object.
+
+	`	Used by subclasses to initialize themselves.
+		"""
+		return dict((pin, programmer.channel[channel]) for pin, channel in pin_to_channel_mapping.items())
 
 
 class socket_module_AP88_PLCC(socket_module):
 	name = "AP88 PLCC"
 	module_id = 0x11
-
-	# 48-pin ZIF socket, pin # to channel # mapping
-	socket_48 = {
-		1:	40,
-		2:	41,
-		3:	42,
-		4:	43,
-		5:	32,
-		6:	33,
-		7:	34,
-		8:	35,
-		9:	24,
-		10:	25,
-		11:	26,
-		12:	27,
-		13:	16,
-		14:	17,
-		15:	18,
-		16:	19,
-		17:	8,
-		18:	9,
-		19:	10,
-		20:	11,
-		21:	0,
-		22:	1,
-		23:	2,
-		24:	3,
-		25:	4,
-		26:	5,
-		27:	6,
-		28:	7,
-		29:	12,
-		30:	13,
-		31:	14,
-		32:	15,
-		33:	20,
-		34:	21,
-		35:	22,
-		36:	23,
-		37:	28,
-		38:	29,
-		39:	30,
-		40:	31,
-		41:	36,
-		42:	37,
-		43:	38,
-		44:	39,
-		45:	44,
-		46:	45,
-		47:	46,
-		48:	47
+	sockets = {
+		# 48-pin ZIF socket
+		"ZIF48": {
+			1:	40,
+			2:	41,
+			3:	42,
+			4:	43,
+			5:	32,
+			6:	33,
+			7:	34,
+			8:	35,
+			9:	24,
+			10:	25,
+			11:	26,
+			12:	27,
+			13:	16,
+			14:	17,
+			15:	18,
+			16:	19,
+			17:	8,
+			18:	9,
+			19:	10,
+			20:	11,
+			21:	0,
+			22:	1,
+			23:	2,
+			24:	3,
+			25:	4,
+			26:	5,
+			27:	6,
+			28:	7,
+			29:	12,
+			30:	13,
+			31:	14,
+			32:	15,
+			33:	20,
+			34:	21,
+			35:	22,
+			36:	23,
+			37:	28,
+			38:	29,
+			39:	30,
+			40:	31,
+			41:	36,
+			42:	37,
+			43:	38,
+			44:	39,
+			45:	44,
+			46:	45,
+			47:	46,
+			48:	47
+		}
 	}
 
 
@@ -262,6 +291,26 @@ class dacregister(object):
 		obj.write_command("=", self.address, self.ensure_dac_value(dac))
 
 
+class channel_proxy(object):
+	def __init__(self, programmer, channel):
+		self.programmer = programmer
+		self.channel = channel
+		self.address = programmer.pin_addr(channel)
+
+	def measure_v(self):
+		"""
+		Use bisection search with VPIN to measure the voltage on a
+		pin.  NOTE:  VPIN is left set to (an approximation of) the
+		measured voltage.
+		"""
+		vdac, = self.programmer.write_command("M", self.channel)
+		return vdac / 10.
+
+	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(dac)))
+
+	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
+
+
 
 class allpro88(object):
 	idVendor = 0x04b4
@@ -284,6 +333,12 @@ class allpro88(object):
 
 		# firmware resets itself and the programmer
 		self.device.set_configuration()
+
+		# initialize channel proxy dictionary.  NOTE:  this step
+		# must be completed before initializing the socket_module
+		# attribute (the socket_module classes use this dictionary
+		# to initialize their pin mappings
+		self.channel = dict((i, channel_proxy(self, i)) for i in range(88))
 
 		# command queues
 		self.out_queue = []
@@ -416,12 +471,3 @@ class allpro88(object):
 
 	def load_dacs(self):
 		self.write_command("=", 0x0308, 0)
-
-
-	def measure_pin_voltage(self, pin):
-		"""
-		Use bisection search with VPIN to measure the voltage on a
-		pin.  NOTE:  this scrambles VPIN.
-		"""
-		vdac, = self.write_command("M", pin)
-		return vdac / 10.

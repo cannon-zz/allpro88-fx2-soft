@@ -13,8 +13,8 @@ print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer
 # PCR enable
 programmer.pcr_enable = True
 # set all pins to ground
-for pin in range(88):
-	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.GND)
+for channel in programmer.channel.values():
+	channel.config = allpro88.PINCON.GND
 
 tty_old_settings = termios.tcgetattr(sys.stdin)
 tty.setcbreak(sys.stdin.fileno())
@@ -34,9 +34,9 @@ try:
 					break
 				progress.n = pin
 				progress.refresh()
-			programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.LOGICH)
+			programmer.channel[pin].config = allpro88.PINCON.LOGICH
 			time.sleep(0.5)
-			programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.GND)
+			programmer.channel[pin].config = allpro88.PINCON.GND
 			time.sleep(0.5)
 except KeyboardInterrupt:
 	pass
@@ -44,7 +44,7 @@ except KeyboardInterrupt:
 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, tty_old_settings)
 
 # set all pins to disable
-for pin in range(88):
-	programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.DISABLE)
+for channel in programmer.channel.values():
+	channel.config = allpro88.PINCON.DISABLE
 # PCR disable
 programmer.pcr_enable = False

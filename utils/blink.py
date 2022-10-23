@@ -21,19 +21,19 @@ def blink_zif_pin1():
 	programmer.itst = 5
 	# set all pins to ground
 	for pin in range(88):
-		programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.GND)
+		programmer.channel[pin].config = allpro88.PINCON.GND
 	# PCR enable
 	programmer.pcr_enable = True
 	# toggle pin 40 (zif socket pin 1) between VTST and ground
-	pin = 40
+	channel = programmer.channel[40]
 	for i in tqdm(range(10), desc = "blink ZIF pin 1"):
-		programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.VTST)
+		channel.config = allpro88.PINCON.VTST
 		time.sleep(0.5)
-		programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.GND)
+		channel.config = allpro88.PINCON.GND
 		time.sleep(0.5)
 	# set all pins to disable
 	for pin in range(88):
-		programmer.write_command("=", programmer.pin_addr(pin), allpro88.PINCON.DISABLE)
+		programmer.channel[pin].config = allpro88.PINCON.DISABLE
 	# VTST = 0, ITST = 0
 	programmer.vtst = 0
 	programmer.itst = 0
