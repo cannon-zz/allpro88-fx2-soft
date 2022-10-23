@@ -14,11 +14,9 @@ def blink_idle():
 		time.sleep(0.5)
 
 def blink_zif_pin1():
-	# VADJ = 35 (5 V)
-	programmer.vadj = 35
-	# VTST = 26 (3 V), ITST = 5 (5 mA)
-	programmer.vtst = 26
-	programmer.itst = 5
+	programmer.vadj = 35	# 5 V
+	programmer.vtst = 26	# 3 V
+	programmer.itst = 5	# 5 mA
 	# set all pins to ground
 	for pin in range(88):
 		programmer.channel[pin].config = allpro88.PINCON.GND
@@ -34,10 +32,9 @@ def blink_zif_pin1():
 	# set all pins to disable
 	for pin in range(88):
 		programmer.channel[pin].config = allpro88.PINCON.DISABLE
-	# VTST = 0, ITST = 0
+	# power supplies back to 0
 	programmer.vtst = 0
 	programmer.itst = 0
-	# VADJ = 0
 	programmer.vadj = 0
 	# PCR disable
 	programmer.pcr_enable = False
