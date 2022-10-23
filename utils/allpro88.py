@@ -240,27 +240,27 @@ class command(object):
 
 
 class dacregister(object):
+	"""
+	Write a value to a DAC register.  Provides type conversion and
+	range checking to ensure the value written is allowed.
+	"""
 	def __init__(self, address):
 		self.address = address
-		# store a local copy of the value to emulate read-back
-		# ability (the programmer does not provide read access to
-		# the DAC registers.  assume the programmer's firmware sets
-		# all DACs to 0 on reset.
-		self.dac = 0
 
-	def __set__(self, obj, dac):
-		# safety check input
+	@staticmethod
+	def ensure_dac_value(dac):
+		# test type cast to int
 		dac = int(dac)
+		# verify range
 		if not 0 <= dac <= 255:
 			raise ValueError("0 <= dac <= 255:  %d" % dac)
-		# save local copy
-		self.dac = dac
-		# write value to programmer register
-		obj.write_command("=", self.address, dac)
+		# OK
+		return dac
 
-	def __get__(self, obj, cls):
-		# return local copy
-		return self.dac
+	def __set__(self, obj, dac):
+		# write value to programmer register
+		obj.write_command("=", self.address, self.ensure_dac_value(dac))
+
 
 
 class allpro88(object):
