@@ -155,35 +155,31 @@ def test_vtst_ramp(programmer, pin, idac = 10):
 	channel.config = allpro88.PINCON.DISABLE
 
 
-try:
-	lowest_hi, highest_lo = 25.5, 0.0
-	for pin in range(48):
-		try:
-			a, b = test_logich(programmer, pin)
-		except ValueError:
-			print("\tpin failed")
-			continue
-		if a < lowest_hi:
-			lowest_hi = a
-		if b > highest_lo:
-			highest_lo = b
-	print("\noverall highest GND voltage = %g V, lowest LOGICH voltage = %g V" % (highest_lo, lowest_hi))
+lowest_hi, highest_lo = 25.5, 0.0
+for pin in range(48):
+	try:
+		a, b = test_logich(programmer, pin)
+	except ValueError as e:
+		print("\tpin failed: %s" % str(e))
+		continue
+	if a < lowest_hi:
+		lowest_hi = a
+	if b > highest_lo:
+		highest_lo = b
+print("\noverall highest GND voltage = %g V, lowest LOGICH voltage = %g V" % (highest_lo, lowest_hi))
 
-	print("\n")
-	for pin in range(48):
-		test_vpul_ramp(programmer, pin)
+print("\n")
+for pin in range(48):
+	test_vpul_ramp(programmer, pin)
 
-	print("\n")
-	for pin in range(48):
-		test_vdac_ramp(programmer, pin)
+print("\n")
+for pin in range(48):
+	test_vdac_ramp(programmer, pin)
 
-	print("\n")
-	for pin in range(48):
-		test_vtst_ramp(programmer, pin)
+print("\n")
+for pin in range(48):
+	test_vtst_ramp(programmer, pin)
 
-except ValueError as e:
-	print(e)
-	pass
 
 for channel in programmer.channel.values():
 	channel.config = allpro88.PINCON.DISABLE
