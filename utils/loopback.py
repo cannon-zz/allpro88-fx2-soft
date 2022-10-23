@@ -20,3 +20,9 @@ for i in tqdm(range(320000), desc = "fast loopback test"):
 for i in tqdm(range(100000), desc = "port read speed test"):
 	# device address 0x0280 is the socket board ID
 	programmer.write_command("?", 0x0280)
+
+programmer.pcr_enable = True
+for i in tqdm(range(10000), desc = "voltage read speed test"):
+	# my unit only has 48 channels installed
+	programmer.channel[random.randint(0, 47)].measure_v()
+programmer.pcr_enable = False
