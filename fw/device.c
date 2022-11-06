@@ -292,7 +292,15 @@ static BYTE allpro88_read(WORD addr)
 
 
 /*
- * write a byte to the ALLPRO 88
+ * write a byte to the ALLPRO 88.  NOTE: the DAC chips have active low
+ * write lines and so are clocked by the negative going edge of /WR, but
+ * the pin driver register chips are active high write lines and so are
+ * clocked by the positive going edge of /WR.  unless the programmable
+ * logic chips that derive the address and enable lines for the pin drivers
+ * from the programmer's external data and address buses account for this
+ * (I'm not sure it's possible, I'd have to think more about that), I
+ * believe the data and address buses must both be held in a valid state
+ * for both the negative going and positive going edges of the /WR.
  */
 
 
