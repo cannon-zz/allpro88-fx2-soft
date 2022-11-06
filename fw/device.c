@@ -528,6 +528,8 @@ static void allpro88_soft_reset(void)
 {
 	BYTE pin;
 
+	allpro88_set_PCR(PCR_DISABLE);
+
 	/* NOTE:  kevtris recommends 0'ing all pin-driver DACs *before*
 	 * hardware reset.  really?  I do this after a hardware reset. */
 
@@ -543,8 +545,6 @@ static void allpro88_soft_reset(void)
 	allpro88_set_VTST(0, 0);
 
 	allpro88_xfer_PINDACs();
-
-	allpro88_set_PCR(PCR_DISABLE);
 }
 
 
