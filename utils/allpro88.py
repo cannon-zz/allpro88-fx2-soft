@@ -356,6 +356,46 @@ class allpro88(object):
 			self.socket_module = None
 
 
+	def __enter__(self):
+		# ensure the programmer is left in a safe condition (all
+		# variable power supplies off, all channel drivers
+		# disabled).
+
+		# ensure all channel drivers are disabled (off)
+		for channel in self.channel.values():
+			channel.config = PINCON.DISABLE
+		# set all variable power supplies to 0 V
+		self.vpin = 0
+		self.vpul = 0
+		self.load_dacs()
+		self.vadj = 0
+		# turn off power supplies
+		self.pcr_enable = False
+
+		# done
+		return self
+
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		# ensure the programmer is left in a safe condition (all
+		# variable power supplies off, all channel drivers
+		# disabled).
+
+		# ensure all channel drivers are disabled (off)
+		for channel in self.channel.values():
+			channel.config = PINCON.DISABLE
+		# set all variable power supplies to 0 V
+		self.vpin = 0
+		self.vpul = 0
+		self.load_dacs()
+		self.vadj = 0
+		# turn off power supplies
+		self.pcr_enable = False
+
+		# done.  if an exception has occured, continue processing
+		return False
+
+
 	def read_responses(self):
 		n = self.device.read(self.ep_addr_in, self.buf)
 		# every response ends in a new line character.  some
