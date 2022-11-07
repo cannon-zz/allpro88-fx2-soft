@@ -34,25 +34,20 @@ class channel_driver_test_suite(object):
 		not the "TTL high" signal, the analogue electronics is not
 		at fault.
 		"""
-		print("toggling channel %d GND <--> LOGICH %d times:" % (self.channel.channel, trials))
+		print("toggling channel %d LOGICL <--> LOGICH %d times:" % (self.channel.channel, trials))
 		lowest_hi, highest_lo = 100.0, 0.0
 		for i in range(trials):
 			self.channel.config = allpro88.PINCON.LOGICH
 			v = self.channel.measure_v()
 			if v < lowest_hi:
 				lowest_hi = v;
-			if v < min_hi:
-				self.channel.config = allpro88.PINCON.DISABLE
-				raise ValueError("required >= %g V, got %g V" % (min_hi, v))
-			self.channel.config = allpro88.PINCON.GND
+			self.channel.config = allpro88.PINCON.LOGICL
 			v = self.channel.measure_v()
 			if v > highest_lo:
 				highest_lo = v;
-			if v > max_lo:
-				self.channel.config = allpro88.PINCON.DISABLE
-				raise ValueError("expected <= %g V, got %g V" % (max_lo, v))
 		self.channel.config = allpro88.PINCON.DISABLE
-		print("\thighest GND voltage = %g V, lowest LOGICH voltage = %g V" % (highest_lo, lowest_hi))
+		failed = lowest_hi < min_hi or highest_lo > max_lo
+		print("\thighest LOGICL voltage = %g V, lowest LOGICH voltage = %g V%s" % (highest_lo, lowest_hi, "" if not failed else "\t<-- FAILED"))
 		return lowest_hi, highest_lo
 
 
@@ -73,9 +68,8 @@ class channel_driver_test_suite(object):
 			rms_residual += residual**2.
 			#print("pin %d:  VPUL %d, measured %.3g V, expected %.3g V" % (self.channel.channel, vdac, measured, expected))
 		rms_residual = rms_residual**0.5 / 256.
-		print("pin %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V" % (self.channel.channel, max_residual, rms_residual))
-		if rms_residual > 0.010:
-			print("\t ^^ large RMS residual for pin %d" % self.channel.channel)
+		failed = rms_residual > 0.010
+		print("pin %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 		self.programmer.vpul = 0
 		self.programmer.load_dacs()
 		self.channel.config = allpro88.PINCON.DISABLE
@@ -109,9 +103,8 @@ class channel_driver_test_suite(object):
 			rms_residual += residual**2.
 			#print("channel %d:  VDAC %d, measured %.3g V, expected %.3g V" % (self.channel.channel, vdac, measured, expected))
 		rms_residual = rms_residual**0.5 / 256.
-		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V" % (self.channel.channel, max_residual, rms_residual))
-		if rms_residual > 0.020:
-			print("\t ^^ large RMS residual for channel %d" % self.channel.channel)
+		failed = rms_residual > 0.020
+		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 		self.channel.vdac = 0
 		self.programmer.load_dacs()
 		self.channel.config = allpro88.PINCON.DISABLE
@@ -191,34 +184,13 @@ class channel_driver_test_suite(object):
 			time.sleep(0.05)
 			if self.channel.measure_v() > 20.:
 				break
-		print("channel %d VTST gate drive current limit: %.3g mA" % (self.channel.channel, current_limit))
+		failed = current_limit > 12
+		print("channel %d VTST gate drive current limit: %.3g mA%s" % (self.channel.channel, current_limit, "" if not failed else "\t<-- FAILED"))
 
 		self.programmer.vtst = 0
 		self.programmer.itst = 0
 		self.channel.config = allpro88.PINCON.DISABLE
 		return
-
-		# old test code that was wrong
-		max_residual = 0.
-		rms_residual = 0.
-		for vdac in range(256):
-			self.programmer.vtst = vdac
-			self.programmer.itst = idac
-			expected = 0.408 + (0.003855 * idac) + (0.10151 * vdac)
-			measured = self.channel.measure_v()
-			residual = abs(measured - expected)
-			if residual > max_residual:
-				max_residual = residual
-			rms_residual += residual**2.
-			#print("channel %d:  VTST %d, measured %.3g V, expected %.3g V" % (self.channel.channel, vdac, measured, expected))
-		rms_residual = rms_residual**0.5 / 256.
-		print("channel %d VTST ramp max residual = %.3g V, RMS residual = %.3g V" % (self.channel.channel, max_residual, rms_residual))
-		if rms_residual > 0.03:
-			print("\t ^^ large RMS residual for channel %d" % self.channel.channel)
-		self.programmer.vtst = 0
-		self.programmer.itst = 0
-		self.channel.config = allpro88.PINCON.DISABLE
-
 
 
 with allpro88.allpro88() as programmer:
@@ -232,10 +204,8 @@ with allpro88.allpro88() as programmer:
 
 	for channel in range(48):
 		test_suite = channel_driver_test_suite(programmer, programmer.channel[channel])
-		try:
-			test_suite.test_logich()
-		except ValueError as e:
-			print("\tpin failed: %s" % str(e))
+
+		test_suite.test_logich()
 
 		test_suite.test_vpul_ramp()
 
