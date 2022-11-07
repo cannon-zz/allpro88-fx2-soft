@@ -12,7 +12,7 @@ def blink_idle(programmer):
 def blink_zif_pin1(programmer):
 	programmer.vadj = 35	# 5 V
 	programmer.vtst = 26	# 3 V
-	programmer.itst = 5	# 5 mA
+	programmer.itst = 15	# 15 mA
 	# set all pins to ground
 	for pin in range(88):
 		programmer.channel[pin].config = allpro88.PINCON.GND
