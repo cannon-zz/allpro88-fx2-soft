@@ -197,11 +197,17 @@ static void newline(void)
  * there are a number of consequences:
  *
  * 1.  with the FX2 chip powered down, all I/O lines should be pulled to
- * approximately 2.5 V by these resistors.  that is a problem for the FX2,
- * whose inputs must not be driven when the chip is powered off.
- * Therefore: ALWAYS APPLY POWER TO THE FX2 BOARD BEFORE APPLYING POWER TO
- * THE PROGRAMMER, AND ALWAYS REMOVE POWER FROM THE PROGRAMMER BEFORE
- * REMOVING POWER FROM THE FX2 BOARD.
+ * approximately 2.5 V by these resistors.  I had previously believed that
+ * this is a problem for the FX2, because I got the impression from
+ * somehting that its inputs must not be driven when the chip is powered
+ * off, i.e., they must not be raised to a potential above the supply
+ * voltage.  however, more recently I've rechecked the documentation and I
+ * don't see that restriction, and anyway that would make them not 5 V
+ * tolerant if it was true (the chip runs on 3.3 V).  the only restriction
+ * is that the GPIO lines must not have more than 5 V to ground placed on
+ * them, but there is no statement about the chip being powered when this
+ * happens.  I now believe it is safe to power the programmer before
+ * powering the FX2 chip.
  *
  * 2.  when an FX2 output pin is pulled low, there is only a 200 Ohm
  * resistor between it and a +5 V rail, so 25 mA of current will flow.
@@ -293,14 +299,11 @@ static BYTE allpro88_read(WORD addr)
 
 /*
  * write a byte to the ALLPRO 88.  NOTE: the DAC chips have active low
- * write lines and so are clocked by the negative going edge of /WR, but
- * the pin driver register chips are active high write lines and so are
- * clocked by the positive going edge of /WR.  unless the programmable
- * logic chips that derive the address and enable lines for the pin drivers
- * from the programmer's external data and address buses account for this
- * (I'm not sure it's possible, I'd have to think more about that), I
- * believe the data and address buses must both be held in a valid state
- * for both the negative going and positive going edges of the /WR.
+ * write lines and so load data when /WR is held low, but the pin driver
+ * register chips are clocked by a low-to-high transition on the /WR lines.
+ * clocked by the positive going edge of /WR.  therefore, the data and
+ * address buses must both be held in a valid state for both the negative
+ * going and positive going edges of the /WR.
  */
 
 
@@ -351,24 +354,25 @@ static void allpro88_hard_reset(void)
 
 enum ALLPRO88_PCR_BITS {
 	PCR_DISABLE = 0x00,
-	/* enables power supplies, and lights red busy LED on socket board */
+	/* enables power supplies, and lights red "busy" LED on socket
+	 * board */
 	PCR_ENABLE = 0x01,
-	/* turns off green idle LED on socket board */
+	/* turns off green "idle" LED on socket board.  no other effect */
 	PCR_NIDLE = 0x02
 };
 
 
 enum ALLPRO88_PINCON_BITS {
 	PINCON_DISABLE = 0x00,
-	PINCON_GND = 0x01,	/* "Ground Driver" */
-	PINCON_VDAC = 0x02,	/* "Power Source Driver" */
-	PINCON_VTST = 0x04,	/* "Current Source Driver" */
-	PINCON_LOGICH = 0x08,	/* "Logic (TTL) High Driver" */
-	PINCON_PULLUP = 0x10,	/* "Pull-up Driver" */
+	PINCON_GND = 0x01,
+	PINCON_VDAC = 0x02,
+	PINCON_VTST = 0x04,
+	PINCON_LOGICH = 0x08,
+	PINCON_PULLUP = 0x10,
 	PINCON_LOGICL = 0x20,
 	PINCON_POSCLK = 0x40,
 	PINCON_NEGCLK = 0x60,
-	PINCON_PULLDN = 0x80	/* "Pull-down Driver" */
+	PINCON_PULLDN = 0x80
 };
 
 
