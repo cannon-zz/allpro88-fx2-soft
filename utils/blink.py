@@ -2,18 +2,14 @@ import allpro88
 import time
 from tqdm import tqdm
 
-programmer = allpro88.allpro88()
-
-print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name))
-
-def blink_idle():
+def blink_idle(programmer):
 	for i in tqdm(range(10), desc = "blink IDLE LED"):
 		programmer.write_command("=", 0x030c, 0x02)
 		time.sleep(0.5)
 		programmer.write_command("=", 0x030c, 0x00)
 		time.sleep(0.5)
 
-def blink_zif_pin1():
+def blink_zif_pin1(programmer):
 	programmer.vadj = 35	# 5 V
 	programmer.vtst = 26	# 3 V
 	programmer.itst = 5	# 5 mA
@@ -22,8 +18,8 @@ def blink_zif_pin1():
 		programmer.channel[pin].config = allpro88.PINCON.GND
 	# PCR enable
 	programmer.pcr_enable = True
-	# toggle pin 40 (zif socket pin 1) between VTST and ground
-	channel = programmer.channel[40]
+	# ZIF socket pin 1 between VTST and ground
+	channel = programmer.socket_module.sockets["ZIF48"][1]
 	for i in tqdm(range(10), desc = "blink ZIF pin 1"):
 		channel.config = allpro88.PINCON.VTST
 		time.sleep(0.5)
@@ -39,6 +35,10 @@ def blink_zif_pin1():
 	# PCR disable
 	programmer.pcr_enable = False
 
-blink_idle()
 
-blink_zif_pin1()
+with allpro88.allpro88() as programmer:
+	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name))
+
+	blink_idle(programmer)
+
+	blink_zif_pin1(programmer)
