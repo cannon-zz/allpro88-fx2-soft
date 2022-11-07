@@ -66,10 +66,10 @@ class channel_driver_test_suite(object):
 			if residual > max_residual:
 				max_residual = residual
 			rms_residual += residual**2.
-			#print("pin %d:  VPUL %d, measured %.3g V, expected %.3g V" % (self.channel.channel, vdac, measured, expected))
+			#print("channel %d:  VPUL %d, measured %.3g V, expected %.3g V" % (self.channel.channel, vdac, measured, expected))
 		rms_residual = rms_residual**0.5 / 256.
 		failed = rms_residual > 0.010
-		print("pin %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+		print("channel %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 		self.programmer.vpul = 0
 		self.programmer.load_dacs()
 		self.channel.config = allpro88.PINCON.DISABLE
