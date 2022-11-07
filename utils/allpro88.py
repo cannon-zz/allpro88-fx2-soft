@@ -93,6 +93,25 @@ class socket_module(object):
 		return dict((pin, programmer.channel[channel]) for pin, channel in pin_to_channel_mapping.items())
 
 
+	def channel_lookup(self, socket_name, channel):
+		"""
+		Given the name of a socket on this socket module and a
+		channel number, return the pin number of the given socket
+		corresponding to that channel number.  This finds use in
+		diagnostic programs where it can be helpful to report to
+		the user which pin number a channel that is being tested
+		corresponds to so that a probe can be inserted into the
+		socket.
+
+		Raises KeyError if the channel number does not correspond
+		to one of the socket's pins.
+		"""
+		for pin_number, channel_obj in self.sockets[socket_name].items():
+			if channel_obj.channel == channel:
+				return pin_number
+		raise KeyError(channel)
+
+
 class socket_module_AP88_PLCC(socket_module):
 	name = "AP88 PLCC"
 	module_id = 0x11
