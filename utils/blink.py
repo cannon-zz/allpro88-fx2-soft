@@ -14,8 +14,8 @@ def blink_zif_pin1(programmer):
 	programmer.vtst = 26	# 3 V
 	programmer.itst = 15	# 15 mA
 	# set all pins to ground
-	for pin in range(88):
-		programmer.channel[pin].config = allpro88.PINCON.GND
+	for channel in programmer.channel.values():
+		channel.config = allpro88.PINCON.GND
 	# PCR enable
 	programmer.pcr_enable = True
 	# ZIF socket pin 1 between VTST and ground
@@ -26,8 +26,8 @@ def blink_zif_pin1(programmer):
 		channel.config = allpro88.PINCON.GND
 		time.sleep(0.5)
 	# set all pins to disable
-	for pin in range(88):
-		programmer.channel[pin].config = allpro88.PINCON.DISABLE
+	for channel in programmer.channel.values():
+		channel.config = allpro88.PINCON.DISABLE
 	# power supplies back to 0
 	programmer.vtst = 0
 	programmer.itst = 0
