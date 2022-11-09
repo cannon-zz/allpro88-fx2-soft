@@ -485,6 +485,8 @@ class allpro88(object):
 		self.vpin = 0
 		self.vpul = 0
 		self.load_dacs()
+		self.vtst = 0
+		self.itst = 0
 		self.vadj = 0
 		# turn off power supplies
 		self.pcr_enable = False
@@ -505,6 +507,8 @@ class allpro88(object):
 		self.vpin = 0
 		self.vpul = 0
 		self.load_dacs()
+		self.vtst = 0
+		self.itst = 0
 		self.vadj = 0
 		# turn off power supplies
 		self.pcr_enable = False
