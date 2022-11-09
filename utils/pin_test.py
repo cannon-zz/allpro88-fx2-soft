@@ -15,6 +15,28 @@ class channel_driver_test_suite(object):
 		self.programmer = programmer
 		self.channel = channel_obj
 
+
+	def test_vadj_ramp(self):
+		"""
+		Ramps VADJ up and down in a triangle wave pattern.  NOTE:
+		confirming the VADJ power supply voltage and its ramp
+		requires access to the interior of the programmer.  This
+		code is not intended to be used for self-test purpose.
+		"""
+		with tqdm(desc = "VADJ", total = 255, mininterval = 0.) as progress:
+			def set_vadj(vadj):
+				self.programmer.vadj = progress.n = vadj
+				progress.refresh()
+
+			for i in range(10):
+				for vadj in range(256):
+					set_vadj(vadj)
+					time.sleep(10. / 256)
+				for vadj in range(255, -1, -1):
+					set_vadj(vadj)
+					time.sleep(10. / 256)
+
+
 	def test_logich(self, trials = 40, max_lo = 0.2, min_hi = 3.9):
 		"""
 		Toggle the channel between logic high and ground several
