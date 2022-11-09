@@ -923,9 +923,8 @@ static void parser_state_reset(void)
  * parse commands from "out" end-point
  *
  * command format.  all numbers are in hexadecimal, and they must be the
- * width indicated.  all commands are terminated by newline, \n, 0x0a.
- * CTRL-C resets the parser (aborts partial command).  all other whitespace
- * is ignored.  commands may straddle packet boundaries.
+ * width indicated.  all commands are terminated by newline, \n, 0x0a.  all
+ * other whitespace is ignored.  commands may straddle packet boundaries.
  *
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
@@ -1063,12 +1062,8 @@ static void parse_out_buffer(void)
 			do_command();
 			/* reset state for next command */
 			parser_state_reset();
-		} else if(next == 0x03) {
-			/* CTRL-C */
-			/* reset state for next command */
-			parser_state_reset();
 		} else if(next < 0x21) {
-			/* other white space, ignore */
+			/* white space, ignore */
 		} else if(parser_state.command_idx > 6) {
 			/* if command buffer is full, an error has occured,
 			 * reset */
