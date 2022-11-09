@@ -96,6 +96,57 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 
+	def test_pulldn(self):
+		"""
+		In pull-down mode there should be about 5.4 kOhm of
+		resistance to ground.  This test enables the pull-down
+		mode, then applies a VTST current ramp to measure the
+		resistance to ground.
+		"""
+		# I don't know what current the pull-down circuit path can
+		# handle.  the 7406 inverter that drives it can sink up to
+		# 40 mA on any output, but that would require over 200 V to
+		# be applied to the circuit and would lead to over 8 W of
+		# power being disspated by the 5.4 kOhm resistor, so I
+		# don't think the 7406's limits define the limits of the
+		# circuit.  VTST can't deliver more than about 25 V, which
+		# means the current flow will never get above about 5 mA
+		# and the power dissipated won't get above 1/8 W.  those
+		# are probably safe for the 5.4 kOhm resistors.
+
+		# assume 10 mA is required for the VTST gate drive circuit
+		vtst_current = 10
+
+		# set VTST voltage limit to max, and start with current
+		# limit set to 0
+		self.programmer.vtst = 255
+		# we seem to need to warm it up a bit ... ?
+		self.programmer.itst = vtst_current
+		time.sleep(0.1)
+
+		# enable VTST and pull-down modes together
+		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.PULLDN
+
+		# ramp current, taking voltage readings.  shouldn't be
+		# possible to go above 5 mA so don't try
+		current = list(range(5))
+		voltage = []
+		for i in current:
+			self.programmer.itst = vtst_current + i
+			time.sleep(0.05)
+			voltage.append(self.channel.measure_v())
+
+		# turn off VTST and disable channel
+		self.channel.config = allpro88.PINCON.DISABLE
+		self.programmer.vtst = 0
+		self.programmer.itst = 0
+
+		# report resistance
+		R = scipy.stats.linregress(current, voltage)[0] * 1000.
+		failed = R < 5000.
+		print("channel %d pull-down resistance:  %.0f Ohm%s" % (self.channel.channel, R, "" if not failed else "\t<-- FAILED"))
+
+
 	def test_vdac_ramp(self):
 		"""
 		Each channel has its own 8-bit DAC controlling a high
@@ -236,6 +287,8 @@ with allpro88.allpro88() as programmer:
 		test_suite.test_vdac_ramp()
 
 		test_suite.test_vtst()
+
+		test_suite.test_pulldn()
 
 		print("\n")
 
