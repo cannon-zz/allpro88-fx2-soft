@@ -199,7 +199,7 @@ class socket_module_AP88_PLCC(socket_module):
 		},
 
 		# 48 pin ZIF socket
-		"ZIF48": {
+		"DIP48": {
 			1:	40,
 			2:	41,
 			3:	42,

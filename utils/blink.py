@@ -19,7 +19,7 @@ def blink_zif_pin1(programmer):
 	# PCR enable
 	programmer.pcr_enable = True
 	# ZIF socket pin 1 between VTST and ground
-	channel = programmer.socket_module.sockets["ZIF48"][1]
+	channel = programmer.socket_module.sockets["DIP48"][1]
 	for i in tqdm(range(10), desc = "blink ZIF pin 1"):
 		channel.config = allpro88.PINCON.VTST
 		time.sleep(0.5)

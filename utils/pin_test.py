@@ -205,9 +205,9 @@ with allpro88.allpro88() as programmer:
 	for channel in range(48):
 		test_suite = channel_driver_test_suite(programmer, programmer.channel[channel])
 		try:
-			print("channel %d --> ZIF48 pin %d" % (channel, programmer.socket_module.channel_lookup("ZIF48", channel)))
+			print("channel %d --> DIP48 pin %d" % (channel, programmer.socket_module.channel_lookup("DIP48", channel)))
 		except KeyError:
-			print("channel %d --> ZIF48 no connection" % channel)
+			print("channel %d --> DIP48 no connection" % channel)
 
 		test_suite.test_logich()
 
