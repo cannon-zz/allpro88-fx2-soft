@@ -105,7 +105,7 @@ class socket_module(object):
 		return dict((pin, programmer.channel[channel]) for pin, channel in pin_to_channel_mapping.items())
 
 
-	def channel_lookup(self, socket_name, channel):
+	def pin_lookup(self, socket_name, channel):
 		"""
 		Given the name of a socket on this socket module and a
 		channel number, return the pin number of the given socket
