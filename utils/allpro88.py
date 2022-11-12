@@ -1,4 +1,5 @@
 from enum import IntEnum
+import time
 import usb.core
 
 
@@ -393,8 +394,13 @@ class dacregister(object):
 	Write a value to a DAC register.  Provides type conversion and
 	range checking to ensure the value written is allowed.
 	"""
-	def __init__(self, address):
+	def __init__(self, address, transient = 0.):
 		self.address = address
+		# transient response time.  for convenience, the DAC
+		# control proxy can enforce a delay after changing a DAC to
+		# give the respective voltage time to settle, so that that
+		# doesn't have to be added manually to every script
+		self.transient = transient
 
 	@staticmethod
 	def ensure_dac_value(dac):
@@ -409,6 +415,7 @@ class dacregister(object):
 	def __set__(self, obj, dac):
 		# write value to programmer register
 		obj.write_command("=", self.address, self.ensure_dac_value(dac))
+		time.sleep(self.transient)
 
 
 class channel_proxy(object):
@@ -650,8 +657,8 @@ class allpro88(object):
 
 	# vsr voltage = dac value * 255 / 256 * 0.1
 	vsr = dacregister(0x0300)
-	vadj = dacregister(0x0302)
 	vth = dacregister(0x0301)
+	vadj = dacregister(0x0302, transient = 0.05)
 	vadjth = dacregister(0x0303)
 	vpul = dacregister(0x0305)	# must call .load_dacs()
 	vtst = dacregister(0x0386)
