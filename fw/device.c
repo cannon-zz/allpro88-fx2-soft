@@ -405,6 +405,19 @@ static void allpro88_set_VADJ(BYTE vdac)
 
 
 /*
+ * set the VADJTH voltage DAC.  the voltage will be
+ *
+ * VADJTH = 0.1 * vdac
+ */
+
+
+static void allpro88_set_VADJTH(BYTE vdac)
+{
+	allpro88_write(0x0303, vdac);
+}
+
+
+/*
  * set the VTH voltage DAC.  the voltage will be
  *
  * VTH = 0.1 * vdac
@@ -575,6 +588,26 @@ static BYTE allpro88_measure_pin_voltage(BYTE pin)
 	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
 		allpro88_set_VTH(vdac | test_bit);
 		if(allpro88_read(addr) & 1)
+			vdac |= test_bit;
+	}
+	return vdac;
+}
+
+
+/*
+ * use a bisection search with VADJTH to measure the VADJ voltage
+ *
+ * NOTE:  VADJTH is, obviously, left modified by this operation
+ */
+
+
+static BYTE allpro88_measure_vadj_voltage(void)
+{
+	BYTE vdac = 0;
+	BYTE test_bit;
+	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
+		allpro88_set_VADJTH(vdac | test_bit);
+		if(allpro88_read(0x0300) & 0x10)
 			vdac |= test_bit;
 	}
 	return vdac;
@@ -931,6 +964,7 @@ static void parser_state_reset(void)
  * EXXXX	echo the number XXXX (loop-back test)
  * MXX		run voltage measurement sequence on channel XX, report VTH DAC
  * R		reset programmer
+ * V  		run VADJ voltage measurement sequence report VADJTH DAC
  *
  * response format.  all numbers are in hexadecimal format.  responses are
  * separated by newline, \n, 0x0a, characters.  each packet of commands
@@ -1018,6 +1052,30 @@ static void do_command(void)
 		allpro88_hard_reset();
 		allpro88_soft_reset();
 		break;
+
+	/*
+	 * VADJ voltage measurement
+	 */
+
+	case 'V':
+	case 'v': {
+		/* FIXME:  this command produces more characters of output
+		 * than characters of input, so it violates the assumption
+		 * that the results of the commands contained in any single
+		 * input buffer can all fit into a single response buffer.
+		 * there's no motivation to queue a bunch of these
+		 * operations up and push them as a single command buffer,
+		 * it's a once-off measurement, so it's unlikely to lead to
+		 * problems, but at the moment there are no safety checks
+		 * in place to guarantee it doesn't lead to problems */
+		/* check for correct end of string */
+		if(parser_state.command[1])
+			goto error;
+		/* measure the voltage, report the VADJTH DAC value */
+		puts_byte(allpro88_measure_vadj_voltage());
+		newline();
+		break;
+	}
 
 	/*
 	 * unrecognized command
