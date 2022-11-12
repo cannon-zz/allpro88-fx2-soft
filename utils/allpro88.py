@@ -409,7 +409,9 @@ class dacregister(object):
 class channel_proxy(object):
 	def __init__(self, programmer, channel):
 		self.programmer = programmer
+		# integer channel number
 		self.channel = channel
+		# start of group of addresses for this channel
 		self.address = programmer.pin_addr(channel)
 
 	def measure_v(self):
