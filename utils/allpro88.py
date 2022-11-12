@@ -426,6 +426,14 @@ class channel_proxy(object):
 		# start of group of addresses for this channel
 		self.address = programmer.pin_addr(channel)
 
+	def __bool__(self):
+		"""
+		Boolean state = state of comparator.  Set VTH to threshold
+		voltage.
+		"""
+		state, = self.programmer.write_command("?", self.address)
+		return bool(state & 1)
+
 	def measure_v(self):
 		"""
 		Use bisection search with VTH to measure the voltage on a
