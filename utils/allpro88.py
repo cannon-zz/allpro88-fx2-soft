@@ -426,7 +426,7 @@ class channel_proxy(object):
 		measured voltage.
 		"""
 		vdac, = self.programmer.write_command("M", self.channel)
-		return vdac / 10.
+		return vdac * 25.5 / 256.
 
 	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(dac)))
 
