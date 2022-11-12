@@ -274,7 +274,7 @@ with allpro88.allpro88() as programmer:
 
 	for channel in range(48):
 		test_suite = channel_driver_test_suite(programmer, programmer.channel[channel])
-		print("channel %d --> pin driver group %d, DAC U%d, hybrid H%d, hybrid channel %d" % (channel, channel // 8, channel % 8 + 1, (channel % 8) // 2 + 1, (channel % 8) % 2))
+		print("channel %d --> pin driver group %d, DAC U%d, hybrid H%d, hybrid channel %d" % ((channel,) + programmer.channel[channel].physical))
 		try:
 			print("channel %d --> DIP48 pin %d" % (channel, programmer.socket_module.pin_lookup("DIP48", channel)))
 		except KeyError:

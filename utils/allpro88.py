@@ -432,6 +432,19 @@ class channel_proxy(object):
 
 	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
 
+	@property
+	def physical(self):
+		"""
+		Physical location of this channel within the programmer.
+		Value is a tuple:  (pin driver group #, DAC chip identifier
+		#, hybrid identifier #, channel # on hybrid).
+		"""
+		return (
+			self.channel // 8,	# group number, group #
+			self.channel % 8 + 1,	# DAC chip ident., U#
+			(self.channel % 8) // 2 + 1,	# hybrid ident., H#
+			(self.channel % 8) % 2	# hybrid channel number
+		)
 
 
 class allpro88(object):
