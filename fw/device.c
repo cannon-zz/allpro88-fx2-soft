@@ -393,7 +393,7 @@ static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
  * VADJ =  0.8598 + (dac * 0.119036) + (dac**2. * -0.0000115199973)
  *
  * NOTE:  VADJ must be at least 1 or 2 volts above the highest of all of
- * the pin DAC voltages, VPUL, VTST and VPIN because it supplies all of
+ * the pin DAC voltages, VPUL, VTST and VTH because it supplies all of
  * these.
  */
 
@@ -405,13 +405,13 @@ static void allpro88_set_VADJ(BYTE vdac)
 
 
 /*
- * set the VPIN voltage DAC.  the voltage will be
+ * set the VTH voltage DAC.  the voltage will be
  *
- * VPIN = 0.1 * vdac
+ * VTH = 0.1 * vdac
  */
 
 
-static void allpro88_set_VPIN(BYTE vdac)
+static void allpro88_set_VTH(BYTE vdac)
 {
 	allpro88_write(0x0301, vdac);
 }
@@ -552,7 +552,7 @@ static void allpro88_soft_reset(void)
 	}
 
 	allpro88_set_VADJ(0);
-	allpro88_set_VPIN(0);
+	allpro88_set_VTH(0);
 	allpro88_set_VPUL(0);
 	allpro88_set_VTST(0, 0);
 
@@ -561,9 +561,9 @@ static void allpro88_soft_reset(void)
 
 
 /*
- * use a bisection search with VPIN to measure the voltage on a pin
+ * use a bisection search with VTH to measure the voltage on a pin
  *
- * NOTE:  VPIN is, obviously, left modified by this operation
+ * NOTE:  VTH is, obviously, left modified by this operation
  */
 
 
@@ -573,7 +573,7 @@ static BYTE allpro88_measure_pin_voltage(BYTE pin)
 	BYTE vdac = 0;
 	BYTE test_bit;
 	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
-		allpro88_set_VPIN(vdac | test_bit);
+		allpro88_set_VTH(vdac | test_bit);
 		if(allpro88_read(addr) & 1)
 			vdac |= test_bit;
 	}
@@ -929,7 +929,7 @@ static void parser_state_reset(void)
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, display value
  * EXXXX	echo the number XXXX (loop-back test)
- * MXX		run voltage measurement sequence on channel XX, report VPIN DAC
+ * MXX		run voltage measurement sequence on channel XX, report VTH DAC
  * R		reset programmer
  *
  * response format.  all numbers are in hexadecimal format.  responses are
@@ -993,7 +993,7 @@ static void do_command(void)
 	}
 
 	/*
-	 * voltage measurement
+	 * pin voltage measurement
 	 */
 
 	case 'M':
@@ -1003,7 +1003,7 @@ static void do_command(void)
 		/* check for error and correct end of string */
 		if(errno || parser_state.command[3])
 			goto error;
-		/* measure the voltage, report the VPIN DAC value */
+		/* measure the voltage, report the VTH DAC value */
 		puts_byte(allpro88_measure_pin_voltage(pin));
 		newline();
 		break;

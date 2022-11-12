@@ -366,7 +366,7 @@ class command(object):
 			self.cmd = "E%04X\n" % addr
 			self.need_response = True
 		elif verb == "M":
-			# measure voltage using VPIN
+			# measure voltage using VTH
 			assert val is None
 			self.cmd = "M%02X\n" % addr
 			self.need_response = True
@@ -414,8 +414,8 @@ class channel_proxy(object):
 
 	def measure_v(self):
 		"""
-		Use bisection search with VPIN to measure the voltage on a
-		pin.  NOTE:  VPIN is left set to (an approximation of) the
+		Use bisection search with VTH to measure the voltage on a
+		pin.  NOTE:  VTH is left set to (an approximation of) the
 		measured voltage.
 		"""
 		vdac, = self.programmer.write_command("M", self.channel)
@@ -482,7 +482,7 @@ class allpro88(object):
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
 		# set all variable power supplies to 0 V
-		self.vpin = 0
+		self.vth = 0
 		self.vpul = 0
 		self.load_dacs()
 		self.vtst = 0
@@ -504,7 +504,7 @@ class allpro88(object):
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
 		# set all variable power supplies to 0 V
-		self.vpin = 0
+		self.vth = 0
 		self.vpul = 0
 		self.load_dacs()
 		self.vtst = 0
@@ -624,8 +624,8 @@ class allpro88(object):
 	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
 
 
-	vpin = dacregister(0x0301)
 	vadj = dacregister(0x0302)
+	vth = dacregister(0x0301)
 	vpul = dacregister(0x0305)	# must call .load_dacs()
 	vtst = dacregister(0x0386)
 	itst = dacregister(0x0387)
