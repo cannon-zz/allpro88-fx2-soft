@@ -376,7 +376,7 @@ class command(object):
 			self.cmd = "R\n"
 			self.need_response = False
 		else:
-			raise ValueError("invalid command \"%s\"" % cmd)
+			raise ValueError("invalid command verb \"%s\"" % verb)
 		self.response = None
 
 	def __str__(self):
