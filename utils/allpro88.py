@@ -484,12 +484,14 @@ class allpro88(object):
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
 		# set all variable power supplies to 0 V
+		self.vsr = 0
 		self.vth = 0
 		self.vpul = 0
 		self.load_dacs()
 		self.vtst = 0
 		self.itst = 0
 		self.vadj = 0
+		self.vadjth = 0
 		# turn off power supplies
 		self.pcr_enable = False
 
@@ -506,12 +508,14 @@ class allpro88(object):
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
 		# set all variable power supplies to 0 V
+		self.vsr = 0
 		self.vth = 0
 		self.vpul = 0
 		self.load_dacs()
 		self.vtst = 0
 		self.itst = 0
 		self.vadj = 0
+		self.vadjth = 0
 		# turn off power supplies
 		self.pcr_enable = False
 
@@ -626,8 +630,11 @@ class allpro88(object):
 	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
 
 
+	# vsr voltage = dac value * 255 / 256 * 0.1
+	vsr = dacregister(0x0300)
 	vadj = dacregister(0x0302)
 	vth = dacregister(0x0301)
+	vadjth = dacregister(0x0303)
 	vpul = dacregister(0x0305)	# must call .load_dacs()
 	vtst = dacregister(0x0386)
 	itst = dacregister(0x0387)
