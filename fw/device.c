@@ -577,6 +577,11 @@ static void allpro88_soft_reset(void)
  * use a bisection search with VTH to measure the voltage on a pin
  *
  * NOTE:  VTH is, obviously, left modified by this operation
+ *
+ * the VTH slew rate is about 2.5 V/us.  we need to ensure enough time
+ * passes between setting VTH and reading the comparator state.  what's
+ * here seems to be OK, but I've made no effort to ensure the timing is
+ * good so watch for that if changes to this code are made.
  */
 
 
