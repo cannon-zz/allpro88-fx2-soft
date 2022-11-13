@@ -28,7 +28,7 @@ class channel_driver_test_suite(object):
 				self.programmer.vadj = progress.n = vadj
 				progress.refresh()
 
-			for i in range(10):
+			for i in range(3):
 				for vadj in range(256):
 					set_vadj(vadj)
 					time.sleep(10. / 256)
@@ -268,6 +268,8 @@ with allpro88.allpro88() as programmer:
 
 	# turn on power supplies
 	programmer.pcr_enable = True
+
+	#channel_driver_test_suite(programmer, None).test_vadj_ramp()
 
 	# VADJ = max
 	programmer.vadj = 255
