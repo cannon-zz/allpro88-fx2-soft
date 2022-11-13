@@ -174,7 +174,7 @@ class channel_driver_test_suite(object):
 				max_residual = residual
 			rms_residual += residual**2.
 		rms_residual = rms_residual**0.5 / 256.
-		failed = rms_residual > 0.020
+		failed = max_residual > 0.4
 		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 		self.channel.vdac = 0
 		self.programmer.load_dacs()
