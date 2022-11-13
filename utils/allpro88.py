@@ -403,8 +403,10 @@ class allpro88(object):
 	itst = dacregister(0x0387)
 
 
-	def load_dacs(self):
+	def load_dacs(self, transient = 0.001):
 		self.write_command("=", 0x0308, 0)
+		# wait for transient response
+		time.sleep(transient)
 
 
 	def measure_vadj(self):
