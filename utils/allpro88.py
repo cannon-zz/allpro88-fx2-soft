@@ -246,7 +246,9 @@ class allpro88(object):
 		if self.device is None:
 			raise ValueError("USB device not found (vid:pid = %04X:%04X)" % (self.idVendor, self.idProduct))
 
-		# firmware resets itself and the programmer
+		# firmware resets itself and the programmer.  the
+		# .__enter__() method repeats much of what this does, but
+		# it doesn't hurt to be cautious
 		self.device.set_configuration()
 
 		# initialize channel proxy dictionary.  NOTE:  this step
