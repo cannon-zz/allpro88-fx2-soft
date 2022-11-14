@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import allpro88
+import devices
 
 class m27c512(object):
 	def __init__(self, programmer):
@@ -46,19 +47,8 @@ class m27c512(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	@property
-	def address_bus(self):
-		"""
-		Tuple of address bus channel objects from MSB to LSB.
-		"""
-		return tuple(self.socket[i] for i in (1, 27, 26, 2, 23, 21, 24, 25, 3, 4, 5, 6, 7, 8, 9, 10))
-
-	@property
-	def data_bus(self):
-		"""
-		Tuple of data bus channel objects from MSB to LSB.
-		"""
-		return tuple(self.socket[i] for i in (19, 18, 17, 16, 15, 13, 12, 11))
+	address_bus = devices.bus((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27, 1))
+	data_bus = devices.bus((11, 12, 13, 15, 16, 17, 18, 19))
 
 	@property
 	def chip_enable(self):
@@ -82,39 +72,15 @@ class m27c512(object):
 	def output_enable(self, boolean):
 		self.socket[22] = allpro88.PINCON.LOGICL if boolean else allpro88.PINCON.LOGICH
 
-	@property
-	def address(self):
-		raise NotImplementedError
-
-	@address.setter
-	def address(self, addr):
-		# check type compatibility and range
-		addr = int(addr)
-		if not (0 <= addr <= 0xffff):
-			raise ValueError("0 <= addr <= 0xFFFF: 0x%X" % addr)
-		bit = 0x8000
-		for pin in self.address_bus:
-			pin.config = allpro88.PINCON.LOGICH if (addr & bit) else allpro88.PINCON.LOGICL
-			bit >>= 1
-
-	@property
-	def data(self):
-		data = 0
-		bit = 0x80
-		for pin in self.data_bus:
-			data |= bit if pin else 0
-			bit >>= 1
-		return data
-
 
 with open("dump.dat", "wb") as dump:
 	with allpro88.allpro88() as programmer:
 		with m27c512(programmer) as device:
 			device.chip_enable = True
 
-			for device.address in tqdm(range(0x10000), desc = "Reading"):
+			for device.address_bus in tqdm(range(0x10000), desc = "Reading"):
 				device.output_enable = True
-				dump.write(bytearray((device.data,)))
+				dump.write(bytearray((device.data_bus,)))
 				device.output_enable = False
 
 			device.chip_enable = False
