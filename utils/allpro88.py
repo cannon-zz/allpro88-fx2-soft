@@ -278,15 +278,16 @@ class allpro88(object):
 		# ensure all channel drivers are disabled (off)
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
+			channel.vdac = 0
 		# set all variable power supplies to 0 V
-		self.vsr = 0
-		self.vth = 0
 		self.vpul = 0
 		self.load_dacs()
+		self.vsr = 0
+		self.vth = 0
 		self.vtst = 0
 		self.itst = 0
-		self.vadj = 0
 		self.vadjth = 0
+		self.vadj = 0
 		# turn off power supplies
 		self.pcr_enable = False
 
@@ -302,15 +303,16 @@ class allpro88(object):
 		# ensure all channel drivers are disabled (off)
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
+			channel.vdac = 0
 		# set all variable power supplies to 0 V
-		self.vsr = 0
-		self.vth = 0
 		self.vpul = 0
 		self.load_dacs()
+		self.vsr = 0
+		self.vth = 0
 		self.vtst = 0
 		self.itst = 0
-		self.vadj = 0
 		self.vadjth = 0
+		self.vadj = 0
 		# turn off power supplies
 		self.pcr_enable = False
 
