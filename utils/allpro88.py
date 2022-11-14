@@ -124,13 +124,16 @@ class dacregister(object):
 	Write a value to a DAC register.  Provides type conversion and
 	range checking to ensure the value written is allowed.
 	"""
-	def __init__(self, address, transient = 0.):
+	def __init__(self, address, transient = 0., cal = (lambda dac: dac * 25.5/256.)):
 		self.address = address
 		# transient response time.  for convenience, the DAC
 		# control proxy can enforce a delay after changing a DAC to
 		# give the respective voltage time to settle, so that that
 		# doesn't have to be added manually to every script
 		self.transient = transient
+		# calibration function mapping numeric DAC value to
+		# potential in volts
+		self.cal = cal
 
 	@staticmethod
 	def ensure_dac_value(dac):
@@ -146,6 +149,35 @@ class dacregister(object):
 		# write value to programmer register
 		obj.write_command("=", self.address, self.ensure_dac_value(dac))
 		time.sleep(self.transient)
+
+	def invcal(self, v):
+		# most calibration mappings are linear or quadratic
+		# polynomials and are easily inverted, but that would
+		# require it be done for each case.  since the number of
+		# possible values is so small, this loop completes in only
+		# a few iterations, and doing it this way has the advantage
+		# of always working without having to remember to invert an
+		# algebraic expression.
+		lo, hi = 0., 255.
+		while hi > lo + 0.5:
+			dac = (hi + lo) / 2.
+			cal = self.cal(dac)
+			if cal == v:
+				break
+			elif cal < v:
+				lo = dac
+			else:	# cal > v:
+				hi = dac
+		dac = round(dac)
+		assert 0 <= dac <= 255
+		# some calibration mappings predict a constant output below
+		# some threshold.  if we've chosen a DAC setting in such an
+		# interval, choose the lowest such DAC setting (typically
+		# 0, but check).
+		while dac and self.cal(dac - 1) == self.cal(dac):
+			dac -= 1
+		assert 0 <= dac <= 255
+		return dac
 
 
 class channel_proxy(object):
@@ -171,11 +203,16 @@ class channel_proxy(object):
 		measured voltage.
 		"""
 		vdac, = self.programmer.write_command("M", self.channel)
-		return vdac * 25.5 / 256.
+		return self.programmer.vth.cal(vdac)
 
 	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(dac)))
 
 	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
+
+	def cal(self, dac):
+		return max(0., dac * 255./256. * 0.1 - 0.5)
+
+	invcal = dacregister.invcal
 
 	@property
 	def physical(self):
@@ -388,12 +425,12 @@ class allpro88(object):
 	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
 
 
-	# vsr voltage = dac value * 255 / 256 * 0.1
-	vsr = dacregister(0x0300)
-	vth = dacregister(0x0301)
-	vadj = dacregister(0x0302, transient = 0.05)
+	vsr = dacregister(0x0300, cal = (lambda dac: dac * 255./256. * 0.1))
+	vth = dacregister(0x0301, cal = (lambda dac: dac * 255./256. * 0.1))
+	vadj = dacregister(0x0302, transient = 0.05, cal = (lambda dac: 0.371637285 + dac * 0.117641953 + dac**2. * -9.13385655e-07))
 	vadjth = dacregister(0x0303)
-	vpul = dacregister(0x0305)	# must call .load_dacs()
+	# must call .load_dacs() for vpul changes
+	vpul = dacregister(0x0305, cal = (lambda dac: max(0., -0.54392 + (dac * 0.100723) + (dac**2. * 0.000000000497))))
 	vtst = dacregister(0x0386)
 	itst = dacregister(0x0387)
 

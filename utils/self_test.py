@@ -82,7 +82,7 @@ class channel_driver_test_suite(object):
 		for vdac in range(256):
 			self.programmer.vpul = vdac
 			self.programmer.load_dacs()
-			expected = -0.54392 + (vdac * 0.100723) + (vdac**2. * 0.000000000497)
+			expected = self.programmer.vpul.cal(vdac)
 			measured = self.channel.measure_v()
 			residual = abs(measured - expected)
 			if residual > max_residual:
@@ -167,7 +167,7 @@ class channel_driver_test_suite(object):
 		for vdac in range(256):
 			self.channel.vdac = vdac
 			self.programmer.load_dacs()
-			expected = max(0., -0.5 + 0.1 * vdac)
+			expected = self.channel.cal(vdac)
 			measured = self.channel.measure_v()
 			residual = abs(measured - expected)
 			if residual > max_residual:

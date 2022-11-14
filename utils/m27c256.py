@@ -11,16 +11,19 @@ class m27c512(object):
 			self.socket[i].config = allpro88.PINCON.DISABLE
 
 	def __enter__(self):
-		# turn on power supplies, set VADJ to something useful
+		# turn on power supplies, set VADJ to 15 V and VTH to 2 V
 		self.programmer.pcr_enable = True
-		self.programmer.vadj = 90
-		self.programmer.vth = 20	# 2 V
+		self.programmer.vadj = self.programmer.vadj.invcal(15.)
+		self.programmer.vth = self.programmer.vth.invcal(2.)
 
-		# apply power.  first GND, then VCC
-		self.socket[28].vdac = 57	# 5 V
-		self.programmer.load_dacs()
+		# configure power pins.  VPP = VCC for read
+		self.socket[1].config = allpro88.PINCON.VDAC
 		self.socket[14].config = allpro88.PINCON.GND
 		self.socket[28].config = allpro88.PINCON.VDAC
+		# apply 5 V
+		self.socket[1].vdac = self.socket[1].invcal(5.)
+		self.socket[28].vdac = self.socket[28].invcal(5.)
+		self.programmer.load_dacs()
 
 		return self
 
@@ -30,12 +33,12 @@ class m27c512(object):
 		for i in range(1, 29):
 			if i not in (14, 28):
 				self.socket[i].config = allpro88.PINCON.DISABLE
-		# now disable power, first VCC then GND
-		self.socket[28].config = allpro88.PINCON.DISABLE
-		self.socket[14].config = allpro88.PINCON.DISABLE
 		# set VDAC supply to 0
 		self.socket[28].vdac = 0
 		self.programmer.load_dacs()
+		# now disable power
+		self.socket[14].config = allpro88.PINCON.DISABLE
+		self.socket[28].config = allpro88.PINCON.DISABLE
 
 		# turn off programmer power supplies
 		self.programmer.vth = 0
