@@ -1,7 +1,7 @@
 from tqdm import tqdm
 import allpro88
 
-class m27c512(object):
+class m27c256(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP28"]
@@ -111,7 +111,7 @@ class m27c512(object):
 
 with open("dump.dat", "wb") as dump:
 	with allpro88.allpro88() as programmer:
-		with m27c512(programmer) as device:
+		with m27c256(programmer) as device:
 			device.chip_enable = True
 
 			for device.address in tqdm(range(0x8000), desc = "Reading"):
