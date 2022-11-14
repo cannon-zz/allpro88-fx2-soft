@@ -31,12 +31,14 @@ class m27c256(object):
 		# make sure all non-power pins are disabled so they don't
 		# have voltages on them when power is removed from the chip
 		for i in range(1, 29):
-			if i not in (14, 28):
+			if i not in (1, 14, 28):
 				self.socket[i].config = allpro88.PINCON.DISABLE
-		# set VDAC supply to 0
+		# set VDAC supplies to 0
+		self.socket[1].vdac = 0
 		self.socket[28].vdac = 0
 		self.programmer.load_dacs()
 		# now disable power
+		self.socket[1].config = allpro88.PINCON.DISABLE
 		self.socket[14].config = allpro88.PINCON.DISABLE
 		self.socket[28].config = allpro88.PINCON.DISABLE
 
