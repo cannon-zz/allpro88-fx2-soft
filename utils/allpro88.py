@@ -1,7 +1,7 @@
 from enum import IntEnum
 import time
 import usb.core
-from socket_module import *
+from socket_module import socket_modules
 
 
 #
@@ -203,11 +203,6 @@ class allpro88(object):
 
 	command_queue_size = 64	# commands
 
-	# used by .__init__() to select a socket_module object based on the
-	# module ID reported by the programmer.  add more entries hear as
-	# needed.
-	socket_modules = dict((cls.module_id, cls) for cls in (socket_module_AP88_PLCC, socket_module_DIP_MODULE, socket_module_TMS370, socket_module_2708_EAROM, socket_module_PAC1000, socket_module_8789, socket_module_1702A, socket_module_68HC11, socket_module_68701, socket_module_68705, socket_module_68HC705, socket_module_1468705, socket_module_68HC11F1))
-
 	def __init__(self):
 		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
@@ -218,7 +213,7 @@ class allpro88(object):
 		self.device.set_configuration()
 
 		# initialize channel proxy dictionary.  NOTE:  this step
-		# must be completed before initializing the socket_module
+		# must be completed before initializing the .socket_module
 		# attribute (the socket_module classes use this dictionary
 		# to initialize their pin mappings
 		self.channel = dict((i, channel_proxy(self, i)) for i in range(88))
@@ -229,7 +224,7 @@ class allpro88(object):
 
 		# configure for the installed socket module
 		try:
-			self.socket_module = self.socket_modules[self.socket_module_id](self)
+			self.socket_module = socket_modules[self.socket_module_id](self)
 		except KeyError as e:
 			if self.socket_module_id == 0xff:
 				print("warning:  no socket module detected")

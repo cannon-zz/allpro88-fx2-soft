@@ -277,3 +277,12 @@ class socket_module_1468705(socket_module):
 class socket_module_68HC11F1(socket_module):
 	name = "68HC11F1"
 	module_id = 0xd6
+
+
+#
+# used to select a socket_module object based on the module ID reported by
+# the programmer.  add more entries here as needed.
+#
+
+
+socket_modules = dict((cls.module_id, cls) for cls in (socket_module_AP88_PLCC, socket_module_DIP_MODULE, socket_module_TMS370, socket_module_2708_EAROM, socket_module_PAC1000, socket_module_8789, socket_module_1702A, socket_module_68HC11, socket_module_68701, socket_module_68705, socket_module_68HC705, socket_module_1468705, socket_module_68HC11F1))
