@@ -187,41 +187,49 @@ class channel_driver_test_suite(object):
 		used either as a current source or as a probe to test for
 		the presence of a part.
 
-		The VTST drive output is delivered to the pin via a FET
-		whose gate, when the VTST output is disabled, is held in
-		the off state by the VTST voltage itself.  The FET's gate
-		is pulled towards ground by an NPN transistor when the VTST
-		output is enabled, but the voltage difference between the
-		gate and the drain cannot exceed about 12 V, so for high
-		VTST voltages a limiting circuit is needed to prevent
-		damage to the output transistor.  This circuit consists of
-		a 1 kOHm resistor between VTST and the gate, followed by a
-		current limiting circuit set to approximately 10 mA so that
-		when the VTST output is enabled never more than about 10 V
-		(the voltage drop across the 1 kOhm resistor when 10 mA
-		flows through it) is between the gate and the VTST source
-		voltage.  This gate drive circuitry is in parallel with the
-		pin being driven by the VTST output, and must be accounted
-		for when using the VTST feature to check for the presence
-		of a part.  This circuitry looks like a 1 kOhm resistor to
-		ground up to about 10 V, after which it looks like a
-		constant current 10 mA load.
+		The VTST drive output is delivered to the pin via a PNP
+		transistor whose base is pulled towards ground when the
+		output is enabled.  If it was shorted directly to ground
+		the current flowing through the emitter-base junction would
+		damage the transistor as soon as VTST was raised high
+		enough to forward-bias the junction, so a current limiting
+		circuit is used to limit the base current to at most about
+		10 mA.  If the transistor's gain is at least about 100 then
+		that's enough to ensure the transistor can deliver VTST's
+		max current driving capabilities to the pin (minus the 10
+		mA going through the base).
 
-		This test measures the properties of the gate drive
-		circuitry, measuring the resistance to ground and the
-		constant current limit by varying the VTST driving voltage
-		and current limit DACs, and measuring the actual voltage
-		that appears on the output.
+		The current limiting circuit is a 68 Ohm resistor combined
+		with a PNP transistor whose base rides on the high side of
+		the resistor, whose collector is tied to the digital
+		control signal and whose emitter is grounded.  If the
+		voltage drop across the resistor is less than the
+		forward-bias voltage of the PNP transistor's base-emitter
+		junction the circuit looks like the 68 Ohm resistor to
+		ground.  Once the voltage drop gets above about 600 mV
+		(approximately 10 mA of current flows) the transitor begins
+		to conduct, partially shorting the digital control signal
+		to ground and throttling the current pulled out through the
+		driver transistor's base.
 
-		Unfortunately, even though the gate voltage limiting
-		circuit interacts with measurements of the pin made using
-		this feature, the circuit's properties are not precisely
-		defined.  The characteristics of the circuit vary from
-		channel to channel, and change noticably with temperatures
-		as the programmer warms up.  It is recommended that the
-		results of this test not be taken too seriously until the
-		programmer has been allowed a 20 min or longer warm up
-		period.
+		All of this circuitry appears in parallel across
+		whatever load is inserted into the socket that VTST is
+		being used to probe.  So if nothing is connected to the
+		VTST output, then VTST sees a 68 Ohm resistor up to a
+		current of about 10 mA after which it sees a fixed 10 mA
+		current sink regardless of voltage.
+
+		This test measures the properties of the output
+		transistor's base control circuitry, testing for the 68 Ohm
+		resistor, by ramping the current limit and measuring the
+		voltage developed by the VTST output.
+
+		Unfortunately, these measurements require tweaking the
+		parameters of the VTST power supply at the very bottom end
+		of its operating regime and there's quite a bit of noise in
+		these measurements.  It is recommended that the results of
+		this test not be taken too seriously until the programmer
+		has been allowed a 20 min or longer warm up period.
 		"""
 		self.channel.config = allpro88.PINCON.VTST
 
