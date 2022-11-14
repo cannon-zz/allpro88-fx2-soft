@@ -49,28 +49,8 @@ class hn462732(object):
 
 	address_bus = devices.bus((8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))
 	data_bus = devices.bus((9, 10, 11, 13, 14, 15, 16, 17))
-
-	@property
-	def chip_enable(self):
-		"""
-		Active low chip enable channel object.
-		"""
-		raise NotImplemented
-
-	@chip_enable.setter
-	def chip_enable(self, boolean):
-		self.socket[18] = allpro88.PINCON.LOGICL if boolean else allpro88.PINCON.LOGICH
-
-	@property
-	def output_enable(self):
-		"""
-		Active low output enable channel object.
-		"""
-		raise NotImplementedError
-
-	@output_enable.setter
-	def output_enable(self, boolean):
-		self.socket[20] = allpro88.PINCON.LOGICL if boolean else allpro88.PINCON.LOGICH
+	chip_enable = devices.flag(18, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
+	output_enable = devices.flag(20, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
 
 
 with open("dump.dat", "wb") as dump:

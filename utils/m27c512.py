@@ -49,28 +49,8 @@ class m27c512(object):
 
 	address_bus = devices.bus((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27, 1))
 	data_bus = devices.bus((11, 12, 13, 15, 16, 17, 18, 19))
-
-	@property
-	def chip_enable(self):
-		"""
-		Active low chip enable channel object.
-		"""
-		raise NotImplemented
-
-	@chip_enable.setter
-	def chip_enable(self, boolean):
-		self.socket[20] = allpro88.PINCON.LOGICL if boolean else allpro88.PINCON.LOGICH
-
-	@property
-	def output_enable(self):
-		"""
-		Active low output enable channel object.
-		"""
-		raise NotImplementedError
-
-	@output_enable.setter
-	def output_enable(self, boolean):
-		self.socket[22] = allpro88.PINCON.LOGICL if boolean else allpro88.PINCON.LOGICH
+	chip_enable = devices.flag(20, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
+	output_enable = devices.flag(22, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
 
 
 with open("dump.dat", "wb") as dump:

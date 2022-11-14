@@ -21,3 +21,16 @@ class bus(object):
 			raise ValueError("0x%X <= word <= 0x%X: 0x%X" % (self.min_word, self.max_word, word))
 		for bit, pin_number in self.pin_numbers:
 			obj.socket[pin_number].config = allpro88.PINCON.LOGICH if (word & bit) else allpro88.PINCON.LOGICL
+
+
+class flag(object):
+	def __init__(self, pin_number, inactive = allpro88.PINCON.LOGICL, active = allpro88.PINCON.LOGICH):
+		self.pin_number = pin_number
+		self.inactive = inactive
+		self.active = active
+
+	def __get__(self, obj, objtype = None):
+		return NotImplementedError
+
+	def __set__(self, obj, boolean):
+		obj.socket[self.pin_number].config = self.active if boolean else self.inactive
