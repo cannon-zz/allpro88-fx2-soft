@@ -187,6 +187,25 @@ class channel_proxy(object):
 		self.channel = channel
 		# start of group of addresses for this channel
 		self.address = programmer.pin_addr(channel)
+		# bypass capacitor control register
+		# FIXME:  the bypass capacitor feature including its
+		# associated control logic and address decode circuitry
+		# lives on the socket module.  it's not part of the
+		# programmer.  if a different socket module gets installed
+		# who knows what these addresses would control.  this
+		# address range is probably meant to be a generic expansion
+		# port feature, and it would probably be better being
+		# handled by the socket_module class somehow so that the
+		# correct code is attached to the electronics.  the
+		# subclass for the DIP/PLCC module that I have would then
+		# provide this bypass capacitor feature, specifically.
+		if channel <= 0x27:
+			self.bypass_address = 0x280 + channel
+		elif channel <= 0x2f:
+			self.bypass_address = 0x2c0 + (channel - 0x28)
+		else:
+			# only first 48 channels have bypass capacitors
+			self.bypass_address = None
 
 	def __bool__(self):
 		"""
@@ -208,6 +227,18 @@ class channel_proxy(object):
 	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(dac)))
 
 	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
+
+	@property
+	def bypass(self):
+		raise NotImplementedError
+
+	@bypass.setter
+	def bypass(self, boolean):
+		# bypass capacitor is turned on and off with bit 0.
+		# silently ignore requests to turn on or off bypass
+		# capacitors on channels that don't have them.
+		if self.bypass_address is not None:
+			self.programmer.write_command("=", self.bypass_address, 1 if boolean else 0)
 
 	def cal(self, dac):
 		return max(0., dac * 255./256. * 0.1 - 0.5)
@@ -277,9 +308,11 @@ class allpro88(object):
 		# variable power supplies off, all channel drivers
 		# disabled).
 
-		# ensure all channel drivers are disabled (off)
+		# ensure all channel drivers are disabled (off), the DAC
+		# voltages are 0'ed and the bypass capacitors disabled
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
+			channel.bypass = False
 			channel.vdac = 0
 		# set all variable power supplies to 0 V
 		self.vpul = 0
@@ -302,9 +335,11 @@ class allpro88(object):
 		# variable power supplies off, all channel drivers
 		# disabled).
 
-		# ensure all channel drivers are disabled (off)
+		# ensure all channel drivers are disabled (off), the DAC
+		# voltages are 0'ed and the bypass capacitors disabled
 		for channel in self.channel.values():
 			channel.config = PINCON.DISABLE
+			channel.bypass = False
 			channel.vdac = 0
 		# set all variable power supplies to 0 V
 		self.vpul = 0
