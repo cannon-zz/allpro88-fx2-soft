@@ -23,14 +23,36 @@ class bus(object):
 			obj.socket[pin_number].config = allpro88.PINCON.LOGICH if (word & bit) else allpro88.PINCON.LOGICL
 
 
+#
+# Boolean state pins
+#
+
+
 class flag(object):
-	def __init__(self, pin_number, inactive = allpro88.PINCON.LOGICL, active = allpro88.PINCON.LOGICH):
+	# subclasses override these with the appropriate states
+	inactive = None
+	active = None
+
+	def __init__(self, pin_number):
 		self.pin_number = pin_number
-		self.inactive = inactive
-		self.active = active
 
 	def __get__(self, obj, objtype = None):
 		return NotImplementedError
 
 	def __set__(self, obj, boolean):
-		obj.socket[self.pin_number].config = self.active if boolean else self.inactive
+		"""
+		Sets the pin's state to .active (.inactive) if boolean is
+		True (False).  If boolean is None the state is set to
+		DISABLED (floating).
+		"""
+		obj.socket[self.pin_number].config = allpro88.PINCON.DISABLED if boolean is None else self.active if boolean else self.inactive
+
+
+class flag_ttl(flag):
+	inactive = allpro88.PINCON.LOGICL
+	active = allpro88.PINCON.LOGICH
+
+
+class flag_ttl_active_low(flag):
+	inactive = allpro88.PINCON.LOGICH
+	active = allpro88.PINCON.LOGICL

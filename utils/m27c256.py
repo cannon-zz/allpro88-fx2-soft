@@ -53,8 +53,8 @@ class m27c256(object):
 
 	address = devices.bus((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))
 	data = devices.bus((11, 12, 13, 15, 16, 17, 18, 19))
-	chip_enable = devices.flag(20, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
-	output_enable = devices.flag(22, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
+	chip_enable = devices.flag_ttl_active_low(20)
+	output_enable = devices.flag_ttl_active_low(22)
 
 
 with open("dump.dat", "wb") as dump:
