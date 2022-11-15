@@ -8,8 +8,8 @@ class hn462732(object):
 		self.socket = programmer.socket_module.sockets["DIP24"]
 		# make sure all associated pins are disabled so they are in
 		# a predictable state.
-		for i in range(1, 25):
-			self.socket[i].config = allpro88.PINCON.DISABLE
+		for channel in self.socket.values():
+			channel.config = allpro88.PINCON.DISABLE
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 15 V and VTH to 1.5 V
@@ -31,9 +31,9 @@ class hn462732(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# make sure all non-power pins are disabled so they don't
 		# have voltages on them when power is removed from the chip
-		for i in range(1, 25):
-			if i not in (12, 24):
-				self.socket[i].config = allpro88.PINCON.DISABLE
+		for pin_number, channel in self.socket.items():
+			if pin_number not in (12, 24):
+				channel.config = allpro88.PINCON.DISABLE
 		# set VDAC supply to 0
 		self.socket[24].vdac = 0
 		self.programmer.load_dacs()

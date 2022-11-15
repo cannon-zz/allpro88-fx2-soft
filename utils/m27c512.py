@@ -8,8 +8,8 @@ class m27c512(object):
 		self.socket = programmer.socket_module.sockets["DIP28"]
 		# make sure all associated pins are disabled so they are in
 		# a predictable state.
-		for i in range(1, 29):
-			self.socket[i].config = allpro88.PINCON.DISABLE
+		for channel in self.socket.values():
+			channel.config = allpro88.PINCON.DISABLE
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 15 V and VTH to 2 V
@@ -31,9 +31,9 @@ class m27c512(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# make sure all non-power pins are disabled so they don't
 		# have voltages on them when power is removed from the chip
-		for i in range(1, 29):
-			if i not in (14, 28):
-				self.socket[i].config = allpro88.PINCON.DISABLE
+		for pin_number, channel in self.socket.items():
+			if pin_number not in (14, 28):
+				channel.config = allpro88.PINCON.DISABLE
 		# set VDAC supply to 0
 		self.socket[28].vdac = 0
 		self.programmer.load_dacs()
