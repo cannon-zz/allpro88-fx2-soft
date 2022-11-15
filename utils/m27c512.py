@@ -47,8 +47,8 @@ class m27c512(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27, 1))
-	data = devices.bus((11, 12, 13, 15, 16, 17, 18, 19))
+	address = devices.bus_ttl((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27, 1))
+	data = devices.bus_ttl((11, 12, 13, 15, 16, 17, 18, 19))
 	chip_enable = devices.flag_ttl_active_low(20)
 	output_enable = devices.flag_ttl_active_low(22)
 

@@ -2,12 +2,45 @@ import allpro88
 
 
 class bus(object):
+	"""
+	A collection of pins whose digital states represent an integer
+	number.  The pins can be used for output or input.  To use the bus
+	for output, write a value to it.  To use the bus for input, read a
+	value from it.  To switch a bus that is being used for output to
+	input, write None to the bus to float the pins.
+	"""
+	# subclasses must override these
+	inactive = None
+	active = None
+
 	def __init__(self, pin_numbers, min_word = None, max_word = None):
+		"""
+		pin_numbers:  sequence of socket pin numbers for this bus
+		in order from least-significant bit to most-significant
+		bit.
+
+		min_word, max_word:  the numeric value written to the bus
+		will be restricted to the range min_word <= word <=
+		max_word.  If None (default), min_word is set to 0 and
+		max_word is defined by the number of pins.
+		"""
 		self.min_word = 0 if min_word is None else min_word
 		self.max_word = 2**len(pin_numbers) - 1 if max_word is None else max_word
 		self.pin_numbers = tuple((1 << i, pin_number) for i, pin_number in enumerate(pin_numbers))
+		# to improve performance, when setting pin states only pins
+		# whose state has changed are updated.  .last_state = None
+		# forces all pins to be updated, otherwise .last_state
+		# contains the most recently written word, and an exclusive
+		# or operation is used to identify the bits that need
+		# updating.
+		self.last_state = None
 
 	def __get__(self, obj, objtype = None):
+		"""
+		Return the integer value corresponding to the bus' pin
+		voltage comparators.  The "high"/"low" states are defined
+		by the VTH voltage, not the .inactive and .active states.
+		"""
 		data = 0
 		for bit, pin_number in self.pin_numbers:
 			if obj.socket[pin_number]:
@@ -15,12 +48,35 @@ class bus(object):
 		return data
 
 	def __set__(self, obj, word):
-		# check type compatibility and range
-		word = int(word)
-		if not (self.min_word <= word <= self.max_word):
-			raise ValueError("0x%X <= word <= 0x%X: 0x%X" % (self.min_word, self.max_word, word))
-		for bit, pin_number in self.pin_numbers:
-			obj.socket[pin_number].config = allpro88.PINCON.LOGICH if (word & bit) else allpro88.PINCON.LOGICL
+		"""
+		Set the pins of the bus to either .inactive or .active
+		according to the bits of the integer word.  If word is None
+		the pins are floated.  Only pins whose state is different
+		from the previous value written will be updated, so if code
+		elsewhere is playing with the pin states that should be
+		taken into consideration.
+		"""
+		# disable (float) pins if word is None
+		if word is None:
+			for bit, pin_number in self.pin_numbers:
+				obj.socket[pin_number].config = allpro88.PINCON.DISABLED
+				self.last_state = None
+		else:
+			# check type compatibility and range
+			word = int(word)
+			if not (self.min_word <= word <= self.max_word):
+				raise ValueError("0x%X <= word <= 0x%X: 0x%X" % (self.min_word, self.max_word, word))
+			mask = -1 if self.last_state is None else (self.last_state ^ word)
+			# set the pin states
+			for bit, pin_number in self.pin_numbers:
+				if mask & bit:
+					obj.socket[pin_number].config = self.active if (word & bit) else self.inactive
+			self.last_state = word
+
+
+class bus_ttl(bus):
+	inactive = allpro88.PINCON.LOGICL
+	active = allpro88.PINCON.LOGICH
 
 
 #

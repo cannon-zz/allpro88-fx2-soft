@@ -47,8 +47,8 @@ class hn462732(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus((8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))
-	data = devices.bus((9, 10, 11, 13, 14, 15, 16, 17))
+	address = devices.bus_ttl((8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))
+	data = devices.bus_ttl((9, 10, 11, 13, 14, 15, 16, 17))
 	chip_enable = devices.flag_ttl_active_low(18)
 	output_enable = devices.flag_ttl_active_low(20)
 
