@@ -18,7 +18,9 @@ class m27c512(object):
 		self.programmer.vth = self.programmer.vth.invcal(2.)
 
 		# configure power pins
+		self.socket[14].bypass = True
 		self.socket[14].config = allpro88.PINCON.GND
+		self.socket[28].bypass = True
 		self.socket[28].config = allpro88.PINCON.VDAC
 		# apply 5 V
 		self.socket[28].vdac = self.socket[28].invcal(5.)
@@ -36,7 +38,9 @@ class m27c512(object):
 		self.socket[28].vdac = 0
 		self.programmer.load_dacs()
 		# now disable power
+		self.socket[14].bypass = False
 		self.socket[14].config = allpro88.PINCON.DISABLE
+		self.socket[28].bypass = False
 		self.socket[28].config = allpro88.PINCON.DISABLE
 
 		# turn off programmer power supplies

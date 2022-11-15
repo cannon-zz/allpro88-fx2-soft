@@ -18,7 +18,9 @@ class hn462732(object):
 		self.programmer.vth = self.programmer.vth.invcal(1.5)
 
 		# configure power pins
+		self.socket[12].bypass = True
 		self.socket[12].config = allpro88.PINCON.GND
+		self.socket[24].bypass = True
 		self.socket[24].config = allpro88.PINCON.VDAC
 		# apply 5 V
 		self.socket[24].vdac = self.socket[24].invcal(5.)
@@ -36,7 +38,9 @@ class hn462732(object):
 		self.socket[24].vdac = 0
 		self.programmer.load_dacs()
 		# now disable power
+		self.socket[12].bypass = False
 		self.socket[12].config = allpro88.PINCON.DISABLE
+		self.socket[24].bypass = False
 		self.socket[24].config = allpro88.PINCON.DISABLE
 
 		# turn off programmer power supplies
