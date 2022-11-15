@@ -149,7 +149,7 @@ class socket_module_AP88_PLCC(socket_module):
 			# FIXME
 		},
 
-		# 48 pin ZIF socket
+		# 48 pin DIP socket
 		"DIP48": {
 			1:	40,
 			2:	41,
@@ -207,7 +207,7 @@ class socket_module_AP88_PLCC(socket_module):
 
 		# provide socket definitions for DIP packages smaller than
 		# 48 pins.  these packages get inserted into the 48 pin
-		# socket according to the diagram on the socket module,
+		# socket according to the diagram on the socket module.
 		# the drawing only shows 8, 16, 20, 24, 28, 32 and 40 pin
 		# packages, but for completeness we generate definitions
 		# for all even counts of pins starting with 2.
