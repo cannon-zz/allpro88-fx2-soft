@@ -51,8 +51,8 @@ class m27c256(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address_bus = devices.bus((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))
-	data_bus = devices.bus((11, 12, 13, 15, 16, 17, 18, 19))
+	address = devices.bus((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))
+	data = devices.bus((11, 12, 13, 15, 16, 17, 18, 19))
 	chip_enable = devices.flag(20, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
 	output_enable = devices.flag(22, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
 
@@ -62,9 +62,9 @@ with open("dump.dat", "wb") as dump:
 		with m27c256(programmer) as device:
 			device.chip_enable = True
 
-			for device.address_bus in tqdm(range(0x8000), desc = "Reading"):
+			for device.address in tqdm(range(0x8000), desc = "Reading"):
 				device.output_enable = True
-				dump.write(bytearray((device.data_bus,)))
+				dump.write(bytearray((device.data,)))
 				device.output_enable = False
 
 			device.chip_enable = False

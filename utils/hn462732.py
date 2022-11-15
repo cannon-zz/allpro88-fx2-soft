@@ -47,8 +47,8 @@ class hn462732(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address_bus = devices.bus((8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))
-	data_bus = devices.bus((9, 10, 11, 13, 14, 15, 16, 17))
+	address = devices.bus((8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))
+	data = devices.bus((9, 10, 11, 13, 14, 15, 16, 17))
 	chip_enable = devices.flag(18, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
 	output_enable = devices.flag(20, inactive = allpro88.PINCON.LOGICH, active = allpro88.PINCON.LOGICL)
 
@@ -58,9 +58,9 @@ with open("dump.dat", "wb") as dump:
 		with hn462732(programmer) as device:
 			device.chip_enable = True
 
-			for device.address_bus in tqdm(range(0x1000), desc = "Reading"):
+			for device.address in tqdm(range(0x1000), desc = "Reading"):
 				device.output_enable = True
-				dump.write(bytearray((device.data_bus,)))
+				dump.write(bytearray((device.data,)))
 				device.output_enable = False
 
 			device.chip_enable = False
