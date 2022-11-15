@@ -37,7 +37,12 @@ class flag(object):
 		self.pin_number = pin_number
 
 	def __get__(self, obj, objtype = None):
-		return NotImplementedError
+		"""
+		Returns the state of the pin's comparator.  The
+		comparator's threshold is set by VTH, not the values of
+		.inactive and .active.
+		"""
+		return bool(obj.socket[self.pin_number])
 
 	def __set__(self, obj, boolean):
 		"""
