@@ -316,7 +316,7 @@ class allpro88(object):
 			channel.vdac = 0
 		# set all variable power supplies to 0 V
 		self.vpul = 0
-		self.load_dacs()
+		self.load_dacs()	# also updates pin driver DACs
 		self.vsr = 0
 		self.vth = 0
 		self.vtst = 0
@@ -343,7 +343,7 @@ class allpro88(object):
 			channel.vdac = 0
 		# set all variable power supplies to 0 V
 		self.vpul = 0
-		self.load_dacs()
+		self.load_dacs()	# also updates pin driver DACs
 		self.vsr = 0
 		self.vth = 0
 		self.vtst = 0
