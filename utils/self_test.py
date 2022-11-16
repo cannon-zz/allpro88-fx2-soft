@@ -5,6 +5,33 @@ import time
 from tqdm import tqdm
 
 
+def vtst_measure_r(programmer, channel, max_milliamps):
+	# assume 10 mA is required for the VTST base pull-down circuit
+	vtst_current = 10
+
+	# set VTST voltage limit to max, and start with current
+	# limit set to 0
+	programmer.vtst = 255
+	# we seem to need to warm it up a bit ... ?
+	programmer.itst = vtst_current
+	time.sleep(0.1)
+
+	# ramp current, taking voltage readings.
+	current = list(range(max_milliamps))
+	voltage = []
+	for i in current:
+		programmer.itst = vtst_current + i
+		time.sleep(0.05)
+		voltage.append(channel.measure_v())
+
+	# turn off VTST and disable channel
+	programmer.vtst = 0
+	programmer.itst = 0
+
+	# report resistance
+	return scipy.stats.linregress(current, voltage)[0] * 1000.
+
+
 class channel_driver_test_suite(object):
 	"""
 	Run a series of tests on a single pin driver channel, and collect
@@ -114,37 +141,35 @@ class channel_driver_test_suite(object):
 		# and the power dissipated won't get above 1/8 W.  those
 		# are probably safe for the 5.4 kOhm resistors.
 
-		# assume 10 mA is required for the VTST gate drive circuit
-		vtst_current = 10
-
-		# set VTST voltage limit to max, and start with current
-		# limit set to 0
-		self.programmer.vtst = 255
-		# we seem to need to warm it up a bit ... ?
-		self.programmer.itst = vtst_current
-		time.sleep(0.1)
-
 		# enable VTST and pull-down modes together
 		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.PULLDN
 
-		# ramp current, taking voltage readings.  shouldn't be
-		# possible to go above 5 mA so don't try
-		current = list(range(5))
-		voltage = []
-		for i in current:
-			self.programmer.itst = vtst_current + i
-			time.sleep(0.05)
-			voltage.append(self.channel.measure_v())
+		# measure resistance.  don't let current exceed 5 mA
+		R = vtst_measure_r(self.programmer, self.channel, 5)
 
-		# turn off VTST and disable channel
+		# disable VTST
 		self.channel.config = allpro88.PINCON.DISABLE
-		self.programmer.vtst = 0
-		self.programmer.itst = 0
 
-		# report resistance
-		R = scipy.stats.linregress(current, voltage)[0] * 1000.
 		failed = R < 5000.
 		print("channel %d pull-down resistance:  %.0f Ohm%s" % (self.channel.channel, R, "" if not failed else "\t<-- FAILED"))
+
+
+	def test_logicl(self):
+		"""
+		The TTL low driver is a 50 Ohm resistor to ground.  This
+		test uses a VTST current ramp to test for this resistance.
+		"""
+		# enable VTST and logic low modes together
+		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.LOGICL
+
+		# measure resistance.  don't let current exceed 20 mA
+		R = vtst_measure_r(self.programmer, self.channel, 10)
+
+		# disable VTST
+		self.channel.config = allpro88.PINCON.DISABLE
+
+		failed = False
+		print("channel %d logic low pull-down resistance:  %.0f Ohm%s" % (self.channel.channel, R, "" if not failed else "\t<-- FAILED"))
 
 
 	def test_vdac_ramp(self):
@@ -299,6 +324,8 @@ with allpro88.allpro88() as programmer:
 		test_suite.test_vtst()
 
 		test_suite.test_pulldn()
+
+		test_suite.test_logicl()
 
 		print("\n")
 
