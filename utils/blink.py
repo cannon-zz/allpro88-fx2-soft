@@ -10,8 +10,8 @@ def blink_idle(programmer, n = 10):
 		time.sleep(0.5)
 
 def blink_zif_pin1(programmer, n = 10):
-	programmer.vadj = 35	# 5 V
-	programmer.vtst = 26	# 3 V
+	programmer.vadj = programmer.vadj.invcal(5.)	# 5 V
+	programmer.vtst = programmer.vtst.invcal(3.)	# 3 V
 	programmer.itst = 15	# 15 mA
 	# set all pins to ground
 	for channel in programmer.channel.values():
@@ -20,7 +20,7 @@ def blink_zif_pin1(programmer, n = 10):
 	programmer.pcr_enable = True
 	# ZIF socket pin 1 between VTST and ground
 	channel = programmer.socket_module.sockets["DIP48"][1]
-	for i in tqdm(range(n), desc = "blink ZIF pin 1"):
+	for i in tqdm(range(n), desc = "blink DIP pin 1"):
 		channel.config = allpro88.PINCON.VTST
 		time.sleep(0.5)
 		channel.config = allpro88.PINCON.GND
