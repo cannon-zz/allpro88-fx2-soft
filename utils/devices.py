@@ -79,6 +79,91 @@ class bus_ttl(bus):
 	active = allpro88.PINCON.LOGICH
 
 
+class bus_iic(object):
+	"""
+	IIC (aka I2C) bus.  NOTE:  must set VPUL = VCC for the chip and VTH
+	to the minimum bus "high" state voltage.
+
+	example sequences:
+
+	start()
+	write_byte()	# return value = ack
+	write_byte()
+	...
+	read_byte(ack)	# return value = byte
+	...
+	stop()
+	"""
+	lo = allpro88.PINCON.LOGICL | allpro88.PINCON.PULLUP
+	hi = allpro88.PINCON.PULLUP
+	flt = allpro88.PINCON.PULLUP
+
+	def __init__(self, socket, sda, scl):
+		# the socket object containing the part
+		self.socket = socket
+		# SDA and SCL pins
+		self.sda = socket[sda]
+		self.scl = socket[scl]
+		# start in idle state
+		self.idle()
+
+	def idle(self):
+		# idle state
+		self.sda.config = self.hi
+		self.scl.config = self.hi
+
+	def start(self):
+		# do start sequence.  must be in idle state
+		self.sda.config = self.lo
+
+	def stop(self):
+		# do stop sequence.  but have just read or written a byte
+		# pull clock low, pull data low, raise clock, then raise
+		# data.  bus is left in idle state
+		self.scl.config = self.lo
+		self.sda.config = self.lo
+		self.scl.config = self.hi
+		self.sda.config = self.hi
+
+	def write_bit(self, boolean):
+		# pull clock low, put bit onto data, raise clock
+		self.scl.config = self.lo
+		self.sda.config = self.hi if boolean else self.lo
+		self.scl.config = self.hi
+		# a 4 us pause is required here.  we assume the USB I/O
+		# overhead is more than that, and the pause will take care
+		# of itself
+		# NOTE:  finally, clock must be pulled low again to
+		# complete the bit.  the calling code will need to ensure
+		# this.  calling this function repeatedly in sequence will
+		# do the correct thing.
+
+	def read_bit(self):
+		# pull clock low, raise clock, read data state
+		# NOTE:  finally, clock must be pulled low again to
+		# complete the bit.  the calling code will need to ensure
+		# this.  calling this function repeatedly in sequence will
+		# do the correct thing.
+		self.scl.config = self.lo
+		self.scl.config = self.hi
+		return bool(self.sda)
+
+	def write_byte(self, byte):
+		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
+			self.write_bit(byte & bit)
+		# read the ack state
+		return not self.read_bit()
+
+	def read_byte(self, ack = True):
+		data = 0
+		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
+			if self.read_bit():
+				data |= bit
+		# write the ack state
+		self.write_bit(not ack)
+		return data
+
+
 #
 # Boolean state pins
 #
