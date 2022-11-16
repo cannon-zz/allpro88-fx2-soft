@@ -233,7 +233,7 @@ class channel_driver_test_suite(object):
 		"""
 		self.channel.config = allpro88.PINCON.VTST
 
-		# measure the resistance to ground in the gate drive
+		# measure the resistance to ground in the base pull-down
 		# circuit
 
 		# limit the output voltage to about 9 V.  precise value not
@@ -251,9 +251,9 @@ class channel_driver_test_suite(object):
 		idac = list(range(10))
 		R = scipy.stats.linregress(idac, [self.channel.measure_v() for self.programmer.itst in idac])[0] * 1000.
 		self.programmer.itst = 0	# reset to 0
-		print("channel %d VTST gate drive resistance: %.3g Ohm" % (self.channel.channel, R))
+		print("channel %d VTST base pull-down resistance: %.3g Ohm" % (self.channel.channel, R))
 
-		# measure the current limit threshold in the gate drive
+		# measure the current limit threshold in the base pull-down
 		# circuit by setting the drive voltage to max and seeing
 		# what VTST current limit allows us to achieve that voltage
 
@@ -264,7 +264,7 @@ class channel_driver_test_suite(object):
 			if self.channel.measure_v() > 20.:
 				break
 		failed = current_limit > 12
-		print("channel %d VTST gate drive current limit: %.3g mA%s" % (self.channel.channel, current_limit, "" if not failed else "\t<-- FAILED"))
+		print("channel %d VTST base pull-down current limit: %.3g mA%s" % (self.channel.channel, current_limit, "" if not failed else "\t<-- FAILED"))
 
 		self.programmer.vtst = 0
 		self.programmer.itst = 0
