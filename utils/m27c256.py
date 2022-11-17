@@ -10,6 +10,7 @@ class m27c256(object):
 		# a predictable state.
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
+			channel.vdac = 0
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 15 V and VTH to 2 V

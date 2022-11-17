@@ -12,6 +12,7 @@ class st24w04(object):
 		# a predictable state.
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
+			channel.vdac = 0
 
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
 
