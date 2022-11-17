@@ -13,7 +13,10 @@ class st24w04(object):
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
-
+		self.power = devices.power(self.programmer, self.socket, {
+			4: 0.0,
+			8: 5.0
+		})
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
 
 	def __enter__(self):
@@ -22,33 +25,19 @@ class st24w04(object):
 		self.programmer.vadj = self.programmer.vadj.invcal(15.)
 		self.programmer.vpul = self.programmer.vadj.invcal(5.)
 		self.programmer.vth = self.programmer.vth.invcal(2.)
-
-		# configure power pins.  VPP = VCC for read
-		self.socket[4].bypass = True
-		self.socket[4].config = allpro88.PINCON.GND
-		self.socket[8].bypass = True
-		self.socket[8].config = allpro88.PINCON.VDAC
-		# apply 5 V
-		self.socket[8].vdac = self.socket[8].invcal(5.)
-		self.programmer.load_dacs()
-
+		# turn on device power
+		self.power.on()
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# make sure all non-power pins are disabled so they don't
 		# have voltages on them when power is removed from the chip
 		for pin_number, channel in self.socket.items():
-			if pin_number not in (4, 8):
+			if pin_number not in self.power.pins:
 				channel.config = allpro88.PINCON.DISABLE
-		# set VDAC supplies to 0
-		self.socket[8].vdac = 0
-		self.programmer.load_dacs()
-		# now disable power
-		self.socket[4].bypass = False
-		self.socket[4].config = allpro88.PINCON.DISABLE
-		self.socket[8].bypass = False
-		self.socket[8].config = allpro88.PINCON.DISABLE
-
+				channel.vdac = 0
+		# turn off pull-up voltage and device power
+		self.power.off()
 		# turn off programmer power supplies
 		self.programmer.vth = 0
 		self.programmer.vpul = 0

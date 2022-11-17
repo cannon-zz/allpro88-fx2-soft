@@ -11,45 +11,31 @@ class tms28f010(object):
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
+		# VPP = VCC or GND for read (use VCC)
+		self.power = devices.power(self.programmer, self.socket, {
+			1: 5.0,
+			16: 0.0,
+			32: 5.0
+		})
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 15 V and VTH to 1.5 V
 		self.programmer.pcr_enable = True
 		self.programmer.vadj = self.programmer.vadj.invcal(15.)
 		self.programmer.vth = self.programmer.vth.invcal(1.5)
-
-		# configure power pins.  VPP = VCC or GND for read (use VCC)
-		self.socket[1].bypass = True
-		self.socket[1].config = allpro88.PINCON.VDAC
-		self.socket[16].bypass = True
-		self.socket[16].config = allpro88.PINCON.GND
-		self.socket[32].bypass = True
-		self.socket[32].config = allpro88.PINCON.VDAC
-		# apply 5 V
-		self.socket[1].vdac = self.socket[1].invcal(5.)
-		self.socket[32].vdac = self.socket[32].invcal(5.)
-		self.programmer.load_dacs()
-
+		# turn on device power
+		self.power.on()
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# make sure all non-power pins are disabled so they don't
 		# have voltages on them when power is removed from the chip
 		for pin_number, channel in self.socket.items():
-			if pin_number not in (1, 16, 32):
+			if pin_number not in self.power.pins:
 				channel.config = allpro88.PINCON.DISABLE
-		# set VDAC supplies to 0
-		self.socket[1].vdac = 0
-		self.socket[32].vdac = 0
-		self.programmer.load_dacs()
-		# now disable power
-		self.socket[1].bypass = False
-		self.socket[1].config = allpro88.PINCON.DISABLE
-		self.socket[16].bypass = False
-		self.socket[16].config = allpro88.PINCON.DISABLE
-		self.socket[32].bypass = False
-		self.socket[32].config = allpro88.PINCON.DISABLE
-
+				channel.vdac = 0
+		# turn off device power
+		self.power.off()
 		# turn off programmer power supplies
 		self.programmer.vth = 0
 		self.programmer.vadj = 0

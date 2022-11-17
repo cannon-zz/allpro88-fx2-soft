@@ -11,39 +11,29 @@ class hn462732(object):
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
+		self.power = devices.power(self.programmer, self.socket, {
+			12: 0.0
+			24: 5.0
+		})
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 15 V and VTH to 1.5 V
 		self.programmer.pcr_enable = True
 		self.programmer.vadj = self.programmer.vadj.invcal(15.)
 		self.programmer.vth = self.programmer.vth.invcal(1.5)
-
-		# configure power pins
-		self.socket[12].bypass = True
-		self.socket[12].config = allpro88.PINCON.GND
-		self.socket[24].bypass = True
-		self.socket[24].config = allpro88.PINCON.VDAC
-		# apply 5 V
-		self.socket[24].vdac = self.socket[24].invcal(5.)
-		self.programmer.load_dacs()
-
+		# turn on device power
+		self.power.on()
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# make sure all non-power pins are disabled so they don't
 		# have voltages on them when power is removed from the chip
 		for pin_number, channel in self.socket.items():
-			if pin_number not in (12, 24):
+			if pin_number not in self.power.pins:
 				channel.config = allpro88.PINCON.DISABLE
-		# set VDAC supply to 0
-		self.socket[24].vdac = 0
-		self.programmer.load_dacs()
-		# now disable power
-		self.socket[12].bypass = False
-		self.socket[12].config = allpro88.PINCON.DISABLE
-		self.socket[24].bypass = False
-		self.socket[24].config = allpro88.PINCON.DISABLE
-
+				channel.vdac = 0
+		# turn off device power
+		self.power.off()
 		# turn off programmer power supplies
 		self.programmer.vth = 0
 		self.programmer.vadj = 0
