@@ -14,7 +14,7 @@ class power(object):
 			self.socket[pin].config = allpro88.PINCON.VDAC if voltage else allpro88.PINCON.GND
 		# apply power
 		for pin, voltage in self.pin_voltage_map.items():
-			self.socket[pin].vdac = self.socket[pin].invcal(voltage) if voltage else 0
+			self.socket[pin].vdac = allpro88.volt(voltage) if voltage else 0
 		self.programmer.load_dacs()
 
 	def off(self):

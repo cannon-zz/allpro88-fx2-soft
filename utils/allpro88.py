@@ -119,6 +119,14 @@ class command(object):
 		return self.cmd
 
 
+class volt(float):
+	"""
+	Sub-class of float used to indicate to a DAC proxy that the value
+	should be interpreted as a voltage, not a DAC count.
+	"""
+	pass
+
+
 class dacregister(object):
 	"""
 	Write a value to a DAC register.  Provides type conversion and
@@ -146,6 +154,10 @@ class dacregister(object):
 		return dac
 
 	def __set__(self, obj, dac):
+		# if the calling code has given us a volt value, convert to
+		# DAC count
+		if type(dac) is volt:
+			dac = self.invcal(dac)
 		# write value to programmer register
 		obj.write_command("=", self.address, self.ensure_dac_value(dac))
 		time.sleep(self.transient)
@@ -224,7 +236,7 @@ class channel_proxy(object):
 		vdac, = self.programmer.write_command("M", self.channel)
 		return self.programmer.vth.cal(vdac)
 
-	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(dac)))
+	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(self.invcal(dac) if type(dac) is volt else dac)))
 
 	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
 

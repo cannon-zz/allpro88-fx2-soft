@@ -10,8 +10,8 @@ def blink_idle(programmer, n = 10):
 		time.sleep(0.5)
 
 def blink_zif_pin1(programmer, n = 10):
-	programmer.vadj = programmer.vadj.invcal(5.)	# 5 V
-	programmer.vtst = programmer.vtst.invcal(3.)	# 3 V
+	programmer.vadj = allpro88.volt(5.)
+	programmer.vtst = allpro88.volt(3.)
 	programmer.itst = 15	# 15 mA
 	# set all pins to ground
 	for channel in programmer.channel.values():

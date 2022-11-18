@@ -21,8 +21,8 @@ class m27c1001(object):
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 15 V and VTH to 1.5 V
 		self.programmer.pcr_enable = True
-		self.programmer.vadj = self.programmer.vadj.invcal(15.)
-		self.programmer.vth = self.programmer.vth.invcal(1.5)
+		self.programmer.vadj = allpro88.volt(15.)
+		self.programmer.vth = allpro88.volt(1.5)
 		# turn on device power
 		self.power.on()
 		return self
