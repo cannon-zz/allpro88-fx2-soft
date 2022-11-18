@@ -261,18 +261,38 @@ static void ALLPRO88_ADDR_SET(WORD addr)
 #define ALLPRO88_NWR    PD6
 #define ALLPRO88_NRESET PD5
 
-/* kevtris' FPGA based controller inserts, I believe, a 0.5 us delay into
- * ALLPRO port accesses.  at 48 MHz, a clock cycle is about 21 ns.  the
- * fx2's NOP instruction is 1 "instruction cycle", which the documentation
- * says is 4 clock cycles = 83.3 ns.  therefore, 6 NOP = 0.5 us.  I don't
- * know where in the read/write cycle to insert them.  see the read/write
- * functions below for explanations of the delays that get inserted. */
-
-#define ALLPRO88_SYNC	SYNCDELAY6	/* 0.5 us @ 48 MHz CPU clock */
-
 
 /*
- * read a byte from the ALLPRO 88
+ * read a byte from the ALLPRO 88.  notes on timing:
+ *
+ * 74HCT251 (pin driver comparator output register).  the comparator
+ * outputs are always present on the data inputs so there is no switching
+ * time to account for in that regard.  the select lines are driven by the
+ * pin driver address bus which is synthesized from the external address
+ * bus by TIBPAL16L8-25CN programmable logic devices which have a 25 ns
+ * maximum propogation delay.  from select pins settling to output pin
+ * being valid is at most about 50 ns, and from output enable pin to output
+ * bin being valid is at most about 38 ns, which likely can be assumed to
+ * occur concurrently.  the output enable is generated from the /RD line
+ * and a board /SELECT line produced by the same programmable logic
+ * devices.  these propogate through two 74HCT02 quad nor gate elements
+ * before driving the output enable line, which adds an additional 52 ns of
+ * delay.  from external address bus being set to 74HCT251 being ready to
+ * respond to /RD is a total of about 75 ns;  from /RD being pulled low to
+ * the chip's output being valid is about 90 ns.  I see no reason why this
+ * can't all be occuring concurrently.  in the worst case scenario the data
+ * bus undergoes some rapid switching as the HCT251's output enable goes
+ * active before its select logic has settled, but as long as the receiving
+ * end waits appropriately long for the dust to settle it should be fine.
+ * anyway, at least 1 instruction cycle (83 ns) must elapse between setting
+ * the address bus and pulling /RD low, and adding the two stages of nor
+ * gate delay to that the output enable signal almost certainly can't go
+ * active until after the select logic has had time to settle.
+ *
+ * the HCT251's output is buffered by a 74LS245 transceiver with an 8 ns
+ * propagation time and about 25 ns time to change direction, so from
+ * the chip's output settling to it appearing on the programmer's external
+ * data bus there is an additional 32 ns.
  */
 
 
@@ -282,12 +302,12 @@ static BYTE allpro88_read(WORD addr)
 
 	/* set data bus for input */
 	ALLPRO88_DATA_FLOAT;
-	/* drive address bus */
+	/* drive address and pull /RD low.  no delay between the two is
+	 * used, the instruction timing is sufficient.  */
 	ALLPRO88_ADDR_SET(addr);
-	ALLPRO88_SYNC;	/* allow the bus to settle */
-	/* pull /RD low */
 	ALLPRO88_NRD = 0;
-	ALLPRO88_SYNC;	/* allow the bus to settle */
+	/* wait 83.3 ns for gate delays and bus settling */
+	NOP;
 	/* latch data bus */
 	data = ALLPRO88_DATA;
 	/* raise /RD */
@@ -298,27 +318,86 @@ static BYTE allpro88_read(WORD addr)
 
 
 /*
- * write a byte to the ALLPRO 88.  NOTE: the DAC chips have active low
- * write lines and so load data when /WR is held low, but the pin driver
- * register chips are clocked by a low-to-high transition on the /WR lines.
- * clocked by the positive going edge of /WR.  therefore, the data and
- * address buses must both be held in a valid state for both the negative
- * going and positive going edges of the /WR.
+ * write a byte to the ALLPRO 88.  notes on timing:
+ *
+ * DAC0832 (pin driver and VPUL DACs).  the DAC0832 chips are said to have
+ * "active low" write lines, but latch the data present on their inputs
+ * upon a low-to-high transition of the /WR control line.  the DAC chips's
+ * positive supply is 12 V, and the documentation says with that supply
+ * voltage /WR must be held low for at least 320 ns before being raised
+ * high again, the data bits must be held stable for at least 320 ns prior
+ * to the low-to-high transition of /WR, and must remain stable for about
+ * 30 ns after /WR is raised.  the /XFER timings are essentially identical,
+ * except the data bits in question are the outputs of the input latch not
+ * the external data bus, so the latch must have had latched the data at
+ * least 320 ns prior to a low-to-high transition of /XFER, etc.
+ *
+ * 74HCT273 octal latches (pin driver config registers).  data is latched
+ * on low-to-high transition of clock (/WR line).  /WR must be held low for
+ * at least 16 ns before a low-to-high transition, and cannot be pulled low
+ * again for at least 16 ns.  data must be valid for at least 12 ns prior
+ * to a low-to-high transition of /WR and stay valid for at least 3 ns
+ * after.
+ *
+ * AD7226 (power supply control DACs).  data is clocked in by a high-to-low
+ * transition of /WR.  /WR must be held low for at least 50 ns, and the
+ * data lines must be stable for at least 50 ns prior to the high-to-low
+ * transition.
+ *
+ * the data bus is buffered by a 74LS245 transceiver with an 8 ns
+ * propagation time and about 25 ns time to change direction, and on the
+ * pin driver modules by a 74HCT244 with a 13 ns propagation time, so from
+ * when the data bus is set it takes a worst-case time of about 46 ns
+ * before the value appears on the input pins to a device.
+ *
+ * the /WR lines for the pin driver DAC chips and pin driver HCT273 config
+ * latches are synthesized from the pin driver address bus by 74HCT138
+ * 3-to-8 line decoders which have a propogation delay of up to 38 ns, and
+ * the pin driver address lines are synthesized from the external address
+ * by TIBPAL16L8-25CN programmable logic devices which have a 25 ns maximum
+ * propogation delay, so from when the address bus is set it takes about
+ * 100 ns before the /WR signal will be routed to the correct physical
+ * chip.  for the HCT273's, there's an additional 74HCT02 quad nor gate
+ * used as an inverter delaying one of the address lines, but because the
+ * HCT273 has negligible setup and hold requirements compared to the
+ * DAC0832 chips we don't bother adding anything extra for that.
+ *
+ * at 48 MHz, a clock cycle is about 21 ns.  the fx2's NOP instruction is 1
+ * "instruction cycle", which the documentation says is 4 clock cycles =
+ * 83.3 ns.  therefore, 6 NOP = 0.5 us.  kevtris' documentation also speaks
+ * of inserting a 0.5 us pause in the I/O cycle, but doesn't say in what
+ * part of it exactly (read, write, setup, hold?).  the DAC0832 setup time
+ * for writes is likely what he means.
  */
 
 
 static void allpro88_write(WORD addr, BYTE data)
 {
-	/* drive address and data bus */
+	/* drive address.  100 ns must elapse before the internal
+	 * electronics can be assumed to have figured out how to respond to
+	 * this, which is about 1.5 instruction cycles.  we assume the time
+	 * spent configuring the data bus takes at least this much time */
 	ALLPRO88_ADDR_SET(addr);
+	/* drive data bus.  about 46 ns is required before this can be
+	 * assumed to be present on any device (about 0.5 instruction
+	 * cycles), plus whatever time is required for it to actually
+	 * stabilize.  one NOP used for the AD7226 setup time is 30 ns
+	 * longer than needed, and there is the time required to actually
+	 * execute the pull-/WR-low instruction, which together should
+	 * provide enough total wait time for the data bus to propogate and
+	 * settle, but rather than risk it I put a second NOP in (167 ns
+	 * total). */
 	ALLPRO88_DATA = data;
 	ALLPRO88_DATA_DRIVE;
-	ALLPRO88_SYNC;	/* allow the buses to settle */
-	/* pull /WR low */
+	NOP; NOP;
+	/* pull /WR low.  clocks AD7226s */
 	ALLPRO88_NWR = 0;
-	ALLPRO88_SYNC;	/* hold it to make sure it takes */
-	/* raise /WR */
+	/* hold data and /WR for 500 ns.  DAC0832 setup time */
+	NOP; NOP; NOP; NOP; NOP; NOP;
+	/* raise /WR.  clocks HCT273s and DAC0832s */
 	ALLPRO88_NWR = 1;
+	/* don't worry about final hold time.  firmware not fast enough to
+	 * violate it. */
 }
 
 
