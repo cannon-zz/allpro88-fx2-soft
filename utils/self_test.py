@@ -1,8 +1,10 @@
 import allpro88
+import numpy
 import scipy.stats
 import sys
 import time
 from tqdm import tqdm
+import yaml
 
 
 def vtst_measure_r(programmer, channel, max_milliamps):
@@ -179,32 +181,51 @@ class channel_driver_test_suite(object):
 		ramps the DAC from minimum to maximum and confirms the
 		voltage measured on the channel is within allowed
 		tolerance.
-
-		Partial, weak, shorts to ground often do not cause this
-		test to fail because the power supply can deliver enough
-		current to overcome the short.  Failure of this test for a
-		group of 8 channels likely indicates failure of the bus
-		interface circuitry.
 		"""
-		self.channel.config = allpro88.PINCON.VDAC
-		max_residual = 0.
-		rms_residual = 0.
-		for vdac in range(256):
-			self.channel.vdac = vdac
+		# configure for VDAC output.  enable the pull-down driver
+		# (5.4 kOhm to ground) so the output sees a load, otherwise
+		# the voltage drop across the final diode in the driver
+		# circuit isn't measured properly.  at the maximum output
+		# voltage, a bit less than 1/8 W is being dissipated by the
+		# pull-down resistor, which hopefully is safe.  turn on the
+		# bypass capacitor to reduce noise
+		self.channel.config = allpro88.PINCON.VDAC | allpro88.PINCON.PULLDN
+		self.channel.bypass = True
+
+		# run the DAC from 0 to 255 inclusively and measure the
+		# output voltage
+		self.vdac_ramp_x = numpy.arange(256)
+		self.vdac_ramp_y = numpy.zeros(256)
+		for i, dac in enumerate(self.vdac_ramp_x):
+			self.channel.vdac = dac
 			self.programmer.load_dacs()
-			expected = self.channel.cal(vdac)
-			measured = self.channel.measure_v()
-			residual = abs(measured - expected)
-			if residual > max_residual:
-				max_residual = residual
-			rms_residual += residual**2.
-		rms_residual = rms_residual**0.5 / 256.
-		failed = max_residual > 0.4
-		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+			# record median of 5 measurements
+			self.vdac_ramp_y[i] = list(sorted(self.channel.measure_v() for i in range(5)))[2]
+
+		# disable output
 		self.channel.vdac = 0
 		self.programmer.load_dacs()
+		self.channel.bypass = False
 		self.channel.config = allpro88.PINCON.DISABLE
 
+		# report deviation from calibration model
+		expected = numpy.array([self.channel.cal(dac) for dac in self.vdac_ramp_x])
+		max_residual = abs(self.vdac_ramp_y[2:] - expected[2:]).max()
+		rms_residual = ((self.vdac_ramp_y[2:] - expected[2:])**2.).mean()**0.5
+		failed = max_residual > 0.3
+		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+
+		# derive updated calibration model and report what its
+		# accuracy would have been
+		self.vdac_ramp_cal = {
+			"poly": tuple(map(float, numpy.polyfit(self.vdac_ramp_x[6:], self.vdac_ramp_y[6:], 2))),
+			"min": float(numpy.median(self.vdac_ramp_y[:4]))
+		}
+		print("\tupdated calibration model:  max(%.3g, %.3g dac^2 + %.3g dac + %.3g)" % ((self.vdac_ramp_cal["min"],) + self.vdac_ramp_cal["poly"]))
+		@numpy.vectorize
+		def model(dac):
+			return max(self.vdac_ramp_cal["min"], (self.vdac_ramp_cal["poly"][0] * dac + self.vdac_ramp_cal["poly"][1]) * dac + self.vdac_ramp_cal["poly"][2])
+		print("\tupdated model's max residual = %.3g V" % (abs(model(self.vdac_ramp_x[2:]) - self.vdac_ramp_y[2:]).max()))
 
 	def test_vtst(self):
 		"""
@@ -296,6 +317,7 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 
+calibration = {}
 with allpro88.allpro88() as programmer:
 	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected"))
 
@@ -308,6 +330,9 @@ with allpro88.allpro88() as programmer:
 	programmer.vadj = 255
 
 	for channel in range(48):
+		calibration_name = "channel%02d" % channel
+		calibration[calibration_name] = {}
+
 		test_suite = channel_driver_test_suite(programmer, programmer.channel[channel])
 		print("channel %d --> pin driver group %d, DAC U%d, hybrid H%d, hybrid channel %d" % ((channel,) + programmer.channel[channel].physical))
 		try:
@@ -320,6 +345,7 @@ with allpro88.allpro88() as programmer:
 		test_suite.test_vpul_ramp()
 
 		test_suite.test_vdac_ramp()
+		calibration[calibration_name]["vdac_ramp_cal"] = test_suite.vdac_ramp_cal
 
 		test_suite.test_vtst()
 
@@ -331,3 +357,6 @@ with allpro88.allpro88() as programmer:
 
 	# context manager turns off all power supplies, we don't have to do
 	# that here.
+
+with open("calibration.dat", "w") as calfile:
+	yaml.dump(calibration, calfile)

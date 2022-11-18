@@ -1,6 +1,7 @@
 from enum import IntEnum
 import time
 import usb.core
+import yaml
 from socket_module import socket_modules
 
 
@@ -193,7 +194,7 @@ class dacregister(object):
 
 
 class channel_proxy(object):
-	def __init__(self, programmer, channel):
+	def __init__(self, programmer, channel, cal_data = {"min": 0.189, "poly": (0., 0.1, -0.62)}):
 		self.programmer = programmer
 		# integer channel number
 		self.channel = channel
@@ -218,6 +219,9 @@ class channel_proxy(object):
 		else:
 			# only first 48 channels have bypass capacitors
 			self.bypass_address = None
+		# set calibration model.  3-tuple giving polynomial
+		# coefficients starting with highest order.
+		self.cal_data = cal_data
 
 	def __bool__(self):
 		"""
@@ -253,7 +257,7 @@ class channel_proxy(object):
 			self.programmer.write_command("=", self.bypass_address, 1 if boolean else 0)
 
 	def cal(self, dac):
-		return max(0., dac * 255./256. * 0.1 - 0.5)
+		return max(self.cal_data["min"], (self.cal_data["poly"][0] * dac + self.cal_data["poly"][1]) * dac + self.cal_data["poly"][2])
 
 	invcal = dacregister.invcal
 
@@ -283,7 +287,7 @@ class allpro88(object):
 
 	command_queue_size = 64	# commands
 
-	def __init__(self):
+	def __init__(self, calibration_file = None):
 		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
 		if self.device is None:
@@ -299,6 +303,18 @@ class allpro88(object):
 		# attribute (the socket_module classes use this dictionary
 		# to initialize their pin mappings
 		self.channel = dict((i, channel_proxy(self, i)) for i in range(88))
+
+		# load calibration data if provided
+		if calibration_file is not None:
+			cal_data = yaml.unsafe_load(calibration_file)
+			for i, channel in self.channel.items():
+				try:
+					channel_cal_data = cal_data["channel%02d" % i]
+				except KeyError:
+					# no calibration data for this
+					# channel
+					continue
+				channel.cal_data = channel_cal_data["vdac_ramp_cal"]
 
 		# command queues
 		self.out_queue = []
