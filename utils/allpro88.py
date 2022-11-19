@@ -194,7 +194,7 @@ class dacregister(object):
 
 
 class channel_proxy(object):
-	def __init__(self, programmer, channel, cal_data = {"min": 0.189, "poly": (0., 0.1, -0.62)}):
+	def __init__(self, programmer, channel, cal_data = {"min": 0.1892, "poly": (4.479e-06, 0.09901, -0.6891)}):
 		self.programmer = programmer
 		# integer channel number
 		self.channel = channel
