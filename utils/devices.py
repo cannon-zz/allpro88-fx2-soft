@@ -11,10 +11,13 @@ class power(object):
 		# configure pins
 		for pin, voltage in self.pin_voltage_map.items():
 			self.socket[pin].bypass = True
-			self.socket[pin].config = allpro88.PINCON.VDAC if voltage else allpro88.PINCON.GND
+			if voltage:
+				self.socket[pin].config = allpro88.PINCON.VDAC
+				self.socket[pin].vdac = allpro88.volt(voltage)
+			else:
+				self.socket[pin].config = allpro88.PINCON.GND
+				self.socket[pin].vdac = 0
 		# apply power
-		for pin, voltage in self.pin_voltage_map.items():
-			self.socket[pin].vdac = allpro88.volt(voltage) if voltage else 0
 		self.programmer.load_dacs()
 
 	def off(self):
@@ -22,7 +25,7 @@ class power(object):
 		for pin in self.pin_voltage_map:
 			self.socket[pin].vdac = 0
 		self.programmer.load_dacs()
-		# disable power
+		# disable pins
 		for pin in self.pin_voltage_map:
 			self.socket[pin].bypass = False
 			self.socket[pin].config = allpro88.PINCON.DISABLE
