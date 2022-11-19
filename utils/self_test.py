@@ -1,4 +1,18 @@
 import allpro88
+import matplotlib
+from matplotlib import figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+matplotlib.rcParams.update({
+	"font.size": 10.0,
+	"axes.titlesize": 10.0,
+	"axes.labelsize": 10.0,
+	"xtick.labelsize": 8.0,
+	"ytick.labelsize": 8.0,
+	"legend.fontsize": 8.0,
+	"figure.dpi": 300,
+	"savefig.dpi": 300,
+	"text.usetex": True
+})
 import numpy
 import scipy.stats
 import sys
@@ -226,6 +240,22 @@ class channel_driver_test_suite(object):
 		def model(dac):
 			return max(self.vdac_ramp_cal["min"], (self.vdac_ramp_cal["poly"][0] * dac + self.vdac_ramp_cal["poly"][1]) * dac + self.vdac_ramp_cal["poly"][2])
 		print("\tupdated model's max residual = %.3g V" % (abs(model(self.vdac_ramp_x[2:]) - self.vdac_ramp_y[2:]).max()))
+
+		# plot the results
+		fig = figure.Figure()
+		FigureCanvas(fig)
+		axes = fig.gca()
+		axes.set_title("Channel %02d Voltage vs. DAC" % self.channel.channel)
+		axes.set_xlabel("DAC Value (counts)")
+		axes.set_ylabel("Voltage (volts)")
+		axes.scatter(self.vdac_ramp_x, self.vdac_ramp_y, marker = ".", color = "k")
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		axes.set_xlim((0, 256))
+		fig.savefig("channel%02d_vdac_ramp.png" % self.channel.channel)
+
 
 	def test_vtst(self):
 		"""
