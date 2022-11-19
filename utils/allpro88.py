@@ -493,7 +493,8 @@ class allpro88(object):
 
 
 	vsr = dacregister(0x0300, cal = (lambda dac: dac * 255./256. * 0.1))
-	vth = dacregister(0x0301, cal = (lambda dac: dac * 255./256. * 0.1))
+	#vth = dacregister(0x0301, cal = (lambda dac: dac * 255./256. * 0.1))
+	vth = dacregister(0x0301, cal = (lambda dac: -1.01764700e-02 + 9.96709040e-02 * dac + 5.55818066e-07 * dac*dac))
 	vadj = dacregister(0x0302, transient = 0.05, cal = (lambda dac: 0.371637285 + dac * 0.117641953 + dac**2. * -9.13385655e-07))
 	vadjth = dacregister(0x0303)
 	# must call .load_dacs() for vpul changes
