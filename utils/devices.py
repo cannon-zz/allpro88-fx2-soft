@@ -198,6 +198,31 @@ class bus_iic(object):
 		return data
 
 
+class bus_spi(object):
+	# NOTE:  must set VDAC on the SCLK and MOSI pins to VCC, VTH to VCC
+	# - 1 V
+	hi = allpro88.PINCON.VDAC
+	lo = allpro88.PINCON.LOGICL
+
+	def __init__(self, socket, sclk, mosi, miso):
+		self.sclk = socket[sclk]	# clock
+		self.mosi = socket[mosi]	# master --> slave
+		self.miso = socket[miso]	# master <-- slave
+
+		self.sclk.config = self.lo
+		self.mosi.config = self.lo
+
+	def transfer_byte(self, out_byte):
+		in_byte = 0
+		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
+			self.mosi.config = self.hi if (out_byte & bit) else self.lo
+			self.sclk.config = self.hi
+			self.sclk.config = self.lo
+			if self.miso:
+				in_byte |= bit
+		return in_byte
+
+
 #
 # Boolean state pins
 #
@@ -235,4 +260,14 @@ class flag_ttl(flag):
 
 class flag_ttl_active_low(flag):
 	inactive = allpro88.PINCON.LOGICH
+	active = allpro88.PINCON.LOGICL
+
+
+class flag_vdac(flag):
+	inactive = allpro88.PINCON.LOGICL
+	active = allpro88.PINCON.VDAC
+
+
+class flag_vdac_active_low(flag):
+	inactive = allpro88.PINCON.VDAC
 	active = allpro88.PINCON.LOGICL
