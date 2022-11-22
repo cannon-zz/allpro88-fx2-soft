@@ -124,7 +124,7 @@ class bus_iic(object):
 	write_byte()	# return value = ack
 	write_byte()
 	...
-	read_byte(ack)	# return value = byte
+	read_byte(ack)	# return value = byte, ack is sent in reponse
 	...
 	stop()
 	"""
@@ -152,8 +152,8 @@ class bus_iic(object):
 
 	def stop(self):
 		# do stop sequence.  but have just read or written a byte
-		# pull clock low, pull data low, raise clock, then raise
-		# data.  bus is left in idle state
+		# so first pull clock low, pull data low, raise clock, then
+		# raise data.  bus is left in idle state
 		self.scl.config = self.lo
 		self.sda.config = self.lo
 		self.scl.config = self.hi
@@ -169,15 +169,15 @@ class bus_iic(object):
 		# of itself
 		# NOTE:  finally, clock must be pulled low again to
 		# complete the bit.  the calling code will need to ensure
-		# this.  calling this function repeatedly in sequence will
-		# do the correct thing.
+		# this.  following this with a call to any of .write_bit(),
+		# .read_bit() or .stop() will do the correct thing.
 
 	def read_bit(self):
 		# pull clock low, raise clock, read data state
 		# NOTE:  finally, clock must be pulled low again to
 		# complete the bit.  the calling code will need to ensure
-		# this.  calling this function repeatedly in sequence will
-		# do the correct thing.
+		# this.  following this with a call to any of .write_bit(),
+		# .read_bit() or .stop() will do the correct thing.
 		self.scl.config = self.lo
 		self.scl.config = self.hi
 		return bool(self.sda)
