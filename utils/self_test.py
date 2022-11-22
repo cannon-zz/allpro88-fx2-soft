@@ -230,10 +230,10 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 		# report deviation from calibration model
-		expected = numpy.array([self.channel.cal(dac) for dac in self.vdac_ramp_x])
+		expected = numpy.fromiter(map(self.channel.cal, self.vdac_ramp_x), "double")
 		max_residual = abs(self.vdac_ramp_y[2:] - expected[2:]).max()
 		rms_residual = ((self.vdac_ramp_y[2:] - expected[2:])**2.).mean()**0.5
-		failed = max_residual > 0.3
+		failed = max_residual > 0.15
 		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 
 		# derive updated calibration model and report what its
