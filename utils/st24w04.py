@@ -75,6 +75,8 @@ with open("dump.dat", "wb") as dump:
 			device.i2c.start()
 			ack = device.i2c.write_byte(device.select_code(0, 1))
 			print("device select ack: %d" % ack)
+			if not ack:
+				raise ValueError("device did not ack")
 			for i in tqdm(range(256), desc = "Reading"):
 				dump.write(bytearray((device.i2c.read_byte(ack = i < 255),)))
 			device.i2c.stop()
