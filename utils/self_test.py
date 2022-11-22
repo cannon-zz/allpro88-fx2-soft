@@ -127,24 +127,105 @@ class channel_driver_test_suite(object):
 	def test_vpul_ramp(self):
 		"""
 		"""
-		self.channel.config = allpro88.PINCON.PULLUP
-		max_residual = 0.
-		rms_residual = 0.
-		for vdac in range(256):
-			self.programmer.vpul = vdac
+		# the device seems to be unable to produce a pull-up
+		# voltage below about 1.2 V or 1.3 V.  below some DAC
+		# value, the output collapses to about 0.5 V and is
+		# constant.  we first measure where this occurs to identify
+		# the lowest achievable output voltage
+
+		# configure channel for pull-up and turn on the pull-down
+		# driver.  for the pull-up supply specifically, this
+		# resistance is only 2.7 kOhm to ground, because the
+		# pull-up driver drives the mid-point of the pull-down
+		# circuit's 5.4 kOhm resistor.  at full voltage, the
+		# resistor must dissipate about 1/4 W.  I don't know what
+		# it's rated for, but we don't do that for very long so I
+		# *hope* it's OK.  without the resitor turned on, these
+		# measurements don't work, we need something to drain
+		# charge out of the circuit.  we do not use the bypass
+		# capacitors because the resistance leads to too high a
+		# time constant, and it becomes tricky to time voltage
+		# measurements well.  even without, we need to sometimes
+		# wait a bit for stray capacitance.
+		self.channel.config = allpro88.PINCON.PULLUP | allpro88.PINCON.PULLDN
+		self.channel.bypass = False	# make sure it's off
+		# discharge the circuit
+		self.programmer.vpul = 0
+		self.programmer.load_dacs()
+		time.sleep(0.2)	# wait for RC delay
+
+		# ramp the DAC over a range of low voltages with the
+		# pull-down resistor enabled to get an initial fit and
+		# identify the lowest reliable operating point.  with the
+		# pull-down resistor on we don't want the voltage to get
+		# too high to avoid damage.  I don't know how much power
+		# it's rated for, but at full voltage it would have to
+		# dissipate about 1/4 W.
+		self.vpul_ramp_x = numpy.arange(256)
+		self.vpul_ramp_y = numpy.zeros(256)
+		for i, dac in enumerate(self.vpul_ramp_x):
+			self.programmer.vpul = dac
 			self.programmer.load_dacs()
-			expected = self.programmer.vpul.cal(vdac)
-			measured = self.channel.measure_v()
-			residual = abs(measured - expected)
-			if residual > max_residual:
-				max_residual = residual
-			rms_residual += residual**2.
-		rms_residual = rms_residual**0.5 / 256.
-		failed = rms_residual > 0.010
-		print("channel %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+			time.sleep(0.002)	# wait for RC delay
+			self.vpul_ramp_y[i] = measure_v(self.channel)
+
+		# disable channel
 		self.programmer.vpul = 0
 		self.programmer.load_dacs()
 		self.channel.config = allpro88.PINCON.DISABLE
+
+		# get a fit from what should be the linear regime
+		a2, a1, a0 = map(float, numpy.polyfit(self.vpul_ramp_x[30:], self.vpul_ramp_y[30:], 2))
+		@numpy.vectorize
+		def model(dac):
+			return (a2 * dac + a1) * dac + a0
+
+		# for which DAC values does the fit agree with the observed
+		# value?  "agree" = residual < 10 mV.  find the threshold
+		# where this occurs.
+		output_good = abs(model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32]) < 0.01
+		threshold = max(i for i, val in enumerate(output_good) if not val) + 1
+		assert threshold >= 3
+		#for i in range(32):
+		#	print("\t%d\t%.3g\t%.3g\t%.3g\t%s" % (i, model(i), self.vpul_ramp_y[i], model(i) - self.vpul_ramp_y[i], "" if i != threshold else "<--"))
+
+		# compute the final model using the measured threshold
+		a2, a1, a0 = map(float, numpy.polyfit(self.vpul_ramp_x[threshold:], self.vpul_ramp_y[threshold:], 2))
+		self.vpul_ramp_cal = {
+			"poly": (a2, a1, a0),
+			"min": list(sorted(self.vpul_ramp_y[:threshold - 3]))[(threshold - 3) // 2]
+		}
+		print("\tupdated calibration model:  %.3g dac^2 + %.3g dac + %.3g" % self.vpul_ramp_cal["poly"])
+		vpul_min = list(sorted(self.vpul_ramp_y[:threshold - 2]))[(threshold - 2) // 2]
+		@numpy.vectorize
+		def model(dac):
+			return (a2 * dac + a1) * dac + a0 if dac >= threshold else vpul_min
+
+		expected = numpy.fromiter(map(self.programmer.vpul.cal, self.vpul_ramp_x), "double")
+		max_residual = abs(self.vpul_ramp_y[threshold:] - expected[threshold:]).max()
+		rms_residual = ((self.vpul_ramp_y[threshold:] - expected[threshold:])**2.).mean()**0.5
+		failed = max_residual > 0.15
+		print("channel %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+
+		expected = model(self.vpul_ramp_x[threshold:])
+		max_residual = abs(self.vpul_ramp_y[threshold:] - expected).max()
+		rms_residual = ((self.vpul_ramp_y[threshold:] - expected)**2.).mean()**0.5
+		print("\tchannel updated model residual = %.3g V, RMS residual = %.3g V" % (max_residual, rms_residual))
+
+		# plot the results
+		fig = figure.Figure()
+		FigureCanvas(fig)
+		axes = fig.gca()
+		axes.set_title("Channel %02d Voltage vs. Pull-Up DAC" % self.channel.channel)
+		axes.set_xlabel("DAC Value (counts)")
+		axes.set_ylabel("Voltage (volts)")
+		axes.scatter(self.vpul_ramp_x, self.vpul_ramp_y, marker = ".", color = "k")
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		axes.set_xlim((0, 256))
+		fig.savefig("channel%02d_vpul_ramp.png" % self.channel.channel)
 
 
 	def test_pulldn(self):
@@ -354,7 +435,9 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 
-calibration = {}
+calibration = {
+	"vpul_ramp_cal": []
+}
 with allpro88.allpro88() as programmer:
 	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected"))
 
@@ -380,6 +463,7 @@ with allpro88.allpro88() as programmer:
 		test_suite.test_logich()
 
 		test_suite.test_vpul_ramp()
+		calibration["vpul_ramp_cal"].append(test_suite.vpul_ramp_cal["poly"])
 
 		test_suite.test_vdac_ramp()
 		calibration[calibration_name]["vdac_ramp_cal"] = test_suite.vdac_ramp_cal
@@ -394,6 +478,12 @@ with allpro88.allpro88() as programmer:
 
 	# context manager turns off all power supplies, we don't have to do
 	# that here.
+
+calibration["vpul_ramp_cal"] = (
+	float(numpy.median([poly[0] for poly in calibration["vpul_ramp_cal"]])),
+	float(numpy.median([poly[1] for poly in calibration["vpul_ramp_cal"]])),
+	float(numpy.median([poly[2] for poly in calibration["vpul_ramp_cal"]]))
+)
 
 with open("calibration.dat", "w") as calfile:
 	yaml.dump(calibration, calfile)
