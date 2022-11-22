@@ -21,6 +21,14 @@ from tqdm import tqdm
 import yaml
 
 
+
+def measure_v(channel):
+	"""
+	Report median of 5 measurements
+	"""
+	return numpy.median([channel.measure_v() for i in range(5)])
+
+
 def vtst_measure_r(programmer, channel, max_milliamps):
 	# assume 10 mA is required for the VTST base pull-down circuit
 	vtst_current = 10
@@ -38,7 +46,7 @@ def vtst_measure_r(programmer, channel, max_milliamps):
 	for i in current:
 		programmer.itst = vtst_current + i
 		time.sleep(0.05)
-		voltage.append(channel.measure_v())
+		voltage.append(measure_v(channel))
 
 	# turn off VTST and disable channel
 	programmer.vtst = 0
@@ -213,8 +221,7 @@ class channel_driver_test_suite(object):
 		for i, dac in enumerate(self.vdac_ramp_x):
 			self.channel.vdac = dac
 			self.programmer.load_dacs()
-			# record median of 5 measurements
-			self.vdac_ramp_y[i] = list(sorted(self.channel.measure_v() for i in range(5)))[2]
+			self.vdac_ramp_y[i] = measure_v(self.channel)
 
 		# disable output
 		self.channel.vdac = 0
@@ -325,7 +332,7 @@ class channel_driver_test_suite(object):
 		# need to not leave the ohmic regime of the circuit, so the
 		# current must be kept to less than 10 mA.
 		idac = list(range(10))
-		R = scipy.stats.linregress(idac, [self.channel.measure_v() for self.programmer.itst in idac])[0] * 1000.
+		R = scipy.stats.linregress(idac, [measure_v(self.channel) for self.programmer.itst in idac])[0] * 1000.
 		self.programmer.itst = 0	# reset to 0
 		print("channel %d VTST base pull-down resistance: %.3g Ohm" % (self.channel.channel, R))
 
