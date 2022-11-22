@@ -11,6 +11,7 @@ class m27c2001(object):
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
+			channel.bypass = False
 		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
 			1: 5.0,
@@ -34,6 +35,7 @@ class m27c2001(object):
 			if pin_number not in self.power.pins:
 				channel.config = allpro88.PINCON.DISABLE
 				channel.vdac = 0
+				channel.bypass = False
 		# turn off device power
 		self.power.off()
 		# turn off programmer power supplies

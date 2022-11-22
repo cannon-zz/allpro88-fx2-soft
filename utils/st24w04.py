@@ -13,6 +13,7 @@ class st24w04(object):
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
+			channel.bypass = False
 		self.power = devices.power(self.programmer, self.socket, {
 			4: 0.0,
 			8: 5.0
@@ -36,6 +37,7 @@ class st24w04(object):
 			if pin_number not in self.power.pins:
 				channel.config = allpro88.PINCON.DISABLE
 				channel.vdac = 0
+				channel.bypass = False
 		# turn off pull-up voltage and device power
 		self.power.off()
 		# turn off programmer power supplies
