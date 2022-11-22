@@ -498,7 +498,7 @@ class allpro88(object):
 	vadj = dacregister(0x0302, transient = 0.05, cal = (lambda dac: 0.371637285 + dac * 0.117641953 + dac**2. * -9.13385655e-07))
 	vadjth = dacregister(0x0303)
 	# must call .load_dacs() for vpul changes
-	vpul = dacregister(0x0305, cal = (lambda dac: max(0., -0.54392 + (dac * 0.100723) + (dac**2. * 0.000000000497))))
+	vpul = dacregister(0x0305, cal = (lambda dac: max(0., (7.14173430688944e-07 * dac + 0.09954692191382541) * dac + -0.7873764486422744)))
 	vtst = dacregister(0x0386)
 	itst = dacregister(0x0387)
 
