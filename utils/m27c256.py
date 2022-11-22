@@ -20,9 +20,9 @@ class m27c256(object):
 		})
 
 	def __enter__(self):
-		# turn on power supplies, set VADJ to 15 V and VTH to 2 V
+		# turn on power supplies, set VADJ to 10 V and VTH to 2 V
 		self.programmer.pcr_enable = True
-		self.programmer.vadj = allpro88.volt(15.)
+		self.programmer.vadj = allpro88.volt(10.)
 		self.programmer.vth = allpro88.volt(2.)
 		# turn on device power
 		self.power.on()
