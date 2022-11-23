@@ -212,6 +212,21 @@ class bus_iic(object):
 			self.stop()
 		return found
 
+	#
+	# emulate enough of the smbus2 API to allow luma.oled to control an
+	# I2C OLED display through the programmer.
+	# FIXME:  expand the emulated API for even more fun.
+	#
+
+	def write_i2c_block_data(self, i2c_addr, register, data, force = None):
+		self.start()
+		# combine address with R/!W bit = 0
+		self.write_byte(i2c_addr << 1 | 0)
+		self.write_byte(register)
+		for val in data:
+			self.write_byte(val)
+		self.stop()
+
 
 class bus_spi(object):
 	# NOTE:  must set VDAC on the SCLK and MOSI pins to VCC, VTH to VCC
