@@ -197,6 +197,21 @@ class bus_iic(object):
 		self.write_bit(not ack)
 		return data
 
+	def scan(self):
+		"""
+		Scan the IIC bus and report the addresses that generate an
+		ACK for a read operation.
+		"""
+		found = []
+		for address in range(128):
+			self.start()
+			# combine address with R/!W, which we set to 1 so
+			# we don't initiate a write operation
+			if self.write_byte(address << 1 | 1):
+				found.append(address)
+			self.stop()
+		return found
+
 
 class bus_spi(object):
 	# NOTE:  must set VDAC on the SCLK and MOSI pins to VCC, VTH to VCC
