@@ -46,6 +46,7 @@ class bus(object):
 	# subclasses must override these
 	inactive = None
 	active = None
+	flt = None
 
 	def __init__(self, pin_numbers, min_word = None, max_word = None):
 		"""
@@ -93,8 +94,8 @@ class bus(object):
 		# disable (float) pins if word is None
 		if word is None:
 			for bit, pin_number in self.pin_numbers:
-				obj.socket[pin_number].config = allpro88.PINCON.DISABLED
-				self.last_state = None
+				obj.socket[pin_number].config = self.flt
+			self.last_state = None
 		else:
 			# check type compatibility and range
 			word = int(word)
@@ -111,6 +112,7 @@ class bus(object):
 class bus_ttl(bus):
 	inactive = allpro88.PINCON.LOGICL
 	active = allpro88.PINCON.LOGICH
+	flt = allpro88.PINCON.DISABLE
 
 
 class bus_iic(object):
@@ -255,6 +257,7 @@ class bus_spi(object):
 
 #
 # Boolean state pins
+# FIXME:  teach flag pins how to self-initialize to sensible default values
 #
 
 
@@ -278,9 +281,9 @@ class flag(object):
 		"""
 		Sets the pin's state to .active (.inactive) if boolean is
 		True (False).  If boolean is None the state is set to
-		DISABLED (floating).
+		DISABLE (floating).
 		"""
-		obj.socket[self.pin_number].config = allpro88.PINCON.DISABLED if boolean is None else self.active if boolean else self.inactive
+		obj.socket[self.pin_number].config = allpro88.PINCON.DISABLE if boolean is None else self.active if boolean else self.inactive
 
 
 class flag_ttl(flag):
