@@ -170,6 +170,7 @@ static void newline(void)
  * Port A = data bus
  * Port B = address bus low byte
  * Port D[0:3] = address bus bits 8,9,10,11
+ * Port D[4] = activity LED / PSEN (depends on board configuration)
  * Port D[5] = /RESET
  * Port D[6] = /WR
  * Port D[7] = /RD
@@ -261,6 +262,7 @@ static void ALLPRO88_ADDR_SET(WORD addr)
 	IOD = 0xe0 | MSB(addr);
 }
 
+#define ALLPRO88_ACT    PD4
 #define ALLPRO88_NRESET PD5
 #define ALLPRO88_NWR    PD6
 #define ALLPRO88_NRD    PD7
