@@ -1060,7 +1060,8 @@ static void parser_state_reset(void)
  *
  * command format.  all numbers are in base 16, and they must be the
  * width indicated.  all commands are terminated by newline, \n, 0x0a.  all
- * other whitespace is ignored.  commands may straddle packet boundaries.
+ * other whitespace is ignored.  commands may not straddle packet
+ * boundaries.
  *
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, report the value
@@ -1228,6 +1229,11 @@ static void parse_out_buffer(void)
 			parser_state.command[parser_state.command_idx++] = next;
 		}
 	}
+
+	/* end of packet:  reset.  commands not allowed to straddle packet
+	 * boundaries */
+
+	parser_state_reset();
 
 	/* arm the in end-point to send it to the host.  we do this even if
 	 * it's empty (byte count = 0) so that code running on the host
