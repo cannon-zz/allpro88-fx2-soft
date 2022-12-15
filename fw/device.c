@@ -170,13 +170,13 @@ static void newline(void)
  * Port A = data bus
  * Port B = address bus low byte
  * Port D[0:3] = address bus bits 8,9,10,11
- * Port D[7] = /RD
- * Port D[6] = /WR
  * Port D[5] = /RESET
+ * Port D[6] = /WR
+ * Port D[7] = /RD
  *
  * the address and control lines are wired into the inputs of SN74LS244N
  * bus driver chips, and the data bus into an SN74LS245N bi-directional bus
- * driver.  those chips are gauranteed to recognize anything over 2 V as a
+ * driver.  those chips are guaranteed to recognize anything over 2 V as a
  * logic high level, so they should provide the required level shifting
  * from the FX2's 3.3 V logic outputs to 5 V logic inside the programmer.
  * the FX2's documentation says it has 5 V tolerant inputs, so the 5 V
@@ -199,7 +199,7 @@ static void newline(void)
  * 1.  with the FX2 chip powered down, all I/O lines should be pulled to
  * approximately 2.5 V by these resistors.  I had previously believed that
  * this is a problem for the FX2, because I got the impression from
- * somehting that its inputs must not be driven when the chip is powered
+ * something that its inputs must not be driven when the chip is powered
  * off, i.e., they must not be raised to a potential above the supply
  * voltage.  however, more recently I've rechecked the documentation and I
  * don't see that restriction, and anyway that would make them not 5 V
@@ -241,6 +241,10 @@ static void newline(void)
  * tolerate normal input voltages even without power supplied to the chips,
  * so the FX2 can be powered on and driving the ALLPRO's inputs without
  * damaging them even when the ALLPRO is powered off.
+ *
+ * ultimately, I ended up using one of the empty sockets to get +5 V and
+ * GND into a custom FX2 based controller board, which gave me even more
+ * reason to want the resistor arrays removed.
  */
 
 
@@ -252,14 +256,14 @@ static void ALLPRO88_ADDR_SET(WORD addr)
 {
 	/* the low byte of the 12 bit address */
 	IOB = LSB(addr);
-	/* /RD, /WR and /RESET are set high, and combined with the high
-	 * nibble of the 12 bit address */
+	/* ACT, /RD, /WR and /RESET are set high, and combined with the
+	 * high nibble of the 12 bit address */
 	IOD = 0xe0 | MSB(addr);
 }
 
-#define ALLPRO88_NRD    PD7
-#define ALLPRO88_NWR    PD6
 #define ALLPRO88_NRESET PD5
+#define ALLPRO88_NWR    PD6
+#define ALLPRO88_NRD    PD7
 
 
 /*
@@ -564,8 +568,6 @@ static WORD allpro88_pin_addr(BYTE pin)
 
 static void allpro88_set_PINCON(BYTE pin, enum ALLPRO88_PINCON_BITS val)
 {
-	/* FIXME add safety check for valid values to avoid damage */
-
 	/* config register is at offset 0 from the start of the register
 	 * group for each pin */
 	allpro88_write(allpro88_pin_addr(pin), val);
@@ -812,7 +814,7 @@ void main_init(void)
 	 * show this being done twice at start-up.  if my belief is
 	 * correct, the correct number of times to do this is not
 	 * necessarily 2, but however many -uple's worth of buffering you
-	 * have configured the chip for (duoble, quadruple, etc.). */
+	 * have configured the chip for (double, quadruple, etc.). */
 
 	arm_out_endpoint();
 	arm_out_endpoint();
@@ -1039,12 +1041,12 @@ static void parser_state_reset(void)
 /*
  * parse commands from "out" end-point
  *
- * command format.  all numbers are in hexadecimal, and they must be the
+ * command format.  all numbers are in base 16, and they must be the
  * width indicated.  all commands are terminated by newline, \n, 0x0a.  all
  * other whitespace is ignored.  commands may straddle packet boundaries.
  *
  * =XXXXYY	write YY to address XXXX
- * ?XXXX	read address XXXX, display value
+ * ?XXXX	read address XXXX, report the value
  * EXXXX	echo the number XXXX (loop-back test)
  * MXX		run voltage measurement sequence on channel XX, report VTH DAC
  * R		reset programmer
