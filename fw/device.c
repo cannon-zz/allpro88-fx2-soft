@@ -1116,8 +1116,7 @@ static void do_command(void)
 	 * loop-back test
 	 */
 
-	case 'E':
-	case 'e': {
+	case 'E': {
 		/* decode the 16 bit number to echo */
 		WORD addr = str_to_word(&parser_state.command[1]);
 		/* check for error and correct end of string */
@@ -1133,8 +1132,7 @@ static void do_command(void)
 	 * pin voltage measurement
 	 */
 
-	case 'M':
-	case 'm': {
+	case 'M': {
 		/* decode the 8 bit channel number */
 		BYTE pin = str_to_byte(&parser_state.command[1]);
 		/* check for error and correct end of string */
@@ -1151,7 +1149,6 @@ static void do_command(void)
 	 */
 
 	case 'R':
-	case 'r':
 		allpro88_hard_reset();
 		break;
 
@@ -1160,7 +1157,6 @@ static void do_command(void)
 	 */
 
 	case 'V':
-	case 'v': {
 		/* FIXME:  this command produces more characters of output
 		 * than characters of input, so it violates the assumption
 		 * that the results of the commands contained in any single
@@ -1177,7 +1173,6 @@ static void do_command(void)
 		puts_byte(allpro88_measure_vadj_voltage());
 		newline();
 		break;
-	}
 
 	/*
 	 * unrecognized command
