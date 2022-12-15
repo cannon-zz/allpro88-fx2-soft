@@ -408,27 +408,6 @@ static void allpro88_write(WORD addr, BYTE data)
 
 
 /*
- * reset the ALLPRO 88 device
- */
-
-
-static void allpro88_hard_reset(void)
-{
-	/* hold /RESET low */
-	ALLPRO88_NRESET = 0;
-	/* set /RD, /WR high (order doesn't matter) */
-	ALLPRO88_NRD = ALLPRO88_NWR = 1;
-	/* set data bus to all zero, but float it */
-	ALLPRO88_DATA_FLOAT;
-	ALLPRO88_DATA = 0;
-	/* wait a while (10 ms) */
-	delay(10);	/* FIXME:  what delay is required?  */
-	/* zero the address bus (raises /RESET) */
-	ALLPRO88_ADDR_SET(0);
-}
-
-
-/*
  * ============================================================================
  *
  *                        AllPro88 Programmer Control
@@ -512,6 +491,19 @@ static void allpro88_set_VADJTH(BYTE vdac)
 static void allpro88_set_VTH(BYTE vdac)
 {
 	allpro88_write(0x0301, vdac);
+}
+
+
+/*
+ * set the VSR voltage DAC.  the voltage will be
+ *
+ * VSR = 0.1 * vdac
+ */
+
+
+static void allpro88_set_VSR(BYTE vdac)
+{
+	allpro88_write(0x0300, vdac);
 }
 
 
@@ -622,37 +614,65 @@ static void allpro88_set_PINBYPASS(BYTE pin, BOOL enable)
 
 
 /*
- * clear the ALLPRO 88 voltage DACs back to "all off, all disabled"
- *
- * kevtris' documentation says the reset line (what the hard reset code has
- * done) resets all the latches but doesn't modify the pin driver DACs nor
- * VPUL DAC, so we should 0 them explicitly.  that's the reason for this
- * function, a sort of software reset.  we 0 all the other voltage output
- * DACs, too, because why not.
+ * reset the ALLPRO 88 circuitry
  */
 
 
-static void allpro88_soft_reset(void)
+static void allpro88_hard_reset(void)
 {
 	BYTE pin;
 
-	allpro88_set_PCR(PCR_DISABLE);
+	/*
+	 * the /RESET line clears all configuration registers (octal latch
+	 * chips) back to 0.  we pull it low (active), clear data, address
+	 * and control buses to a known safe state, wait a while, then
+	 * raise /RESET to take the circuitry out of hardware reset.  we
+	 * leave the data bus floating (but internally, within the FX2, set
+	 * to 0), the address bus set to 0, and /RD, /WR and /RESET all
+	 * high (inactive).
+	 */
 
-	/* NOTE:  kevtris recommends 0'ing all pin-driver DACs *before*
-	 * hardware reset.  really?  I do this after a hardware reset. */
+	/* hold /RESET low */
+	ALLPRO88_NRESET = 0;
+	/* set /RD, /WR high (order doesn't matter) */
+	ALLPRO88_NRD = ALLPRO88_NWR = 1;
+	/* set data bus to all zero, but float it */
+	ALLPRO88_DATA_FLOAT;
+	ALLPRO88_DATA = 0;
+	/* wait a while (1 ms) */
+	delay(1);
+	/* zero the address bus (raises /RESET) */
+	ALLPRO88_ADDR_SET(0);
 
-	for(pin = 0; pin < 88; pin++) {
-		allpro88_set_PINCON(pin, PINCON_DISABLE);
-		allpro88_set_PINDAC(pin, 0);
-		allpro88_set_PINBYPASS(pin, FALSE);
-	}
+	/*
+	 * it should now be safe to use our canned routines to manipulate
+	 * the programmer's interface bus via the FX2 GPIO lines.  use our
+	 * new-found powers to reset all the DAC control registers.  these
+	 * are not cleared by a hardware reset, they need to be cleared
+	 * manually.
+	 */
 
+	/* zero the DACs that can be written to directly */
 	allpro88_set_VADJ(0);
+	allpro88_set_VADJTH(0);
+	allpro88_set_VSR(0);
 	allpro88_set_VTH(0);
-	allpro88_set_VPUL(0);
 	allpro88_set_VTST(0, 0);
 
+	/* zero the DACs that require a separate update step, then do it */
+	for(pin = 0; pin < 88; pin++)
+		allpro88_set_PINDAC(pin, 0);
+	allpro88_set_VPUL(0);
 	allpro88_xfer_PINDACs();
+
+	/*
+	 * zero and float the data bus again.  zero the address bus.  leave
+	 * /RD, /WR and /RESET high.
+	 */
+
+	ALLPRO88_DATA_FLOAT;
+	ALLPRO88_DATA = 0;
+	ALLPRO88_ADDR_SET(0);
 }
 
 
@@ -772,9 +792,6 @@ void main_init(void)
 
 	/* programmer hardware reset */
 	allpro88_hard_reset();
-
-	/* clear programmer state */
-	allpro88_soft_reset();
 
 	/* I can't figure out what to set this to.  the documentation says
 	 * over and over that for basically every configuration you can
@@ -918,7 +935,6 @@ BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
 		arm_out_endpoint();
 		/* reset the programmer and command processor */
 		allpro88_hard_reset();
-		allpro88_soft_reset();
 		/* FIXME: enable this */
 		/*parser_state_reset();*/
 		return TRUE;
@@ -959,7 +975,6 @@ BOOL handle_set_configuration(BYTE cfg)
 		arm_out_endpoint();
 		/* reset the programmer and command processor */
 		allpro88_hard_reset();
-		allpro88_soft_reset();
 		/* FIXME: enable this */
 		/*parser_state_reset();*/
 		return TRUE;
@@ -1138,7 +1153,6 @@ static void do_command(void)
 	case 'R':
 	case 'r':
 		allpro88_hard_reset();
-		allpro88_soft_reset();
 		break;
 
 	/*
