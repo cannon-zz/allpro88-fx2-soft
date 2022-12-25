@@ -19,6 +19,11 @@ class st24w04(object):
 			8: 5.0
 		})
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
+		# documentation calls these two pins chip enable lines, but
+		# the value coded onto them must match the two low bits of
+		# the device select code.  they are more conveniently
+		# treated, here, as a two-bit address bus
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3))
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 10 V and VTH to 2 V
@@ -51,11 +56,7 @@ class st24w04(object):
 		return False
 
 	write_protect_enable = devices.flag_ttl(1)
-	# documentation calls these two pins chip enable lines, but the
-	# value coded onto them must match the two low bits of the device
-	# select code.  they are more conveniently treated, here, as a
-	# two-bit address bus
-	address = devices.bus_ttl((2, 3))
+	address = devices.bus_parallel("address_bus")
 	write_control = devices.flag_ttl_active_low(7)
 
 	def select_code(self, block_select, r_not_w):

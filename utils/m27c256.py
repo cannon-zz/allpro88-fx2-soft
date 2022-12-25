@@ -18,6 +18,9 @@ class m27c256(object):
 			14: 0.0,
 			28: 5.0
 		})
+		# address and data buses
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))
+		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (11, 12, 13, 15, 16, 17, 18, 19))
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 10 V and VTH to 2 V
@@ -46,8 +49,8 @@ class m27c256(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus_ttl((10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))
-	data = devices.bus_ttl((11, 12, 13, 15, 16, 17, 18, 19))
+	address = devices.bus_parallel("address_bus")
+	data = devices.bus_parallel("data_bus")
 	chip_enable = devices.flag_ttl_active_low(20)
 	output_enable = devices.flag_ttl_active_low(22)
 
@@ -57,7 +60,7 @@ with open("dump.dat", "wb") as dump:
 		with m27c256(programmer) as device:
 			device.chip_enable = True
 
-			for device.address in tqdm(range(0x8000), desc = "Reading"):
+			for device.address in tqdm(device.address_bus, desc = "Reading"):
 				device.output_enable = True
 				dump.write(bytearray((device.data,)))
 				device.output_enable = False

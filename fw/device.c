@@ -108,6 +108,12 @@ static WORD str_to_word(const char *str)
 }
 
 
+static DWORD str_to_dword(const char *str)
+{
+	return MAKEDWORD(str_to_word(str), str_to_word(str + 4));
+}
+
+
 /*
  * write a null-terminated string without the terminator character.
  * assumes AUTOPTR2 is set to the destination.
@@ -139,6 +145,13 @@ static void puts_word(WORD val)
 {
 	puts_byte(MSB(val));
 	puts_byte(LSB(val));
+}
+
+
+static void puts_dword(DWORD val)
+{
+	puts_word(MSW(val));
+	puts_word(LSW(val));
 }
 
 
@@ -991,6 +1004,237 @@ BOOL handle_vendorcommand(BYTE cmd)
 /*
  * ============================================================================
  *
+ *                               Bus Operations
+ *
+ * ============================================================================
+ */
+
+
+/*
+ * bus definitions
+ */
+
+
+/*
+ * parallel bus.  from 1 to 32 channels, three states, "true", "false" and
+ * "float".  the host must, itself, configure VTH for read-back of the bus
+ * pin states.  if pin DACs are required for any of the states, it must
+ * also configure those.
+ */
+
+
+struct bus_parallel {
+	/* pin config for "true" state */
+	enum ALLPRO88_PINCON_BITS state_true;
+	/* pin config for "false" state */
+	enum ALLPRO88_PINCON_BITS state_false;
+	/* pin config for "float" state */
+	enum ALLPRO88_PINCON_BITS state_float;
+	/* size of bus in bits */
+	BYTE width;
+	/* channel addresses for bits from least significant to most
+	 * significant. */
+	WORD bit_addr[32];
+};
+
+
+/*
+ * preallocated array of bus definitions.  each entry in the array is a
+ * union of bus structures.  host code must remember what buses it has
+ * defined, and what type each is or nonsense will ensue.
+ */
+
+
+__xdata static union {
+	struct bus_parallel parallel;
+} bus[8];
+
+
+/*
+ * ====
+ * parallel bus operations
+ * ====
+ */
+
+
+/*
+ * parse the bus definition command string
+ */
+
+
+static void bus_parallel_define(BYTE bus_number, const char *s)
+{
+	BYTE i;
+	BYTE width;
+	/* parse pin config register values and bus width */
+	bus[bus_number].parallel.state_true = str_to_byte(s);
+	s += 2;
+	bus[bus_number].parallel.state_false = str_to_byte(s);
+	s += 2;
+	bus[bus_number].parallel.state_float = str_to_byte(s);
+	s += 2;
+	bus[bus_number].parallel.width = width = str_to_byte(s);
+	s += 2;
+	/* check for error */
+	if(errno || width < 1 || width > 32)
+		goto error;
+	/* parse channel numbers */
+	for(i = 0; i < width; i++) {
+		BYTE channel = str_to_byte(s);
+		s += 2;
+		/* check for error */
+		if(errno || channel > 87)
+			goto error;
+		bus[bus_number].parallel.bit_addr[i] = allpro88_pin_addr(channel);
+	}
+	/* check for correct end of string */
+	if(*s)
+		goto error;
+	/* fill unused addresses with a safe value, just in case */
+	for(; i < 32; i++)
+		bus[bus_number].parallel.bit_addr[i] = bus[bus_number].parallel.bit_addr[0];
+	/* done */
+	return;
+
+error:
+	/* disable the use of this bus as a parallel bus */
+	bus[bus_number].parallel.state_true = PINCON_DISABLE;
+	bus[bus_number].parallel.state_false = PINCON_DISABLE;
+	bus[bus_number].parallel.state_float = PINCON_DISABLE;
+	bus[bus_number].parallel.width = 0;
+	return;
+}
+
+
+/*
+ * set all pins to "float" state
+ */
+
+
+static void bus_parallel_float(BYTE bus_number)
+{
+	enum ALLPRO88_PINCON_BITS state_float = bus[bus_number].parallel.state_float;
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+
+	do
+		allpro88_write(*(bit_addr++), state_float);
+	while(--width);
+}
+
+
+/*
+ * read a byte, word, dword from the bus (which function is called depends
+ * on the bus width).  NOTE:  these functions do bad things if width < 1,
+ * which is what the bus definition command leaves it set to if that fails,
+ * so the calling code needs to check for that before calling these
+ */
+
+
+static BYTE bus_parallel_read_byte(BYTE bus_number)
+{
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+	BYTE value = 0;
+	BYTE test_bit = 1;
+
+	do {
+		if(allpro88_read(*(bit_addr++)) & 1)
+			value |= test_bit;
+		test_bit <<= 1;
+	} while(--width);
+
+	return value;
+}
+
+
+static WORD bus_parallel_read_word(BYTE bus_number)
+{
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+	WORD value = 0;
+	WORD test_bit = 1;
+
+	do {
+		if(allpro88_read(*(bit_addr++)) & 1)
+			value |= test_bit;
+		test_bit <<= 1;
+	} while(--width);
+
+	return value;
+}
+
+
+static DWORD bus_parallel_read_dword(BYTE bus_number)
+{
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+	DWORD value = 0;
+	DWORD test_bit = 1;
+
+	do {
+		if(allpro88_read(*(bit_addr++)) & 1)
+			value |= test_bit;
+		test_bit <<= 1;
+	} while(--width);
+
+	return value;
+}
+
+
+/*
+ * write a byte, word, dword to the bus (which function is called depends
+ * on the bus width).  NOTE:  these functions do bad things if width < 1,
+ * which is what the bus definition command leaves it set to if that fails,
+ * so the calling code needs to check for that before calling these
+ */
+
+
+static void bus_parallel_write_byte(BYTE bus_number, BYTE value)
+{
+	enum ALLPRO88_PINCON_BITS state_true = bus[bus_number].parallel.state_true;
+	enum ALLPRO88_PINCON_BITS state_false = bus[bus_number].parallel.state_false;
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+
+	do {
+		allpro88_write(*(bit_addr++), (value & 1) ? state_true : state_false);
+		value >>= 1;
+	} while(--width);
+}
+
+
+static void bus_parallel_write_word(BYTE bus_number, WORD value)
+{
+	enum ALLPRO88_PINCON_BITS state_true = bus[bus_number].parallel.state_true;
+	enum ALLPRO88_PINCON_BITS state_false = bus[bus_number].parallel.state_false;
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+
+	do {
+		allpro88_write(*(bit_addr++), (value & 1) ? state_true : state_false);
+		value >>= 1;
+	} while(--width);
+}
+
+
+static void bus_parallel_write_dword(BYTE bus_number, DWORD value)
+{
+	enum ALLPRO88_PINCON_BITS state_true = bus[bus_number].parallel.state_true;
+	enum ALLPRO88_PINCON_BITS state_false = bus[bus_number].parallel.state_false;
+	BYTE width = bus[bus_number].parallel.width;
+	WORD *bit_addr = bus[bus_number].parallel.bit_addr;
+
+	do {
+		allpro88_write(*(bit_addr++), (value & 1) ? state_true : state_false);
+		value >>= 1;
+	} while(--width);
+}
+
+
+/*
+ * ============================================================================
+ *
  *                             Command Processor
  *
  * ============================================================================
@@ -1031,10 +1275,41 @@ static BOOL in_buffer_not_full(void)
  *
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, report the value
+ * BXT<cmd>	bus commands, use bus number X for command.  bus type, T,
+ *		is one of 'P' (parallel bus), FIXME add more
  * EXXXX	echo the number XXXX (loop-back test)
  * MXX		run voltage measurement sequence on channel XX, report VTH DAC
  * R		reset programmer
  * V  		run VADJ voltage measurement sequence report VADJTH DAC
+ *
+ * bus commands:
+ *
+ * P (parallel bus) commands:
+ *
+ * :ttffzzwwC1..CN	define bus
+ *	tt : pin configuration register value for "true" state
+ *	ff : pin configuration register value for "false" state
+ *	zz : pin configuration register value for "float" state
+ *	ww : width of bus in bits, 1 <= width <= 32
+ *	C1..CN : channel number for bit n (least significant to most
+ *		significant).  must supply exactly as many as the bus width
+ *		(no more, no less).
+ *
+ * =XX..XX	set the bus to XX..XX.  the bits to use are determined by
+ *		the bus width, using the least significant portion of the
+ *		supplied number.  for bus widths <= 8 a two-digit number is
+ *		required;  otherwise for bus widths <= 16 a four-digit
+ *		number is required;  otherwise an eight-digit number is
+ *		required.
+ *
+ * ?		read the bus, report the value.  the number of digits in
+ *		the number reported depends on the width of the bus.  for
+ *		bus widths <= 8 a two-digit number is reported;  otherwise
+ *		for bus widths <= 16 a four-digit number is reported;
+ *		otherwise an eight-digit number is reported.  in all cases,
+ *		unused high bits are set to 0.
+ *
+ * -		set all bus pins to "float" state
  *
  * response format.  all numbers are in hexadecimal format.  responses are
  * separated by newline, \n, 0x0a, characters.  each packet of commands
@@ -1076,6 +1351,113 @@ static void do_command(const char *command)
 		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
 		newline();
+		break;
+	}
+
+	/*
+	 * bus commands
+	 */
+
+	case 'B': {
+		BYTE bus_number = hex_to_val(command[1]);
+		BYTE width = bus[bus_number].parallel.width;
+		if(errno)
+			goto error;
+		switch(command[2]) {
+		/*
+		 * parallel bus
+		 */
+
+		case 'P':
+			switch(command[3]) {
+			/*
+			 * define bus
+			 */
+
+			case ':':
+				bus_parallel_define(bus_number, &command[4]);
+				break;
+
+			/*
+			 * read from bus
+			 */
+
+			case '?':
+				/* check for correct end of string */
+				if(command[4])
+					goto error;
+				/* report the value on the bus */
+				if(!width)
+					goto error;
+				else if(width <= 8)
+					puts_byte(bus_parallel_read_byte(bus_number));
+				else if(width <= 16)
+					puts_word(bus_parallel_read_word(bus_number));
+				else
+					puts_dword(bus_parallel_read_dword(bus_number));
+				newline();
+				break;
+
+			/*
+			 * write to bus
+			 */
+
+			case '=':
+				if(!width)
+					goto error;
+				else if(width <= 8) {
+					/* decode the number to write */
+					BYTE value = str_to_byte(&command[4]);
+					/* check for error and correct end of string */
+					if(errno || command[6])
+						goto error;
+					/* set the bus state */
+					bus_parallel_write_byte(bus_number, value);
+				} else if(width <= 16) {
+					/* decode the number to write */
+					WORD value = str_to_word(&command[4]);
+					/* check for error and correct end of string */
+					if(errno || command[8])
+						goto error;
+					/* set the bus state */
+					bus_parallel_write_word(bus_number, value);
+				} else {
+					/* decode the number to write */
+					DWORD value = str_to_dword(&command[4]);
+					/* check for error and correct end of string */
+					if(errno || command[12])
+						goto error;
+					/* set the bus state */
+					bus_parallel_write_dword(bus_number, value);
+				}
+				break;
+
+			/*
+			 * float the bus
+			 */
+
+			case '-':
+				if(!width || command[4])
+					goto error;
+				bus_parallel_float(bus_number);
+				break;
+
+			/*
+			 * unrecognized parallel bus command
+			 */
+
+			default:
+				break;
+			}
+			break;
+
+		/*
+		 * unrecognized bus type
+		 */
+
+		default:
+			break;
+		}
 		break;
 	}
 

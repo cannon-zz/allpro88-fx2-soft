@@ -18,6 +18,14 @@ class msm538002e(object):
 			12: 0.0,
 			31: 0.0
 		})
+		# address and data buses
+		# these are the address bus and data bus definitions for
+		# word-mode addressing.  in byte-mode addressing, data bus
+		# bit 15 (MSB) is used as the LSB of the address bus
+		# (adding 1 additional bit).  NOTE:  for the configuration
+		# here, the .byte_mode flag must be set to False
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (10, 9, 8, 7, 6, 5, 4, 3, 41, 40, 39, 38, 37, 36, 35, 34, 33, 2, 1))
+		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (14, 16, 18, 20, 23, 25, 27, 29, 15, 17, 19, 21, 24, 26, 28, 30))
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 10 V and VTH to 1.5 V
@@ -46,13 +54,8 @@ class msm538002e(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	# these are the address bus and data bus definitions for word-mode
-	# addressing.  in byte-mode addressing, data bus bit 15 (MSB) is
-	# used as the LSB of the address bus (adding 1 additional bit).
-	# NOTE:  for the configuration here, the .byte_mode flag must be
-	# set to False
-	address = devices.bus_ttl((10, 9, 8, 7, 6, 5, 4, 3, 41, 40, 39, 38, 37, 36, 35, 34, 33, 2, 1))
-	data = devices.bus_ttl((14, 16, 18, 20, 23, 25, 27, 29, 15, 17, 19, 21, 24, 26, 28, 30))
+	address = devices.bus_parallel("address_bus")
+	data = devices.bus_parallel("data_bus")
 	chip_enable = devices.flag_ttl_active_low(11)
 	output_enable = devices.flag_ttl_active_low(13)
 	byte_mode = devices.flag_ttl_active_low(32)
@@ -64,7 +67,7 @@ with open("dump.dat", "wb") as dump:
 			device.byte_mode = False
 			device.chip_enable = True
 
-			for device.address in tqdm(range(2**19), desc = "Reading"):
+			for device.address in tqdm(device.address_bus, desc = "Reading"):
 				device.output_enable = True
 				data = device.data
 				dump.write(bytearray((data & 0xff, data >> 8)))

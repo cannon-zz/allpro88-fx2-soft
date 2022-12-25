@@ -47,9 +47,9 @@ CC=sdcc
 # these are pretty good settings for most firmwares.
 # Have to be careful with memory locations for
 # firmwares that require more xram etc.
-CODE_SIZE?=--code-size 0x3c00
-XRAM_SIZE?=--xram-size 0x0200
-XRAM_LOC?=--xram-loc 0x3c00
+CODE_SIZE?=--code-size 0x3b00
+XRAM_SIZE?=--xram-size 0x0300
+XRAM_LOC?=--xram-loc 0x3b00
 BUILDDIR?=build
 
 FX2LIBDIR?=$(dir $(lastword $(MAKEFILE_LIST)))../

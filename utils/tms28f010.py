@@ -18,6 +18,9 @@ class tms28f010(object):
 			16: 0.0,
 			32: 5.0
 		})
+		# address and data buses
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2))
+		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (13, 14, 15, 17, 18, 19, 20, 21))
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 10 V and VTH to 1.5 V
@@ -46,8 +49,8 @@ class tms28f010(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus_ttl((12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2))
-	data = devices.bus_ttl((13, 14, 15, 17, 18, 19, 20, 21))
+	address = devices.bus_parallel("addrses_bus")
+	data = devices.bus_parallel("data_bus")
 	chip_enable = devices.flag_ttl_active_low(22)
 	output_enable = devices.flag_ttl_active_low(24)
 	write_enable = devices.flag_ttl_active_low(31)
@@ -59,7 +62,7 @@ with open("dump.dat", "wb") as dump:
 			device.write_enable = False
 			device.chip_enable = True
 
-			for device.address in tqdm(range(2**17), desc = "Reading"):
+			for device.address in tqdm(device.address_bus, desc = "Reading"):
 				device.output_enable = True
 				dump.write(bytearray((device.data,)))
 				device.output_enable = False

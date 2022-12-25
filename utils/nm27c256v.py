@@ -18,6 +18,9 @@ class nm27c256v(object):
 			16: 0.0,
 			32: 5.0
 		})
+		# address and data buses
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (11, 10, 9, 8, 7, 6, 5, 4, 29, 28, 24, 27, 3, 30, 31))
+		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (13, 14, 15, 18, 19, 20, 21, 22))
 
 	def __enter__(self):
 		# turn on power supplies, set VADJ to 10 V and VTH to 1.5 V
@@ -46,8 +49,8 @@ class nm27c256v(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus_ttl((11, 10, 9, 8, 7, 6, 5, 4, 29, 28, 24, 27, 3, 30, 31))
-	data = devices.bus_ttl((13, 14, 15, 18, 19, 20, 21, 22))
+	address = devices.bus_parallel("address_bus")
+	data = devices.bus_parallel("data_bus")
 	chip_enable = devices.flag_ttl_active_low(23)
 	output_enable = devices.flag_ttl_active_low(25)
 
@@ -57,7 +60,7 @@ with open("dump.dat", "wb") as dump:
 		with nm27c256v(programmer) as device:
 			device.chip_enable = True
 
-			for device.address in tqdm(range(2**15), desc = "Reading"):
+			for device.address in tqdm(device.address_bus, desc = "Reading"):
 				device.output_enable = True
 				dump.write(bytearray((device.data,)))
 				device.output_enable = False

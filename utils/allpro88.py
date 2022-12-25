@@ -276,6 +276,94 @@ class channel_proxy(object):
 		)
 
 
+class bus_parallel(object):
+	"""
+	A collection of pins whose digital states represent an integer
+	number.  The pins can be used for output or input.  To set the
+	state of the pins, i.e., to use the bus for output, write a value
+	to the bus.  To use the bus for input, write None to the bus to
+	float the pins.  To read the state of the pins, read a value from
+	the bus.
+
+	A bus may be any number of bits between 1 and 32, inclusively.  Up
+	to 8 buses may be defined and in use simultaneously.  These are
+	limitations of the programmer interface firmware.
+
+	NOTE:  see also devices.bus_parallel to create a descriptor
+	to make calling the .read() and .write() methods of an instance of
+	this class more convenient.
+	"""
+	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt):
+		if not (1 <= len(pin_numbers) <= 32):
+			raise ValueError("bus width out of range: 1 <= %d <= 32" % len(pin_numbers))
+		self.programmer = programmer
+		self.bus_number = self.programmer.get_unused_bus(self)
+		self.pin_numbers = tuple(pin_numbers)
+		self.max_word = (1 << len(pin_numbers)) - 1
+		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active, inactive, flt, len(pin_numbers))
+		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
+		command += "\n"
+		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
+		# clear response
+		self.programmer.read_responses()
+
+	def read(self):
+		"""
+		Return the integer value corresponding to the bus' pin
+		voltage comparators.  The "high"/"low" states are defined
+		by the VTH voltage, not the .inactive and .active states.
+		"""
+		command = "B%01XP?\n" % self.bus_number
+		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
+		word, = self.programmer.read_responses()
+		return word
+
+	def write(self, word):
+		"""
+		Set the pins of the bus to either .inactive or .active
+		according to the bits of the integer word.  If word is None
+		the pins are floated.
+		"""
+		# float the bus if word is None
+		if word is None:
+			command = "B%01XP-\n" % self.bus_number
+		# otherwise to a range check
+		elif not (0 <= word <= self.max_word):
+			raise ValueError("0x0 <= word <= 0x%X: 0x%X" % (self.max_word, word))
+		# and set the bus equal to word
+		elif len(self.pin_numbers) <= 8:
+			command = "B%1XP=%02X\n" % (self.bus_number, word)
+		elif len(self.pin_numbers) <= 16:
+			command = "B%1XP=%04X\n" % (self.bus_number, word)
+		else:
+			command = "B%1XP=%08X\n" % (self.bus_number, word)
+		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
+		# clear response
+		self.programmer.read_responses()
+
+	def __len__(self):
+		"""
+		The number of unique values the bus can represent.
+		"""
+		return self.max_word + 1
+
+	def __iter__(self):
+		"""
+		Iterate over the unique values the bus can represent.
+		Useful, for example, to iterate over the addresses for a
+		ROM chip, or to generate test vectors for a logic chip.
+		"""
+		return iter(range(len(self)))
+
+	def __del__(self):
+		self.programmer.release_bus(self.bus_number)
+
+
+class bus_parallel_ttl(bus_parallel):
+	def __init__(self, programmer, socket, pin_numbers):
+		return super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE)
+
+
 class allpro88(object):
 	idVendor = 0x04b4
 	idProduct = 0x1004
@@ -330,6 +418,9 @@ class allpro88(object):
 				print("warning:  unrecognized socket module ID 0x%02X" % self.socket_module_id)
 			self.socket_module = None
 
+		# keep track of what bus numbers are in use
+		self.bus = {}
+
 
 	def __enter__(self):
 		# ensure the programmer is left in a safe condition (all
@@ -383,6 +474,25 @@ class allpro88(object):
 
 		# done.  if an exception has occured, continue processing
 		return False
+
+
+	def get_unused_bus(self, bus_obj = None):
+		# NOTE:  the range() must match the size of the bus
+		# definition array in the firmware source
+		unused = set(range(8)) - set(self.bus)
+		if not unused:
+			raise KeyError("no busses available")
+		# pick one
+		bus_number = unused.pop()
+		# if we've been given something to associate with the bus,
+		# put it into the dictionary.  use None, if not, so that
+		# the bus is still marked as in use
+		self.bus[bus_number] = bus_obj
+		return bus_number
+
+
+	def release_bus(self, bus_number):
+		del self.bus[bus_number]
 
 
 	def read_responses(self):
