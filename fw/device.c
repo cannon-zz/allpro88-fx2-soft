@@ -74,21 +74,19 @@ static BOOL errno = FALSE;
 
 
 /*
- * convert base 16 strings of various fixed lengths to numerical values
+ * convert upper-case base 16 strings of various fixed lengths to numerical
+ * values
  */
 
 
 static BYTE hex_to_val(char digit)
 {
 	digit -= '0';
-	if((signed char) digit < 0)
-		goto error;
 	if(digit > 9) {
-		/* map 'a' through 'f' to upper case */
-		digit &= ~0x20;
-		/* convert to value */
+		if(digit < 'A' - '0')
+			goto error;
 		digit -= 'A' - '0' - 10;
-		if((signed char) digit < 10 || digit > 0xf)
+		if(digit > 0xF)
 			goto error;
 	}
 	return digit;
@@ -112,16 +110,14 @@ static WORD str_to_word(const char *str)
 
 /*
  * write a null-terminated string without the terminator character.
- * assumes AUTOPTR2 is set to the destination.  the length of the string
- * including its null terminator must be less than 256 characters.
+ * assumes AUTOPTR2 is set to the destination.
  */
 
 
 static void puts(const char *str)
 {
-	BYTE i;
-	for(i = 0; str[i]; i++)
-		XAUTODAT2 = str[i];
+	while(*str)
+		XAUTODAT2 = *str++;
 }
 
 
@@ -935,8 +931,6 @@ BOOL handle_set_interface(BYTE ifc, BYTE alt_ifc)
 		arm_out_endpoint();
 		/* reset the programmer and command processor */
 		allpro88_hard_reset();
-		/* FIXME: enable this */
-		/*parser_state_reset();*/
 		return TRUE;
 	}
 
@@ -975,8 +969,6 @@ BOOL handle_set_configuration(BYTE cfg)
 		arm_out_endpoint();
 		/* reset the programmer and command processor */
 		allpro88_hard_reset();
-		/* FIXME: enable this */
-		/*parser_state_reset();*/
 		return TRUE;
 	}
 	return FALSE;
@@ -1030,38 +1022,12 @@ static BOOL in_buffer_not_full(void)
 
 
 /*
- * command parser state.
- */
-
-
-static struct parser_state {
-	char command[8];
-	BYTE command_idx;
-} parser_state = {
-	.command = {0},
-	.command_idx = 0,
-};
-
-
-/*
- * reset the command parser's state.
- */
-
-
-static void parser_state_reset(void)
-{
-	parser_state.command[0] = 0;
-	parser_state.command_idx = 0;
-}
-
-
-/*
  * parse commands from "out" end-point
  *
- * command format.  all numbers are in base 16, and they must be the
- * width indicated.  all commands are terminated by newline, \n, 0x0a.  all
- * other whitespace is ignored.  commands may not straddle packet
- * boundaries.
+ * command format.  all numbers are in base 16, only upper-case numerals
+ * are recognized, and the numbers must be the width indicated (with
+ * leading 0's as needed).  all commands are terminated by newline, \n,
+ * 0x0a.  commands may not straddle packet boundaries.
  *
  * =XXXXYY	write YY to address XXXX
  * ?XXXX	read address XXXX, report the value
@@ -1077,20 +1043,20 @@ static void parser_state_reset(void)
  */
 
 
-static void do_command(void)
+static void do_command(const char *command)
 {
 	errno = FALSE;
-	switch(parser_state.command[0]) {
+	switch(command[0]) {
 	/*
 	 * write byte to address
 	 */
 
 	case '=': {
 		/* decode address and byte */
-		WORD addr = str_to_word(&parser_state.command[1]);
-		BYTE val = str_to_byte(&parser_state.command[5]);
+		WORD addr = str_to_word(&command[1]);
+		BYTE val = str_to_byte(&command[5]);
 		/* check for error and correct end of string */
-		if(errno || parser_state.command[7])
+		if(errno || command[7])
 			goto error;
 		/* write byte to address */
 		allpro88_write(addr, val);
@@ -1103,9 +1069,9 @@ static void do_command(void)
 
 	case '?': {
 		/* decode address */
-		WORD addr = str_to_word(&parser_state.command[1]);
+		WORD addr = str_to_word(&command[1]);
 		/* check for error and correct end of string */
-		if(errno || parser_state.command[5])
+		if(errno || command[5])
 			goto error;
 		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
@@ -1119,9 +1085,9 @@ static void do_command(void)
 
 	case 'E': {
 		/* decode the 16 bit number to echo */
-		WORD addr = str_to_word(&parser_state.command[1]);
+		WORD addr = str_to_word(&command[1]);
 		/* check for error and correct end of string */
-		if(errno || parser_state.command[5])
+		if(errno || command[5])
 			goto error;
 		/* echo the number */
 		puts_word(addr);
@@ -1135,9 +1101,9 @@ static void do_command(void)
 
 	case 'M': {
 		/* decode the 8 bit channel number */
-		BYTE pin = str_to_byte(&parser_state.command[1]);
+		BYTE pin = str_to_byte(&command[1]);
 		/* check for error and correct end of string */
-		if(errno || parser_state.command[3])
+		if(errno || command[3])
 			goto error;
 		/* measure the voltage, report the VTH DAC value */
 		puts_byte(allpro88_measure_pin_voltage(pin));
@@ -1168,7 +1134,7 @@ static void do_command(void)
 		 * problems, but at the moment there are no safety checks
 		 * in place to guarantee it doesn't lead to problems */
 		/* check for correct end of string */
-		if(parser_state.command[1])
+		if(command[1])
 			goto error;
 		/* measure the voltage, report the VADJTH DAC value */
 		puts_byte(allpro88_measure_vadj_voltage());
@@ -1190,6 +1156,7 @@ error:
 
 static void parse_out_buffer(void)
 {
+	char *command = EP2FIFOBUF;
 	WORD n;
 
 	/* initialize autopointer 1 to the start address of end-point 2's
@@ -1208,32 +1175,16 @@ static void parse_out_buffer(void)
 	 * single packet will fit into a single packet and don't bother
 	 * including any logic to handle otherwise */
 
-	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--) {
-		/* retrieve the next character */
-		char next = XAUTODAT1;
-		if(next == '\n') {
-			/* end of command.  null terminate the command
-			 * buffer and interpret its contents */
-			parser_state.command[parser_state.command_idx] = 0;
-			do_command();
+	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--)
+		/* search for end of command character */
+		if(XAUTODAT1 == '\n') {
+			/* null terminate the command and interpret */
+			char *next_cmd = MAKEWORD(AUTOPTRH1, AUTOPTRL1);
+			*(next_cmd - 1) = 0;
+			do_command(command);
 			/* reset state for next command */
-			parser_state_reset();
-		} else if(next < 0x21) {
-			/* white space, ignore */
-		} else if(parser_state.command_idx > 6) {
-			/* if command buffer is full, an error has occured,
-			 * reset */
-			parser_state_reset();
-		} else {
-			/* append character to command buffer */
-			parser_state.command[parser_state.command_idx++] = next;
+			command = next_cmd;
 		}
-	}
-
-	/* end of packet:  reset.  commands not allowed to straddle packet
-	 * boundaries */
-
-	parser_state_reset();
 
 	/* arm the in end-point to send it to the host.  we do this even if
 	 * it's empty (byte count = 0) so that code running on the host
