@@ -160,7 +160,7 @@ static void puts_dword(DWORD val)
  */
 
 
-static void newline(void)
+inline static void newline(void)
 {
 	XAUTODAT2 = '\n';
 }
@@ -262,7 +262,7 @@ static void newline(void)
 #define ALLPRO88_DATA_DRIVE do { OEA = 0xff; } while(0)
 #define ALLPRO88_DATA IOA
 #define ALLPRO88_ADDRCTRL_DRIVE do {OEB = OED = 0xff; } while(0)
-static void ALLPRO88_ADDR_SET(WORD addr)
+inline static void ALLPRO88_ADDR_SET(WORD addr)
 {
 	/* the low byte of the 12 bit address */
 	IOB = LSB(addr);
@@ -454,7 +454,7 @@ enum ALLPRO88_PINCON_BITS {
  */
 
 
-static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
+inline static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
 {
 	allpro88_write(0x030c, val);
 }
@@ -471,7 +471,7 @@ static void allpro88_set_PCR(enum ALLPRO88_PCR_BITS val)
  */
 
 
-static void allpro88_set_VADJ(BYTE vdac)
+inline static void allpro88_set_VADJ(BYTE vdac)
 {
 	allpro88_write(0x0302, vdac);
 }
@@ -484,7 +484,7 @@ static void allpro88_set_VADJ(BYTE vdac)
  */
 
 
-static void allpro88_set_VADJTH(BYTE vdac)
+inline static void allpro88_set_VADJTH(BYTE vdac)
 {
 	allpro88_write(0x0303, vdac);
 }
@@ -497,7 +497,7 @@ static void allpro88_set_VADJTH(BYTE vdac)
  */
 
 
-static void allpro88_set_VTH(BYTE vdac)
+inline static void allpro88_set_VTH(BYTE vdac)
 {
 	allpro88_write(0x0301, vdac);
 }
@@ -510,7 +510,7 @@ static void allpro88_set_VTH(BYTE vdac)
  */
 
 
-static void allpro88_set_VSR(BYTE vdac)
+inline static void allpro88_set_VSR(BYTE vdac)
 {
 	allpro88_write(0x0300, vdac);
 }
@@ -526,7 +526,7 @@ static void allpro88_set_VSR(BYTE vdac)
  */
 
 
-static void allpro88_set_VPUL(BYTE vdac)
+inline static void allpro88_set_VPUL(BYTE vdac)
 {
 	allpro88_write(0x0305, vdac);
 }
@@ -541,7 +541,7 @@ static void allpro88_set_VPUL(BYTE vdac)
  */
 
 
-static void allpro88_set_VTST(BYTE vdac, BYTE idac)
+inline static void allpro88_set_VTST(BYTE vdac, BYTE idac)
 {
 	allpro88_write(0x0386, vdac);
 	allpro88_write(0x0387, idac);
@@ -602,7 +602,7 @@ static void allpro88_set_PINDAC(BYTE channel, BYTE val)
  */
 
 
-static void allpro88_xfer_PINDACs(void)
+inline static void allpro88_xfer_PINDACs(void)
 {
 	allpro88_write(0x308, 0);
 }
@@ -741,7 +741,7 @@ static BYTE allpro88_measure_vadj_voltage(void)
  */
 
 
-static void arm_out_endpoint(void)
+inline static void arm_out_endpoint(void)
 {
 	/* arm endpoint 2.  an out end-point is armed by writing any value
 	 * to the byte-count low byte.  with AUTOOUT=0, the high bit is the
@@ -755,7 +755,7 @@ static void arm_out_endpoint(void)
 }
 
 
-static void arm_in_endpoint(void)
+inline static void arm_in_endpoint(void)
 {
 	/* arm end-point 6 setting the byte count to the offset of autoptr2
 	 * from the start of the buffer.  write byte-count high byte first.
@@ -768,13 +768,16 @@ static void arm_in_endpoint(void)
 }
 
 
-static void io_init(void)
+void main_init(void)
 {
-	/* clear bits 0 and 1:  ports B and D are I/O ports, not FIFO data
-	 * bus */
-	IFCONFIG &= ~0x03;
+	/* set both IFCLK and CPU CLK to 48 MHz */
+	SETCPUFREQ(CLK_48M);
+	SETIF48MHZ();
 
-	/* port A all pins for I/O port, disable alternate functions. */
+	/* configure I/O ports.  clear bits 0 and 1:  ports B and D are I/O
+	 * ports, not FIFO data bus.  port A all pins for I/O port, disable
+	 * alternate functions. */
+	IFCONFIG &= ~0x03;
 	PORTACFG = 0;
 
 	/* ALLPRO88:  zero data bus, address bus, pull /RESET low, and set
@@ -788,17 +791,6 @@ static void io_init(void)
 	 * putting programmer into reset state) */
 	ALLPRO88_DATA_FLOAT;
 	ALLPRO88_ADDRCTRL_DRIVE;
-}
-
-
-void main_init(void)
-{
-	/* set both IFCLK and CPU CLK to 48 MHz */
-	SETCPUFREQ(CLK_48M);
-	SETIF48MHZ();
-
-	/* configure I/O ports (leaves programmer in hardware reset) */
-	io_init();
 
 	/* programmer hardware reset */
 	allpro88_hard_reset();
