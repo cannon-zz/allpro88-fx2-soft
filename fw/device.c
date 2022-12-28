@@ -549,36 +549,37 @@ static void allpro88_set_VTST(BYTE vdac, BYTE idac)
 
 
 /*
- * start address for the control registers for a pin
+ * start address for the control registers for a channel
  */
 
 
-static WORD allpro88_pin_addr(BYTE pin)
+static WORD allpro88_channel_addr(BYTE channel)
 {
-	/* pin 0 starts at 0x0000, 1 at 0x0010, etc., up to pin 0x27 which
-	 * starts at 0x0270, then pin 0x28 starts at 0x0400, and they
-	 * continue in order from there, upto and including pin 0x57 */
-	if(pin > 0x27)
-		pin += 0x18;
-	return (WORD) pin << 4;
+	/* channel 0 starts at 0x0000, 1 at 0x0010, etc., up to channel
+	 * 0x27 which starts at 0x0270, then channel 0x28 starts at 0x0400,
+	 * and they continue in order from there, upto and including
+	 * channel 0x57 */
+	if(channel > 0x27)
+		channel += 0x18;
+	return (WORD) channel << 4;
 }
 
 
 /*
- * set the PINCON register for a pin.
+ * set the PINCON register for a channel
  */
 
 
-static void allpro88_set_PINCON(BYTE pin, enum ALLPRO88_PINCON_BITS val)
+static void allpro88_set_PINCON(BYTE channel, enum ALLPRO88_PINCON_BITS val)
 {
 	/* config register is at offset 0 from the start of the register
-	 * group for each pin */
-	allpro88_write(allpro88_pin_addr(pin), val);
+	 * group for each channel */
+	allpro88_write(allpro88_channel_addr(channel), val);
 }
 
 
 /*
- * set the DAC register for a pin.  the voltage will be
+ * set the DAC register for a channel.  the voltage will be
  *
  * VDAC = -0.5 + (0.1 * dac)
  *
@@ -587,17 +588,17 @@ static void allpro88_set_PINCON(BYTE pin, enum ALLPRO88_PINCON_BITS val)
  */
 
 
-static void allpro88_set_PINDAC(BYTE pin, BYTE val)
+static void allpro88_set_PINDAC(BYTE channel, BYTE val)
 {
 	/* DAC register is at offset 3 from the start of the register group
-	 * for each pin */
-	allpro88_write(allpro88_pin_addr(pin) + 3, val);
+	 * for each channel */
+	allpro88_write(allpro88_channel_addr(channel) + 3, val);
 }
 
 
 /*
- * load all pin DACs and VPUL DAC from their registers.  this causes the
- * DAC value set for each pin and for VPUL to take effect.
+ * load all channel DACs and VPUL DAC from their registers.  this causes
+ * the DAC value set for each channel and for VPUL to take effect.
  */
 
 
@@ -608,17 +609,17 @@ static void allpro88_xfer_PINDACs(void)
 
 
 /*
- * enable/disable the bypass capacitor for a pin.  only pins < 0x30 have
- * bypass capacitors.
+ * enable/disable the bypass capacitor for a channel.  only channels < 0x30
+ * have bypass capacitors.
  */
 
 
-static void allpro88_set_PINBYPASS(BYTE pin, BOOL enable)
+static void allpro88_set_PINBYPASS(BYTE channel, BOOL enable)
 {
-	if(pin < 0x28)
-		allpro88_write(0x0280 + pin, enable);
-	else if(pin < 0x30)
-		allpro88_write(0x02c0 - 0x28 + pin, enable);
+	if(channel < 0x28)
+		allpro88_write(0x0280 + channel, enable);
+	else if(channel < 0x30)
+		allpro88_write(0x02c0 - 0x28 + channel, enable);
 }
 
 
@@ -629,7 +630,7 @@ static void allpro88_set_PINBYPASS(BYTE pin, BOOL enable)
 
 static void allpro88_hard_reset(void)
 {
-	BYTE pin;
+	BYTE channel;
 
 	/*
 	 * the /RESET line clears all configuration registers (octal latch
@@ -669,8 +670,8 @@ static void allpro88_hard_reset(void)
 	allpro88_set_VTST(0, 0);
 
 	/* zero the DACs that require a separate update step, then do it */
-	for(pin = 0; pin < 88; pin++)
-		allpro88_set_PINDAC(pin, 0);
+	for(channel = 0; channel < 88; channel++)
+		allpro88_set_PINDAC(channel, 0);
 	allpro88_set_VPUL(0);
 	allpro88_xfer_PINDACs();
 
@@ -686,7 +687,7 @@ static void allpro88_hard_reset(void)
 
 
 /*
- * use a bisection search with VTH to measure the voltage on a pin
+ * use a bisection search with VTH to measure the voltage on a channel
  *
  * NOTE:  VTH is, obviously, left modified by this operation
  *
@@ -697,9 +698,9 @@ static void allpro88_hard_reset(void)
  */
 
 
-static BYTE allpro88_measure_pin_voltage(BYTE pin)
+static BYTE allpro88_measure_pin_voltage(BYTE channel)
 {
-	WORD addr = allpro88_pin_addr(pin);
+	WORD addr = allpro88_channel_addr(channel);
 	BYTE vdac = 0;
 	BYTE test_bit;
 	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
@@ -1085,7 +1086,7 @@ static void bus_parallel_define(BYTE bus_number, const char *s)
 		/* check for error */
 		if(errno || channel > 87)
 			goto error;
-		bus[bus_number].parallel.bit_addr[i] = allpro88_pin_addr(channel);
+		bus[bus_number].parallel.bit_addr[i] = allpro88_channel_addr(channel);
 	}
 	/* check for correct end of string */
 	if(*s)
@@ -1483,12 +1484,12 @@ static void do_command(const char *command)
 
 	case 'M': {
 		/* decode the 8 bit channel number */
-		BYTE pin = str_to_byte(&command[1]);
+		BYTE channel = str_to_byte(&command[1]);
 		/* check for error and correct end of string */
 		if(errno || command[3])
 			goto error;
 		/* measure the voltage, report the VTH DAC value */
-		puts_byte(allpro88_measure_pin_voltage(pin));
+		puts_byte(allpro88_measure_pin_voltage(channel));
 		newline();
 		break;
 	}
