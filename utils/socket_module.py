@@ -76,6 +76,19 @@ class socket_module(object):
 
 
 class socket_module_AP88_PLCC(socket_module):
+	"""
+	ALLPRO88 Universal PLCC module.  There are two versions of this
+	module.  One version is missing the 84 pin PLCC socket.  Except for
+	the one socket not being installed, the two module versions are
+	identical.  Which sockets can be used with your programmer is
+	determined by the number of channels installed in your programmer.
+	For example, a 48 channel programmer cannot use the three largest
+	PLCC sockets, but can use all the others.
+
+	NOTE:  since my programmer is only 48 channels, I have not bothered
+	constructed pin mappings for the 52 pin, 68 pin and 84 pin PLCC
+	sockets.
+	"""
 	name = "AP88 PLCC"
 	module_id = 0x11
 	sockets = {
@@ -355,4 +368,18 @@ class socket_module_68HC11F1(socket_module):
 #
 
 
-socket_modules = dict((cls.module_id, cls) for cls in (socket_module_AP88_PLCC, socket_module_DIP_MODULE, socket_module_TMS370, socket_module_2708_EAROM, socket_module_PAC1000, socket_module_8789, socket_module_1702A, socket_module_68HC11, socket_module_68701, socket_module_68705, socket_module_68HC705, socket_module_1468705, socket_module_68HC11F1))
+socket_modules = dict((cls.module_id, cls) for cls in (
+	socket_module_AP88_PLCC,
+	socket_module_DIP_MODULE,
+	socket_module_TMS370,
+	socket_module_2708_EAROM,
+	socket_module_PAC1000,
+	socket_module_8789,
+	socket_module_1702A,
+	socket_module_68HC11,
+	socket_module_68701,
+	socket_module_68705,
+	socket_module_68HC705,
+	socket_module_1468705,
+	socket_module_68HC11F1
+))
