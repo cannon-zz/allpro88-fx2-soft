@@ -82,15 +82,11 @@ class bus_iic(object):
 	IIC (aka I2C) bus.  NOTE:  must set VPUL = VCC for the chip and VTH
 	to the minimum bus "high" state voltage.
 
-	example sequences:
-
-	start()
-	write_byte()	# return value = ack
-	write_byte()
-	...
-	read_byte(ack)	# return value = byte, ack is sent in reponse
-	...
-	stop()
+	The methods must be called as followed:  first .start(), then any
+	number of .write_byte() and .read_byte() in any order, finally
+	.stop().  The bit manipulations performed by each method follow
+	correctly from the state the bus has been left in by the preceding
+	method;  different orders will not work.
 	"""
 	lo = allpro88.PINCON.LOGICL | allpro88.PINCON.PULLUP
 	hi = allpro88.PINCON.PULLUP
@@ -103,10 +99,6 @@ class bus_iic(object):
 		self.sda = socket[sda]
 		self.scl = socket[scl]
 		# start in idle state
-		self.idle()
-
-	def idle(self):
-		# idle state
 		self.sda.config = self.hi
 		self.scl.config = self.hi
 
@@ -193,8 +185,10 @@ class bus_iic(object):
 
 
 class bus_spi(object):
-	# NOTE:  must set VDAC on the SCLK and MOSI pins to VCC, VTH to VCC
-	# - 1 V
+	"""
+	SPI bus.  Calling code must set VDAC on the SCLK and MOSI pins to
+	VCC, and VTH for the device to VCC - 1 V.
+	"""
 	hi = allpro88.PINCON.VDAC
 	lo = allpro88.PINCON.LOGICL
 
