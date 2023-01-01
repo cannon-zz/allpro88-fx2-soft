@@ -9,7 +9,7 @@ for i in tqdm(range(100000), desc = "loopback test"):
 	rcv, = programmer.write_command("E", snd)
 	assert rcv == snd
 
-for i in tqdm(range(320000), desc = "fast loopback test"):
+for i in tqdm(range(210000), desc = "fast loopback test"):
 	snd = random.randint(0, 0xffff)
 	programmer.push(allpro88.command("E", snd))
 	if len(programmer.out_queue) >= 32:
@@ -22,7 +22,7 @@ for i in tqdm(range(100000), desc = "port read speed test"):
 	programmer.write_command("?", 0x0280)
 
 programmer.pcr_enable = True
-for i in tqdm(range(30000), desc = "voltage read speed test"):
+for i in tqdm(range(70000), desc = "voltage read speed test"):
 	# my unit only has 48 channels installed
 	programmer.channel[random.randint(0, 47)].measure_v()
 programmer.pcr_enable = False
