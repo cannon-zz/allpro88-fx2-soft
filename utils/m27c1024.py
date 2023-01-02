@@ -6,8 +6,7 @@ class m27c1024(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP40"]
-		# make sure all associated pins are disabled so they are in
-		# a predictable state.
+		# put all pins in a predictable state.
 		for channel in self.socket.values():
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
@@ -31,13 +30,6 @@ class m27c1024(object):
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
-		# make sure all non-power pins are disabled so they don't
-		# have voltages on them when power is removed from the chip
-		for pin_number, channel in self.socket.items():
-			if pin_number not in self.power.pins:
-				channel.config = allpro88.PINCON.DISABLE
-				channel.vdac = 0
-				channel.bypass = False
 		# turn off power
 		self.power.off()
 		self.programmer.vth = 0
