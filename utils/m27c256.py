@@ -11,19 +11,16 @@ class m27c256(object):
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
 			channel.bypass = False
-		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
-			1: 5.0,
-			14: 0.0,
-			28: 5.0
-		})
+			1: 5.0,		# Vpp = Vcc or GND (use Vcc)
+			14: 0.0,	# GND
+			28: 5.0		# Vcc
+		}, vth = 2.0)
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (11, 12, 13, 15, 16, 17, 18, 19))
 
 	def __enter__(self):
-		# set VTH to 2 V
-		self.programmer.vth = allpro88.volt(2.)
 		# turn on device power
 		self.power.on()
 		return self
@@ -31,7 +28,6 @@ class m27c256(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# turn off power
 		self.power.off()
-		self.programmer.vth = 0
 
 		# done.  if an exception has occured, continue processing
 		return False

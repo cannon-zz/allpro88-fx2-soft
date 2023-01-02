@@ -20,8 +20,6 @@ class hn462732(object):
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (9, 10, 11, 13, 14, 15, 16, 17))
 
 	def __enter__(self):
-		# set VTH to 1.5 V
-		self.programmer.vth = allpro88.volt(1.5)
 		# turn on device power
 		self.power.on()
 		return self
@@ -29,7 +27,6 @@ class hn462732(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# turn off power
 		self.power.off()
-		self.programmer.vth = 0
 
 		# done.  if an exception has occured, continue processing
 		return False

@@ -1,16 +1,27 @@
+import itertools
 import operator
 import allpro88
 
 
 class power(object):
-	def __init__(self, programmer, socket, pin_voltage_map, vadj = "auto"):
+	def __init__(self, programmer, socket, pin_voltage_map, vth = 1.5, vadj = "auto"):
 		self.programmer = programmer
 		self.socket = socket
 		self.pin_voltage_map = pin_voltage_map
+		self.vth = allpro88.volt(vth)
 		if vadj == "auto":
-			self.vadj = allpro88.volt(max(self.pin_voltage_map.values()) + 2.)
+			self.vadj = allpro88.volt(max(itertools.chain((vth,), self.pin_voltage_map.values())) + 2.)
 		else:
-			self.vadj = vadj
+			self.vadj = allpro88.volt(vadj)
+
+	def reset_vth(self):
+		"""
+		Reset the programmer's VTH to the configured value.  When a
+		pin voltage is measured, VTH is left set to the measured
+		voltage.  Use this method to reset it so pin boolean states
+		can be interpreted properly again.
+		"""
+		self.programmer.vth = self.vth
 
 	def on(self):
 		# configure pins
@@ -24,6 +35,7 @@ class power(object):
 				self.socket[pin].vdac = 0
 		# apply power
 		self.programmer.vadj = self.vadj
+		self.reset_vth()
 		self.programmer.pcr_enable = True
 		self.programmer.load_dacs()
 
@@ -31,6 +43,7 @@ class power(object):
 		# cut power
 		self.programmer.pcr_enable = False
 		self.programmer.vadj = 0
+		self.programmer.vth = 0
 		# set vdac supplies to 0 and disable pins
 		for pin in self.pin_voltage_map:
 			self.socket[pin].vdac = 0

@@ -16,7 +16,7 @@ class st24w04(object):
 		self.power = devices.power(self.programmer, self.socket, {
 			4: 0.0,
 			8: 5.0
-		})
+		}, vth = 2.0)
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
 		# documentation calls these two pins chip enable lines, but
 		# the value coded onto them must match the two low bits of
@@ -25,9 +25,8 @@ class st24w04(object):
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3))
 
 	def __enter__(self):
-		# set VTH to 2 V
+		# set VPUL to 5 V
 		self.programmer.vpul = allpro88.volt(5.)
-		self.programmer.vth = allpro88.volt(2.)
 		# turn on device power
 		self.power.on()
 		return self
@@ -35,8 +34,6 @@ class st24w04(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# turn off power
 		self.power.off()
-		# turn off programmer power supplies
-		self.programmer.vth = 0
 		self.programmer.vpul = 0
 		self.programmer.load_dacs()
 
