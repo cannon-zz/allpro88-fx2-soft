@@ -13,10 +13,11 @@ class st24w04(object):
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
 			channel.bypass = False
+		# confiugre VPUL and VTH for I2C bus
 		self.power = devices.power(self.programmer, self.socket, {
 			4: 0.0,
 			8: 5.0
-		}, vth = 2.0)
+		}, vpul = 5.0, vth = 2.0)
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
 		# documentation calls these two pins chip enable lines, but
 		# the value coded onto them must match the two low bits of
@@ -25,8 +26,6 @@ class st24w04(object):
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3))
 
 	def __enter__(self):
-		# set VPUL to 5 V
-		self.programmer.vpul = allpro88.volt(5.)
 		# turn on device power
 		self.power.on()
 		return self
@@ -34,8 +33,6 @@ class st24w04(object):
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# turn off power
 		self.power.off()
-		self.programmer.vpul = 0
-		self.programmer.load_dacs()
 
 		# done.  if an exception has occured, continue processing
 		return False

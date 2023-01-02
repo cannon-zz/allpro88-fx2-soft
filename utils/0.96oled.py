@@ -22,24 +22,21 @@ class oled_module(object):
 			channel.config = allpro88.PINCON.DISABLE
 			channel.vdac = 0
 			channel.bypass = False
-		# VTH for I2C bus is 2.0 V
+		# configure VPUL and VTH for I2C bus
 		self.power = devices.power(self.programmer, self.socket, {
 			1: 0.0,
 			2: 5.0
-		}, vth = 2.)
+		}, vpul = 5.0, vth = 2.0)
 		self.i2c = devices.bus_iic(self.socket, 4, 3)
 
 	def __enter__(self):
-		# set VPUL to 5 (logic high on I2C bus)
-		self.programmer.vpul = allpro88.volt(5.)
 		# turn on device power
-		self.power.on()	# calls .load_dacs() for vpul
+		self.power.on()
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# turn off power
-		self.programmer.vpul = 0
-		self.power.off()	# calls .load_dacs() for vpul
+		self.power.off()
 
 		# done.  if an exception has occured, continue processing
 		return False

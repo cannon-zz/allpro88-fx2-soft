@@ -4,13 +4,14 @@ import allpro88
 
 
 class power(object):
-	def __init__(self, programmer, socket, pin_voltage_map, vth = 1.5, vadj = "auto"):
+	def __init__(self, programmer, socket, pin_voltage_map, vadj = "auto", vpul = 0, vth = 1.5):
 		self.programmer = programmer
 		self.socket = socket
 		self.pin_voltage_map = pin_voltage_map
-		self.vth = allpro88.volt(vth)
+		self.vpul = allpro88.volt(vpul) if vpul else vpul
+		self.vth = allpro88.volt(vth) if vth else vth
 		if vadj == "auto":
-			self.vadj = allpro88.volt(max(itertools.chain((vth,), self.pin_voltage_map.values())) + 2.)
+			self.vadj = allpro88.volt(max(itertools.chain((vpul, vth), self.pin_voltage_map.values())) + 2.)
 		else:
 			self.vadj = allpro88.volt(vadj)
 
@@ -35,20 +36,26 @@ class power(object):
 				self.socket[pin].vdac = 0
 		# apply power
 		self.programmer.vadj = self.vadj
+		self.programmer.vpul = self.vpul
 		self.reset_vth()
-		self.programmer.pcr_enable = True
+		# load pin dacs and vpul dac
 		self.programmer.load_dacs()
+		# turn on power supplies
+		self.programmer.pcr_enable = True
 
 	def off(self):
 		# cut power
 		self.programmer.pcr_enable = False
+		# set dacs to 0
 		self.programmer.vadj = 0
+		self.programmer.vpul = 0
 		self.programmer.vth = 0
 		# set vdac supplies to 0 and disable pins
 		for pin in self.pin_voltage_map:
 			self.socket[pin].vdac = 0
 			self.socket[pin].bypass = False
 			self.socket[pin].config = allpro88.PINCON.DISABLE
+		# load pin dacs and vpul dac
 		self.programmer.load_dacs()
 
 	@property
