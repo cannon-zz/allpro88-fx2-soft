@@ -26,8 +26,7 @@ class st24w04(object):
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3))
 
 	def __enter__(self):
-		# turn on power supplies, set VADJ to 10 V and VTH to 2 V
-		self.programmer.pcr_enable = True
+		# set VADJ to 10 V and VTH to 2 V
 		self.programmer.vadj = allpro88.volt(10.)
 		self.programmer.vpul = allpro88.volt(5.)
 		self.programmer.vth = allpro88.volt(2.)
@@ -43,14 +42,13 @@ class st24w04(object):
 				channel.config = allpro88.PINCON.DISABLE
 				channel.vdac = 0
 				channel.bypass = False
-		# turn off pull-up voltage and device power
+		# turn off power
 		self.power.off()
 		# turn off programmer power supplies
 		self.programmer.vth = 0
 		self.programmer.vpul = 0
 		self.programmer.load_dacs()
 		self.programmer.vadj = 0
-		self.programmer.pcr_enable = False
 
 		# done.  if an exception has occured, continue processing
 		return False

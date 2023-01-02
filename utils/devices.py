@@ -19,17 +19,18 @@ class power(object):
 				self.socket[pin].config = allpro88.PINCON.GND
 				self.socket[pin].vdac = 0
 		# apply power
+		self.programmer.pcr_enable = True
 		self.programmer.load_dacs()
 
 	def off(self):
-		# set vdac supplies to 0
+		# cut power
+		self.programmer.pcr_enable = False
+		# set vdac supplies to 0 and disable pins
 		for pin in self.pin_voltage_map:
 			self.socket[pin].vdac = 0
-		self.programmer.load_dacs()
-		# disable pins
-		for pin in self.pin_voltage_map:
 			self.socket[pin].bypass = False
 			self.socket[pin].config = allpro88.PINCON.DISABLE
+		self.programmer.load_dacs()
 
 	@property
 	def pins(self):

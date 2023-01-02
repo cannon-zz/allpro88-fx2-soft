@@ -23,8 +23,7 @@ class nm27c256v(object):
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (13, 14, 15, 18, 19, 20, 21, 22))
 
 	def __enter__(self):
-		# turn on power supplies, set VADJ to 10 V and VTH to 1.5 V
-		self.programmer.pcr_enable = True
+		# set VADJ to 10 V and VTH to 1.5 V
 		self.programmer.vadj = allpro88.volt(10.)
 		self.programmer.vth = allpro88.volt(1.5)
 		# turn on device power
@@ -39,12 +38,10 @@ class nm27c256v(object):
 				channel.config = allpro88.PINCON.DISABLE
 				channel.vdac = 0
 				channel.bypass = False
-		# turn off device power
+		# turn off power
 		self.power.off()
-		# turn off programmer power supplies
 		self.programmer.vth = 0
 		self.programmer.vadj = 0
-		self.programmer.pcr_enable = False
 
 		# done.  if an exception has occured, continue processing
 		return False
