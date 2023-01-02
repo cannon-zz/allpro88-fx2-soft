@@ -30,9 +30,7 @@ class oled_module(object):
 		self.i2c = devices.bus_iic(self.socket, 4, 3)
 
 	def __enter__(self):
-		# turn on power supplies, set VADJ to 10 V, VPUL to 5
-		# (logic high on I2C bus) and VTH to 2 V
-		self.programmer.vadj = allpro88.volt(10.)
+		# set VPUL to 5 (logic high on I2C bus) and VTH to 2 V
 		self.programmer.vpul = allpro88.volt(5.)
 		self.programmer.vth = allpro88.volt(2.)
 		# turn on device power
@@ -52,7 +50,6 @@ class oled_module(object):
 		self.power.off()	# calls .load_dacs() for vpul
 		# turn off programmer power supplies
 		self.programmer.vth = 0
-		self.programmer.vadj = 0
 
 		# done.  if an exception has occured, continue processing
 		return False

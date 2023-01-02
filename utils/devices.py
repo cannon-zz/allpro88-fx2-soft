@@ -3,10 +3,14 @@ import allpro88
 
 
 class power(object):
-	def __init__(self, programmer, socket, pin_voltage_map):
+	def __init__(self, programmer, socket, pin_voltage_map, vadj = "auto"):
 		self.programmer = programmer
 		self.socket = socket
 		self.pin_voltage_map = pin_voltage_map
+		if vadj == "auto":
+			self.vadj = allpro88.volt(max(self.pin_voltage_map.values()) + 2.)
+		else:
+			self.vadj = vadj
 
 	def on(self):
 		# configure pins
@@ -19,12 +23,14 @@ class power(object):
 				self.socket[pin].config = allpro88.PINCON.GND
 				self.socket[pin].vdac = 0
 		# apply power
+		self.programmer.vadj = self.vadj
 		self.programmer.pcr_enable = True
 		self.programmer.load_dacs()
 
 	def off(self):
 		# cut power
 		self.programmer.pcr_enable = False
+		self.programmer.vadj = 0
 		# set vdac supplies to 0 and disable pins
 		for pin in self.pin_voltage_map:
 			self.socket[pin].vdac = 0

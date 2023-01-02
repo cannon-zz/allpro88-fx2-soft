@@ -23,8 +23,7 @@ class m27c256(object):
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (11, 12, 13, 15, 16, 17, 18, 19))
 
 	def __enter__(self):
-		# set VADJ to 10 V and VTH to 2 V
-		self.programmer.vadj = allpro88.volt(10.)
+		# set VTH to 2 V
 		self.programmer.vth = allpro88.volt(2.)
 		# turn on device power
 		self.power.on()
@@ -41,7 +40,6 @@ class m27c256(object):
 		# turn off power
 		self.power.off()
 		self.programmer.vth = 0
-		self.programmer.vadj = 0
 
 		# done.  if an exception has occured, continue processing
 		return False

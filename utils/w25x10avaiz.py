@@ -19,8 +19,7 @@ class w25x10avaiz(object):
 		self.spi = devices.bus_spi(self.socket, 6, 5, 2)
 
 	def __enter__(self):
-		# set VADJ to 10 V and VTH to 1.75 V
-		self.programmer.vadj = allpro88.volt(10.)
+		# set VTH to 1.75 V
 		self.programmer.vth = allpro88.volt(1.75)
 		# turn on device power
 		self.power.on()
@@ -46,7 +45,6 @@ class w25x10avaiz(object):
 		# turn off power
 		self.power.off()
 		self.programmer.vth = 0
-		self.programmer.vadj = 0
 
 		# done.  if an exception has occured, continue processing
 		return False

@@ -28,8 +28,7 @@ class msm538002e(object):
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (14, 16, 18, 20, 23, 25, 27, 29, 15, 17, 19, 21, 24, 26, 28, 30))
 
 	def __enter__(self):
-		# set VADJ to 10 V and VTH to 1.5 V
-		self.programmer.vadj = allpro88.volt(10.)
+		# set VTH to 1.5 V
 		self.programmer.vth = allpro88.volt(1.5)
 		# turn on device power
 		self.power.on()
@@ -46,7 +45,6 @@ class msm538002e(object):
 		# turn off power
 		self.power.off()
 		self.programmer.vth = 0
-		self.programmer.vadj = 0
 
 		# done.  if an exception has occured, continue processing
 		return False
