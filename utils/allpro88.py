@@ -240,6 +240,12 @@ class channel_proxy(object):
 		vdac, = self.programmer.write_command("M", self.channel)
 		return self.programmer.vth.cal(vdac)
 
+	def pulse(self, microseconds, config, final_config):
+		command = "P%02X%04X%02X%02X\n" % (self.channel, microseconds, config, final_config)
+		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
+		# clear response buffer
+		self.programmer.read_responses()
+
 	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(self.invcal(dac) if type(dac) is volt else dac)))
 
 	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
