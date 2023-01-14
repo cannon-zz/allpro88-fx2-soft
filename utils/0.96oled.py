@@ -24,8 +24,10 @@ class oled_module(object):
 			channel.bypass = False
 		# configure VPUL and VTH for I2C bus
 		self.power = devices.power(self.programmer, self.socket, {
-			1: 0.0,
-			2: 5.0
+			"default": {
+				1: 0.0,
+				2: 5.0
+			}
 		}, vpul = 5.0, vth = 2.0)
 		self.i2c = devices.bus_iic(self.socket, 4, 3)
 

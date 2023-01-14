@@ -12,8 +12,10 @@ class hn462732(object):
 			channel.vdac = 0
 			channel.bypass = False
 		self.power = devices.power(self.programmer, self.socket, {
-			12: 0.0
-			24: 5.0
+			"default": {
+				12: 0.0
+				24: 5.0
+			}
 		})
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))

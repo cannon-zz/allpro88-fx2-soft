@@ -13,8 +13,10 @@ class x28c64(object):
 			channel.bypass = False
 		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
-			14: 0.0,
-			28: 5.0
+			"default": {
+				14: 0.0,
+				28: 5.0
+			}
 		})
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2))

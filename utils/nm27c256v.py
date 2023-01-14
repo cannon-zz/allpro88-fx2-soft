@@ -13,9 +13,11 @@ class nm27c256v(object):
 			channel.bypass = False
 		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
-			2: 5.0,
-			16: 0.0,
-			32: 5.0
+			"default": {
+				2: 5.0,
+				16: 0.0,
+				32: 5.0
+			}
 		})
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (11, 10, 9, 8, 7, 6, 5, 4, 29, 28, 24, 27, 3, 30, 31))

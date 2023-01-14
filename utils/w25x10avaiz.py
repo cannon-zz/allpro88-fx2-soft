@@ -12,8 +12,10 @@ class w25x10avaiz(object):
 			channel.vdac = 0
 			channel.bypass = False
 		self.power = devices.power(self.programmer, self.socket, {
-			4: 0.0,
-			8: 3.3
+			"default": {
+				4: 0.0,
+				8: 3.3
+			}
 		}, vth = 1.75)
 		self.spi = devices.bus_spi(self.socket, 6, 5, 2)
 

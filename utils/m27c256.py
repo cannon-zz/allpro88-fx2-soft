@@ -12,9 +12,11 @@ class m27c256(object):
 			channel.vdac = 0
 			channel.bypass = False
 		self.power = devices.power(self.programmer, self.socket, {
-			1: 5.0,		# Vpp = Vcc or GND (use Vcc)
-			14: 0.0,	# GND
-			28: 5.0		# Vcc
+			"default": {
+				1: 5.0,		# Vpp = Vcc or GND (use Vcc)
+				14: 0.0,	# GND
+				28: 5.0		# Vcc
+			}
 		}, vth = 2.0)
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27))

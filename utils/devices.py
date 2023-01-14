@@ -1,19 +1,33 @@
-import itertools
 import operator
 import allpro88
 
 
 class power(object):
-	def __init__(self, programmer, socket, pin_voltage_map, vadj = "auto", vpul = 0, vth = 1.5):
+	def __init__(self, programmer, socket, voltage_maps, vadj = "auto", vpul = 0.0, vth = 1.5, default_voltage_map = "default"):
+		if default_voltage_map not in voltage_maps:
+			raise KeyError("voltage_maps must include '%s'" % default_voltage_map)
 		self.programmer = programmer
 		self.socket = socket
-		self.pin_voltage_map = pin_voltage_map
-		self.vpul = allpro88.volt(vpul) if vpul else vpul
-		self.vth = allpro88.volt(vth) if vth else vth
+		self.voltage_maps = voltage_maps
+		self.default_voltage_map = default_voltage_map
+		self.active_voltage_map = None
+		self.vpul = allpro88.volt(vpul) if vpul else 0
+		self.vth = allpro88.volt(vth) if vth else 0
 		if vadj == "auto":
-			self.vadj = allpro88.volt(max(itertools.chain((vpul, vth), self.pin_voltage_map.values())) + 2.)
+			self.vadj = allpro88.volt(self.max() + 2.)
 		else:
 			self.vadj = allpro88.volt(vadj)
+
+	def max(self):
+		"""
+		Return the highest voltage required for any of the voltage
+		configurations, including the pull-up voltage, VPUL, and
+		the threshold voltage, VTH.
+
+		The return type is a float, not an allpro88.volt.
+		"""
+		max_pin_voltage = max(max(voltage_map.values()) for voltage_map in self.voltage_maps.values())
+		return float(max(self.vpul, self.vth, max_pin_voltage))
 
 	def reset_vth(self):
 		"""
@@ -24,9 +38,11 @@ class power(object):
 		"""
 		self.programmer.vth = self.vth
 
-	def on(self):
-		# configure pins
-		for pin, voltage in self.pin_voltage_map.items():
+	def on(self, voltage_map = None):
+		self.active_voltage_map = self.voltage_maps[voltage_map if voltage_map is not None else self.default_voltage_map]
+		# configure pins.  dacs will be loaded below, with main
+		# dacs
+		for pin, voltage in self.active_voltage_map.items():
 			self.socket[pin].bypass = True
 			if voltage:
 				self.socket[pin].config = allpro88.PINCON.VDAC
@@ -34,11 +50,10 @@ class power(object):
 			else:
 				self.socket[pin].config = allpro88.PINCON.GND
 				self.socket[pin].vdac = 0
-		# apply power
+		# set main dacs
 		self.programmer.vadj = self.vadj
 		self.programmer.vpul = self.vpul
 		self.reset_vth()
-		# load pin dacs and vpul dac
 		self.programmer.load_dacs()
 		# turn on power supplies
 		self.programmer.pcr_enable = True
@@ -51,16 +66,14 @@ class power(object):
 		self.programmer.vpul = 0
 		self.programmer.vth = 0
 		# set vdac supplies to 0 and disable pins
-		for pin in self.pin_voltage_map:
+		for pin in self.active_voltage_map:
 			self.socket[pin].vdac = 0
 			self.socket[pin].bypass = False
 			self.socket[pin].config = allpro88.PINCON.DISABLE
 		# load pin dacs and vpul dac
 		self.programmer.load_dacs()
-
-	@property
-	def pins(self):
-		return tuple(self.pin_voltage_map)
+		# done
+		self.active_voltage_map = None
 
 
 class bus_parallel(object):

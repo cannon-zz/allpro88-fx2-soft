@@ -13,9 +13,11 @@ class msm538002e(object):
 			channel.bypass = False
 		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
-			22: 5.0,
-			12: 0.0,
-			31: 0.0
+			"default": {
+				22: 5.0,
+				12: 0.0,
+				31: 0.0
+			}
 		})
 		# address and data buses
 		# these are the address bus and data bus definitions for

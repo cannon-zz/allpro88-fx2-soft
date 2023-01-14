@@ -13,9 +13,11 @@ class am27c020(object):
 			channel.bypass = False
 		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
-			1: 5.0,
-			16: 0.0,
-			32: 5.0
+			"default": {
+				1: 5.0,
+				16: 0.0,
+				32: 5.0
+			}
 		})
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2, 30))
