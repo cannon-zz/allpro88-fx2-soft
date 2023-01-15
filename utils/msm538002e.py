@@ -40,8 +40,8 @@ class msm538002e(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus_parallel("address_bus")
-	data = devices.bus_parallel("data_bus")
+	address = devices.bus_proxy_parallel("address_bus")
+	data = devices.bus_proxy_parallel("data_bus")
 	chip_enable = devices.flag_ttl_active_low(11)
 	output_enable = devices.flag_ttl_active_low(13)
 	byte_mode = devices.flag_ttl_active_low(32)

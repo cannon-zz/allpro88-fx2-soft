@@ -295,7 +295,7 @@ class bus_parallel(object):
 	to 8 buses may be defined and in use simultaneously.  These are
 	limitations of the programmer interface firmware.
 
-	NOTE:  see also devices.bus_parallel to create a descriptor
+	NOTE:  see also devices.bus_proxy_parallel to create a descriptor
 	to make calling the .read() and .write() methods of an instance of
 	this class more convenient.
 	"""

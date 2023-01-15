@@ -40,7 +40,7 @@ class st24w04(object):
 		return False
 
 	write_protect_enable = devices.flag_ttl(1)
-	address = devices.bus_parallel("address_bus")
+	address = devices.bus_proxy_parallel("address_bus")
 	write_control = devices.flag_ttl_active_low(7)
 
 	def select_code(self, block_select, r_not_w):

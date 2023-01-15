@@ -36,8 +36,8 @@ class m27c1024(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	address = devices.bus_parallel("address_bus")
-	data = devices.bus_parallel("data_bus")
+	address = devices.bus_proxy_parallel("address_bus")
+	data = devices.bus_proxy_parallel("data_bus")
 	chip_enable = devices.flag_ttl_active_low(2)
 	output_enable = devices.flag_ttl_active_low(20)
 	program_enable = devices.flag_ttl_active_low(39)
