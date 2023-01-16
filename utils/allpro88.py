@@ -295,23 +295,39 @@ class bus_parallel(object):
 	to 8 buses may be defined and in use simultaneously.  These are
 	limitations of the programmer interface firmware.
 
+	default sets the initial state of the bus, which will be passed to
+	.write() to perform the configuration.  If not specified, or set to
+	None, the bus is initialized to a floating state.  Note that if the
+	configured default initial state involves any pins being driven to
+	non-zero voltages, those voltages will not take effect until power
+	is applied to the socket.  Pins configured for ground potential
+	take effect immediately.
+
 	NOTE:  see also devices.bus_proxy_parallel to create a descriptor
 	to make calling the .read() and .write() methods of an instance of
 	this class more convenient.
 	"""
-	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt):
+	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt, default = None):
 		if not (1 <= len(pin_numbers) <= 32):
 			raise ValueError("bus width out of range: 1 <= %d <= 32" % len(pin_numbers))
 		self.programmer = programmer
 		self.bus_number = self.programmer.get_unused_bus(self)
 		self.pin_numbers = tuple(pin_numbers)
 		self.max_word = (1 << len(pin_numbers)) - 1
+		self.default = default
+		# send the bus definition command to the programmer
 		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active, inactive, flt, len(pin_numbers))
 		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
 		command += "\n"
 		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
 		# clear response
 		self.programmer.read_responses()
+		# set initial state
+		for pin_number in self.pin_numbers:
+			if PINCON.VDAC not in (active, inactive, flt):
+				socket[pin_number].vdac = 0
+			socket[pin_number].bypass = False
+		self.write(self.default)
 
 	def read(self):
 		"""
@@ -366,8 +382,8 @@ class bus_parallel(object):
 
 
 class bus_parallel_ttl(bus_parallel):
-	def __init__(self, programmer, socket, pin_numbers):
-		return super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE)
+	def __init__(self, programmer, socket, pin_numbers, **kwargs):
+		return super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE, **kwargs)
 
 
 class allpro88(object):
