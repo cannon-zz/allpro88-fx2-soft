@@ -505,6 +505,9 @@ class allpro88(object):
 		# variable power supplies off, all channel drivers
 		# disabled).
 
+		# turn off power supplies
+		self.pcr_enable = False
+
 		# ensure all channel drivers are disabled (off), the DAC
 		# voltages are 0'ed and the bypass capacitors disabled
 		for channel in self.channel.values():
@@ -520,8 +523,6 @@ class allpro88(object):
 		self.itst = 0
 		self.vadjth = 0
 		self.vadj = 0
-		# turn off power supplies
-		self.pcr_enable = False
 
 		# done
 		return self
@@ -532,6 +533,9 @@ class allpro88(object):
 		# variable power supplies off, all channel drivers
 		# disabled).
 
+		# turn off power supplies
+		self.pcr_enable = False
+
 		# ensure all channel drivers are disabled (off), the DAC
 		# voltages are 0'ed and the bypass capacitors disabled
 		for channel in self.channel.values():
@@ -547,8 +551,6 @@ class allpro88(object):
 		self.itst = 0
 		self.vadjth = 0
 		self.vadj = 0
-		# turn off power supplies
-		self.pcr_enable = False
 
 		# done.  if an exception has occured, continue processing
 		return False
