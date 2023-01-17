@@ -320,22 +320,22 @@ class flag(object):
 
 class flag_ttl(flag):
 	def __init__(self, socket, pin_number, **kwargs):
-		return super(flag_ttl, self).__init__(socket, pin_number, active = PINCON.LOGICH, inactive = PINCON.LOGICL, **kwargs)
+		super(flag_ttl, self).__init__(socket, pin_number, active = PINCON.LOGICH, inactive = PINCON.LOGICL, **kwargs)
 
 
 class flag_ttl_active_low(flag):
 	def __init__(self, socket, pin_number, **kwargs):
-		return super(flag_ttl_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.LOGICH, **kwargs)
+		super(flag_ttl_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.LOGICH, **kwargs)
 
 
 class flag_vdac(flag):
 	def __init__(self, socket, pin_number, **kwargs):
-		return super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
+		super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
 
 
 class flag_vdac_active_low(flag):
 	def __init__(self, socket, pin_number, **kwargs):
-		return super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
+		super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
 
 
 class bus_parallel(object):
@@ -439,7 +439,7 @@ class bus_parallel(object):
 
 class bus_parallel_ttl(bus_parallel):
 	def __init__(self, programmer, socket, pin_numbers, **kwargs):
-		return super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE, **kwargs)
+		super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE, **kwargs)
 
 
 class allpro88(object):
