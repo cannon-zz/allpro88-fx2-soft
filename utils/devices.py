@@ -226,16 +226,21 @@ class bus_iic(object):
 
 class bus_spi(object):
 	"""
-	SPI bus.  Calling code must set VDAC on the SCLK and MOSI pins to
-	VCC, and VTH for the device to VCC - 1 V.
+	SPI bus.  Calling code must set VTH for the device to VCC - 1 V.
 	"""
 	hi = allpro88.PINCON.VDAC
 	lo = allpro88.PINCON.LOGICL
 
-	def __init__(self, socket, sclk, mosi, miso):
+	def __init__(self, socket, sclk, mosi, miso, vdac):
 		self.sclk = socket[sclk]	# clock
 		self.mosi = socket[mosi]	# master --> slave
 		self.miso = socket[miso]	# master <-- slave
+
+		if vdac <= 0:
+			raise ValueError(vdac)
+		vdac = allpro88.volt(vdac)
+		self.sclk.vdac = vdac
+		self.mosi.vdac = vdac
 
 		self.sclk.config = self.lo
 		self.mosi.config = self.lo
