@@ -1667,7 +1667,7 @@ static void parse_out_buffer(void)
 		/* search for end of command character */
 		if(XAUTODAT1 == '\n') {
 			/* null terminate the command and interpret */
-			char *next_cmd = MAKEWORD(AUTOPTRH1, AUTOPTRL1);
+			char __xdata *next_cmd = (char __xdata *) MAKEWORD(AUTOPTRH1, AUTOPTRL1);
 			*(next_cmd - 1) = 0;
 			do_command(command);
 			/* reset state for next command */
