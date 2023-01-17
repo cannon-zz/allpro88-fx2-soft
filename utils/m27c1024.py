@@ -6,11 +6,6 @@ class m27c1024(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP40"]
-		# put all pins in a predictable state.
-		for channel in self.socket.values():
-			channel.config = allpro88.PINCON.DISABLE
-			channel.vdac = 0
-			channel.bypass = False
 		# VPP = VCC or GND for read (use VCC)
 		self.power = devices.power(self.programmer, self.socket, {
 			"default": {
@@ -23,24 +18,26 @@ class m27c1024(object):
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37))
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (19, 18, 17, 16, 15, 14, 13, 12, 10, 9, 8, 7, 6, 5, 4, 3))
+		# flags
+		self.chip_enable_flag = allpro88.flag_ttl_active_low(self.socket, 2)
+		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, 20)
+		self.program_enable_flag = allpro88.flag_ttl_active_low(self.socket, 39)
 
 	def __enter__(self):
-		# turn on device power
 		self.power.on()
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
-		# turn off power
 		self.power.off()
-
 		# done.  if an exception has occured, continue processing
 		return False
 
+	# proxy descriptors
 	address = devices.bus_proxy_parallel("address_bus")
 	data = devices.bus_proxy_parallel("data_bus")
-	chip_enable = devices.flag_ttl_active_low(2)
-	output_enable = devices.flag_ttl_active_low(20)
-	program_enable = devices.flag_ttl_active_low(39)
+	chip_enable = devices.flag_proxy("chip_enable_flag")
+	output_enable = devices.flag_proxy("outout_enable_flag")
+	program_enable = devices.flag_proxy("program_enable_flag")
 
 
 with open("dump.dat", "wb") as dump:

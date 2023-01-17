@@ -253,50 +253,30 @@ class bus_spi(object):
 
 #
 # Boolean state pins
-# FIXME:  teach flag pins how to self-initialize to sensible default values
 #
 
 
-class flag(object):
-	# subclasses override these with the appropriate states
-	inactive = None
-	active = None
-
-	def __init__(self, pin_number):
-		self.pin_number = pin_number
+class flag_proxy(object):
+	"""
+	Descriptor to map the get and set operations of an attribute to the
+	.read() and .write() methods, respectively, of some object.
+	"""
+	def __init__(self, attr_name):
+		"""
+		attr_name:  name of the attribute whose .read() and
+		.write() methods will be called by this descriptor's
+		.__get__() and .__set__() methods, respectively.
+		"""
+		self.getter = operator.attrgetter(attr_name)
 
 	def __get__(self, obj, objtype = None):
 		"""
-		Returns the state of the pin's comparator.  The
-		comparator's threshold is set by VTH, not the values of
-		.inactive and .active.
+		Call getattr(obj, attr_name).read() and return the result.
 		"""
-		return bool(obj.socket[self.pin_number])
+		return self.getter(obj).read()
 
-	def __set__(self, obj, boolean):
+	def __set__(self, obj, value):
 		"""
-		Sets the pin's state to .active (.inactive) if boolean is
-		True (False).  If boolean is None the state is set to
-		DISABLE (floating).
+		Call getattr(obj, attr_name).write(value).
 		"""
-		obj.socket[self.pin_number].config = allpro88.PINCON.DISABLE if boolean is None else self.active if boolean else self.inactive
-
-
-class flag_ttl(flag):
-	inactive = allpro88.PINCON.LOGICL
-	active = allpro88.PINCON.LOGICH
-
-
-class flag_ttl_active_low(flag):
-	inactive = allpro88.PINCON.LOGICH
-	active = allpro88.PINCON.LOGICL
-
-
-class flag_vdac(flag):
-	inactive = allpro88.PINCON.LOGICL
-	active = allpro88.PINCON.VDAC
-
-
-class flag_vdac_active_low(flag):
-	inactive = allpro88.PINCON.VDAC
-	active = allpro88.PINCON.LOGICL
+		self.getter(obj).write(value)

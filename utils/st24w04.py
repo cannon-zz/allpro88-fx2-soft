@@ -8,11 +8,6 @@ class st24w04(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP8"]
-		# put all pins in a predictable state.
-		for channel in self.socket.values():
-			channel.config = allpro88.PINCON.DISABLE
-			channel.vdac = 0
-			channel.bypass = False
 		# confiugre VPUL and VTH for I2C bus
 		self.power = devices.power(self.programmer, self.socket, {
 			"default": {
@@ -26,22 +21,23 @@ class st24w04(object):
 		# the device select code.  they are more conveniently
 		# treated, here, as a two-bit address bus
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3))
+		# flags
+		self.write_protect_enable_flag = allpro88.flag_ttl(self.socket, 1)
+		self.write_control_flag = allpro88.flag_ttl_active_low(self.socket, 7)
 
 	def __enter__(self):
-		# turn on device power
 		self.power.on()
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
-		# turn off power
 		self.power.off()
-
 		# done.  if an exception has occured, continue processing
 		return False
 
-	write_protect_enable = devices.flag_ttl(1)
+	# proxy descriptors
 	address = devices.bus_proxy_parallel("address_bus")
-	write_control = devices.flag_ttl_active_low(7)
+	write_protect_enable = devices.flag_proxy("write_protect_enable_flag")
+	write_control = devices.flag_proxy("write_control_flag")
 
 	def select_code(self, block_select, r_not_w):
 		# ensure these are 0 or 1
@@ -55,7 +51,6 @@ with open("dump.dat", "wb") as dump:
 	with allpro88.allpro88() as programmer:
 		with st24w04(programmer) as device:
 			device.address = 0
-			device.write_control = False
 
 			device.i2c.start()
 			ack = device.i2c.write_byte(device.select_code(0, 1))

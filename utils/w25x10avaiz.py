@@ -6,11 +6,6 @@ class w25x10avaiz(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP8"]
-		# put all pins in a predictable state.
-		for channel in self.socket.values():
-			channel.config = allpro88.PINCON.DISABLE
-			channel.vdac = 0
-			channel.bypass = False
 		self.power = devices.power(self.programmer, self.socket, {
 			"default": {
 				4: 0.0,
@@ -18,9 +13,12 @@ class w25x10avaiz(object):
 			}
 		}, vth = 1.75)
 		self.spi = devices.bus_spi(self.socket, 6, 5, 2)
+		# flags
+		self.chip_select_flag = allpro88.flag_vdac_active_low(self.socket, 1)
+		self.write_protect_flag = allpro88.flag_vdac_active_low(self.socket, 3)
+		self.hold_flag = allpro88.flag_vdac_active_low(self.socket, 7)
 
 	def __enter__(self):
-		# turn on device power
 		self.power.on()
 		# set vdac on sclk and mosi pins to 3.3 V
 		self.spi.sclk.vdac = allpro88.volt(3.3)
@@ -34,15 +32,14 @@ class w25x10avaiz(object):
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
-		# turn off power
 		self.power.off()
-
 		# done.  if an exception has occured, continue processing
 		return False
 
-	chip_select = devices.flag_vdac_active_low(1)
-	write_protect = devices.flag_vdac_active_low(3)
-	hold = devices.flag_vdac_active_low(7)
+	# proxy descriptors
+	chip_select = devices.flag_proxy("chip_select_flag")
+	write_protect = devices.flag_proxy("write_protect_flag")
+	hold = devices.flag_proxy("hold_flag")
 
 
 with open("dump.dat", "wb") as dump:
@@ -50,7 +47,9 @@ with open("dump.dat", "wb") as dump:
 		with w25x10avaiz(programmer) as device:
 			# device ignores chip select until it has seen it
 			# deasserted, so we must start with it in that
-			# state
+			# state.  setting it to False is the default for
+			# the flag interface, but we do it here explicitly
+			# for clarity
 			device.chip_select = False
 			device.write_protect = True
 			device.hold = False

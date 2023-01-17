@@ -282,6 +282,62 @@ class channel_proxy(object):
 		)
 
 
+class flag(object):
+	"""
+	A tri-state logic interface on one of a socket's pins, with default
+	initial value.  The pin can be used for output or input.  To set
+	the state of the pin, i.e., to use the pin for output, write a
+	boolean value.  To use the pin for input, set it to None to float
+	the pin.  To read the state of the pins, read a value from the bus.
+
+	The pin is initialized to the value set by the keyword argument
+	default.
+
+	NOTE:  by default, the pin will be set to output, and initialized
+	to the inactive (False) state.  If that requires a voltage to be
+	applied to the pin, it will not take effect until power is applied
+	to the socket.
+	"""
+	def __init__(self, socket, pin_number, active, inactive, flt = PINCON.DISABLE, default = False):
+		self.socket = socket
+		self.pin_number =  pin_number
+		self.active = active
+		self.inactive = inactive
+		self.flt = flt
+		self.default = default
+		# set initial state
+		if PINCON.VDAC not in (active, inactive, flt):
+			self.socket[self.pin_number].vdac = 0
+		self.socket[self.pin_number].bypass = False
+		self.write(self.default)
+
+	def read(self):
+		return bool(self.socket[self.pin_number])
+
+	def write(self, boolean):
+		self.socket[self.pin_number].config = self.flt if boolean is None else self.active if boolean else self.inactive
+
+
+class flag_ttl(flag):
+	def __init__(self, socket, pin_number, **kwargs):
+		return super(flag_ttl, self).__init__(socket, pin_number, active = PINCON.LOGICH, inactive = PINCON.LOGICL, **kwargs)
+
+
+class flag_ttl_active_low(flag):
+	def __init__(self, socket, pin_number, **kwargs):
+		return super(flag_ttl_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.LOGICH, **kwargs)
+
+
+class flag_vdac(flag):
+	def __init__(self, socket, pin_number, **kwargs):
+		return super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
+
+
+class flag_vdac_active_low(flag):
+	def __init__(self, socket, pin_number, **kwargs):
+		return super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
+
+
 class bus_parallel(object):
 	"""
 	A collection of pins whose digital states represent an integer
