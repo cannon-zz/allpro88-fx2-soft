@@ -329,13 +329,19 @@ class flag_ttl_active_low(flag):
 
 
 class flag_vdac(flag):
-	def __init__(self, socket, pin_number, **kwargs):
+	def __init__(self, socket, pin_number, vdac, **kwargs):
 		super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
+		if vdac <= 0:
+			raise ValueError(vdac)
+		self.socket[self.pin_number].vdac = volt(vdac)
 
 
 class flag_vdac_active_low(flag):
-	def __init__(self, socket, pin_number, **kwargs):
+	def __init__(self, socket, pin_number, vdac, **kwargs):
 		super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
+		if vdac <= 0:
+			raise ValueError(vdac)
+		self.socket[self.pin_number].vdac = volt(vdac)
 
 
 class bus_parallel(object):

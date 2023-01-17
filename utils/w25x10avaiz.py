@@ -14,17 +14,11 @@ class w25x10avaiz(object):
 		}, vth = 1.75)
 		self.spi = devices.bus_spi(self.socket, 6, 5, 2, vdac = 3.3)
 		# flags
-		self.chip_select_flag = allpro88.flag_vdac_active_low(self.socket, 1)
-		self.write_protect_flag = allpro88.flag_vdac_active_low(self.socket, 3)
-		self.hold_flag = allpro88.flag_vdac_active_low(self.socket, 7)
+		self.chip_select_flag = allpro88.flag_vdac_active_low(self.socket, 1, vdac = 3.3)
+		self.write_protect_flag = allpro88.flag_vdac_active_low(self.socket, 3, vdac = 3.3)
+		self.hold_flag = allpro88.flag_vdac_active_low(self.socket, 7, vdac = 3.3)
 
 	def __enter__(self):
-		# !cs, !wp, !hold.  FIXME:  we need a systematic way of
-		# doing this
-		for pin in (1, 3, 7):
-			self.socket[pin].vdac = allpro88.volt(3.3)
-		self.programmer.load_dacs()
-
 		self.power.on()
 		return self
 
