@@ -75,6 +75,39 @@ class socket_module(object):
 		raise KeyError(channel)
 
 
+class socket_module_DIP_MODULE(socket_module):
+	name = "DIP MODULE"
+	module_id = 0x02
+
+
+class socket_module_2708_EAROM(socket_module):
+	name = "2708 / EAROM"
+	# Logical Devices' documentation lists two different adapters for
+	# code 0x03:  something called "2708" and something called "EAROM",
+	# so I've combined their names
+	module_id = 0x03
+
+
+class socket_module_TMS370(socket_module):
+	name = "TMS370"
+	module_id = 0x04
+
+
+class socket_module_8789(socket_module):
+	name = "8789"
+	module_id = 0x05
+
+
+class socket_module_68HC11(socket_module):
+	name = "68HC11"
+	module_id = 0x06
+
+
+class socket_module_PAC1000(socket_module):
+	name = "PAC1000"
+	module_id = 0x07
+
+
 class socket_module_AP88_PLCC(socket_module):
 	"""
 	ALLPRO88 Universal PLCC module.  There are two versions of this
@@ -299,32 +332,9 @@ class socket_module_AP88_PLCC(socket_module):
 			self.sockets["DIP%d" % n] = dict((i, self.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
 
 
-class socket_module_DIP_MODULE(socket_module):
-	name = "DIP MODULE"
-	module_id = 0x02
-
-
-class socket_module_TMS370(socket_module):
-	name = "TMS370"
-	module_id = 0x04
-
-
-class socket_module_2708_EAROM(socket_module):
-	name = "2708 / EAROM"
-	# Logical Devices' documentation lists two different adapters for
-	# code 0x03:  something called "2708" and something called "EAROM",
-	# so I've combined their names
-	module_id = 0x03
-
-
-class socket_module_PAC1000(socket_module):
-	name = "PAC1000"
-	module_id = 0x07
-
-
-class socket_module_8789(socket_module):
-	name = "8789"
-	module_id = 0x05
+class socket_module_68705(socket_module):
+	name = "68705"
+	module_id = 0x86
 
 
 class socket_module_1702A(socket_module):
@@ -332,24 +342,14 @@ class socket_module_1702A(socket_module):
 	module_id = 0x98
 
 
-class socket_module_68HC11(socket_module):
-	name = "68HC11"
-	module_id = 0x06
-
-
 class socket_module_68701(socket_module):
 	name = "68701"
 	module_id = 0xc6
 
 
-class socket_module_68705(socket_module):
-	name = "68705"
-	module_id = 0x86
-
-
-class socket_module_68HC705(socket_module):
-	name = "68HC705"
-	module_id = 0xf6
+class socket_module_68HC11F1(socket_module):
+	name = "68HC11F1"
+	module_id = 0xd6
 
 
 class socket_module_1468705(socket_module):
@@ -357,9 +357,9 @@ class socket_module_1468705(socket_module):
 	module_id = 0xe6
 
 
-class socket_module_68HC11F1(socket_module):
-	name = "68HC11F1"
-	module_id = 0xd6
+class socket_module_68HC705(socket_module):
+	name = "68HC705"
+	module_id = 0xf6
 
 
 #
@@ -369,17 +369,17 @@ class socket_module_68HC11F1(socket_module):
 
 
 socket_modules = dict((cls.module_id, cls) for cls in (
-	socket_module_AP88_PLCC,
 	socket_module_DIP_MODULE,
-	socket_module_TMS370,
 	socket_module_2708_EAROM,
-	socket_module_PAC1000,
+	socket_module_TMS370,
 	socket_module_8789,
-	socket_module_1702A,
 	socket_module_68HC11,
-	socket_module_68701,
+	socket_module_PAC1000,
+	socket_module_AP88_PLCC,
 	socket_module_68705,
-	socket_module_68HC705,
+	socket_module_1702A,
+	socket_module_68701,
+	socket_module_68HC11F1,
 	socket_module_1468705,
-	socket_module_68HC11F1
+	socket_module_68HC705
 ))
