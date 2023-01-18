@@ -314,8 +314,18 @@ class flag(object):
 	def read(self):
 		return bool(self.socket[self.pin_number])
 
+	def bool_to_config(self, boolean):
+		"""
+		Convert boolean value to corresponding channel
+		configuration register value.
+		"""
+		return self.flt if boolean is None else self.active if boolean else self.inactive
+
 	def write(self, boolean):
-		self.socket[self.pin_number].config = self.flt if boolean is None else self.active if boolean else self.inactive
+		self.socket[self.pin_number].config = self.bool_to_config(boolean)
+
+	def pulse(self, microseconds, boolean, final_boolean):
+		self.socket[self.pin_number].pulse(microseconds, self.bool_to_config(boolean), self.bool_to_config(final_boolean))
 
 
 class flag_ttl(flag):
