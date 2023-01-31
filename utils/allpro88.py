@@ -102,11 +102,6 @@ class command(object):
 			assert val is None
 			self.cmd = "M%02X\n" % addr
 			self.need_response = True
-		elif verb == "R":
-			# reset
-			assert addr is None and val is None
-			self.cmd = "R\n"
-			self.need_response = False
 		elif verb == "V":
 			# measure voltage using VADJTH
 			assert addr is None and val is None

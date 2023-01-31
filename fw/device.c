@@ -1370,7 +1370,6 @@ static BOOL in_buffer_not_full(void)
  * MXX		run voltage measurement sequence on channel XX, report VTH DAC
  * PXXYYYYAABB	pulse channel XX to state AA for YYYY microseconds,
  *		returning to state BB
- * R		reset programmer
  * V  		run VADJ voltage measurement sequence report VADJTH DAC
  *
  * bus commands:
@@ -1598,14 +1597,6 @@ static void do_command(const char *command)
 		pulse(channel, microseconds, config, final_config);
 		break;
 	}
-
-	/*
-	 * reset programmer
-	 */
-
-	case 'R':
-		allpro88_hard_reset();
-		break;
 
 	/*
 	 * VADJ voltage measurement
