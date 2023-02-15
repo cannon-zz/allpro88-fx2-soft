@@ -71,6 +71,26 @@ class m27c512(m27c256):
 	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27, 1)
 
 
+class m27c4001(m27cx_width8_pulse_ce):
+	socket_name = "DIP32"
+	voltage_maps = {
+		"read": {
+			1: 5.0,		# Vpp
+			16: 0.0,	# GND
+			32: 5.0		# Vcc
+		},
+		"program": {
+			1: 12.75,	# Vpp
+			16: 0.0,	# GND
+			32: 6.25	# Vcc
+		}
+	}
+	address_bus_pins = (12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2, 30, 31)
+	data_bus_pins = (13, 14, 15, 17, 18, 19, 20, 21)
+	chip_enable_pin = 22
+	output_enable_pin = 24
+
+
 class nm27c256v(m27cx_width8_pulse_ce):
 	socket_name = "PLCC32"
 	voltage_maps = {
@@ -91,43 +111,47 @@ class nm27c256v(m27cx_width8_pulse_ce):
 	output_enable_pin = 25
 
 
-with open("dump.dat", "wb") as dump:
-	with allpro88.allpro88() as programmer:
-		with m27c256(programmer, "read") as device:
-			device.chip_enable = True
-			for device.address in tqdm(device.address_bus, desc = "Reading"):
-				device.output_enable = True
-				dump.write(bytearray((device.data,)))
-				device.output_enable = False
-			device.chip_enable = False
-
-
-with open("dump.dat", "rb") as dump:
-	with allpro88.allpro88() as programmer:
-		with m27c256(programmer, "program") as device:
-			# these are the default states, but let's state it
-			# explicitly just to be clear
-			device.chip_enable = False
-			device.output_enable = False
-			for address in tqdm(device.address_bus, desc = "Reading", disable = False):
-				device.address = address
-				# read 1 byte from file
-				byte = dump.read(1)
-				byte = int.from_bytes(byte, byteorder = sys.byteorder)
-				# write.  repeat until read-back value
-				# matches byte
-				for i in range(25):
-					# write byte to chip
-					device.data = byte
-					device.chip_enable_flag.pulse(100, True, False)
-					device.data = None
-					# read back byte
+def read(device_cls):
+	with open("dump.dat", "wb") as dump:
+		with allpro88.allpro88() as programmer:
+			with device_cls(programmer, "read") as device:
+				device.chip_enable = True
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
 					device.output_enable = True
-					verify = device.data
+					dump.write(bytearray((device.data,)))
 					device.output_enable = False
-					# equal?
-					if verify == byte:
-						break
-				else:
-					# retries exhausted
-					raise ValueError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
+				device.chip_enable = False
+
+def write(device_cls):
+	with open("dump.dat", "rb") as dump:
+		with allpro88.allpro88() as programmer:
+			with device_cls(programmer, "program") as device:
+				# these are the default states, but let's state it
+				# explicitly just to be clear
+				device.chip_enable = False
+				device.output_enable = False
+				for address in tqdm(device.address_bus, desc = "Reading", disable = False):
+					device.address = address
+					# read 1 byte from file
+					byte = dump.read(1)
+					byte = int.from_bytes(byte, byteorder = sys.byteorder)
+					# write.  repeat until read-back value
+					# matches byte
+					for i in range(25):
+						# write byte to chip
+						device.data = byte
+						device.chip_enable_flag.pulse(100, True, False)
+						device.data = None
+						# read back byte
+						device.output_enable = True
+						verify = device.data
+						device.output_enable = False
+						# equal?
+						if verify == byte:
+							break
+					else:
+						# retries exhausted
+						raise ValueError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
+
+
+read(m27c4001)
