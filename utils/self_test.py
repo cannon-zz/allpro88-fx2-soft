@@ -111,13 +111,9 @@ class channel_driver_test_suite(object):
 		lowest_hi, highest_lo = 100.0, 0.0
 		for i in range(trials):
 			self.channel.config = allpro88.PINCON.LOGICH
-			v = self.channel.measure_v()
-			if v < lowest_hi:
-				lowest_hi = v;
+			lowest_hi = min(lowest_hi, self.channel.measure_v())
 			self.channel.config = allpro88.PINCON.LOGICL
-			v = self.channel.measure_v()
-			if v > highest_lo:
-				highest_lo = v;
+			highest_lo = max(highest_lo, self.channel.measure_v())
 		self.channel.config = allpro88.PINCON.DISABLE
 		failed = lowest_hi < min_hi or highest_lo > max_lo
 		print("\thighest LOGICL voltage = %g V, lowest LOGICH voltage = %g V%s" % (highest_lo, lowest_hi, "" if not failed else "\t<-- FAILED"))
@@ -267,7 +263,7 @@ class channel_driver_test_suite(object):
 		# enable VTST and logic low modes together
 		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.LOGICL
 
-		# measure resistance.  don't let current exceed 20 mA
+		# measure resistance.  don't let current exceed 10 mA
 		R = vtst_measure_r(self.programmer, self.channel, 10)
 
 		# disable VTST
