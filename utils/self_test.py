@@ -187,12 +187,13 @@ class channel_driver_test_suite(object):
 
 		# compute the final model using the measured threshold
 		a2, a1, a0 = map(float, numpy.polyfit(self.vpul_ramp_x[threshold:], self.vpul_ramp_y[threshold:], 2))
+		vpul_min = float(numpy.median(self.vpul_ramp_y[:threshold - 2]))
 		self.vpul_ramp_cal = {
 			"poly": (a2, a1, a0),
-			"min": list(sorted(self.vpul_ramp_y[:threshold - 3]))[(threshold - 3) // 2]
+			"threshold": threshold,
+			"min": vpul_min
 		}
-		print("\tupdated calibration model:  %.3g dac^2 + %.3g dac + %.3g" % self.vpul_ramp_cal["poly"])
-		vpul_min = list(sorted(self.vpul_ramp_y[:threshold - 2]))[(threshold - 2) // 2]
+		print("\tupdated calibration model:  %.3g dac^2 + %.3g dac + %.3g if dac >= %d else %.3g" % (self.vpul_ramp_cal["poly"] + (threshold, vpul_min)))
 		@numpy.vectorize
 		def model(dac):
 			return (a2 * dac + a1) * dac + a0 if dac >= threshold else vpul_min
@@ -459,7 +460,23 @@ with allpro88.allpro88() as programmer:
 		test_suite.test_logich()
 
 		test_suite.test_vpul_ramp()
-		calibration["vpul_ramp_cal"].append(test_suite.vpul_ramp_cal["poly"])
+		# there's only one pull-up power supply, but what voltage
+		# actually appears on each channel's output depends on the
+		# characteristics of that channel's output circuitry.  we
+		# cannot probe the pull-up power supply's voltage under
+		# softare control, directly, we can only probe the
+		# (slightly different) voltage that appears on each
+		# channel.  the "calibration" for the pull-up power supply
+		# is an average of the output voltage that appears on the
+		# channels.  we collect a voltage ramp curve from each
+		# channel, save them all, then turn them into a single
+		# calibration function after the loop is finished.  it can
+		# be checked, later, that each channel is within some
+		# tolerance of this function, both to detect malfunctioning
+		# channels and to confirm the one single calibration
+		# function is close enough to be used with any of the
+		# channels individually.
+		calibration["vpul_ramp_cal"].append(test_suite.vpul_ramp_cal)
 
 		test_suite.test_vdac_ramp()
 		calibration[calibration_name]["vdac_ramp_cal"] = test_suite.vdac_ramp_cal
@@ -475,11 +492,15 @@ with allpro88.allpro88() as programmer:
 	# context manager turns off all power supplies, we don't have to do
 	# that here.
 
-calibration["vpul_ramp_cal"] = (
-	float(numpy.median([poly[0] for poly in calibration["vpul_ramp_cal"]])),
-	float(numpy.median([poly[1] for poly in calibration["vpul_ramp_cal"]])),
-	float(numpy.median([poly[2] for poly in calibration["vpul_ramp_cal"]]))
-)
+calibration["vpul_ramp_cal"] = {
+	"poly": (
+		float(numpy.median([cal["poly"][0] for cal in calibration["vpul_ramp_cal"]])),
+		float(numpy.median([cal["poly"][1] for cal in calibration["vpul_ramp_cal"]])),
+		float(numpy.median([cal["poly"][2] for cal in calibration["vpul_ramp_cal"]]))
+	),
+	"threshold": float(numpy.median([cal["threshold"] for cal in calibration["vpul_ramp_cal"]])),
+	"min": float(numpy.median([cal["min"] for cal in calibration["vpul_ramp_cal"]])),
+}
 
 with open("calibration.dat", "w") as calfile:
 	yaml.dump(calibration, calfile)
