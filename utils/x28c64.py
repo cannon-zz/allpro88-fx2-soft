@@ -6,11 +6,11 @@ class x28c64(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP28"]
-		# VPP = VCC or GND for read (use VCC)
+		# power
 		self.power = devices.power(self.programmer, self.socket, {
 			"default": {
-				14: 0.0,
-				28: 5.0
+				14: 0.0,	# GND
+				28: 5.0		# Vcc
 			}
 		})
 		# address and data buses
