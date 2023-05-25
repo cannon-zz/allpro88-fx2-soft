@@ -3,15 +3,19 @@ import allpro88
 import devices
 
 class hn462732(object):
-	def __init__(self, programmer):
+	def __init__(self, programmer, mode):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP24"]
 		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
+			"read": {
+				12: 0.0
+				24: 5.0
+			},
+			"program": {
 				12: 0.0
 				24: 5.0
 			}
-		})
+		}, default_voltage_map = mode)
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21))
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (9, 10, 11, 13, 14, 15, 16, 17))
@@ -37,7 +41,7 @@ class hn462732(object):
 
 with open("dump.dat", "wb") as dump:
 	with allpro88.allpro88() as programmer:
-		with hn462732(programmer) as device:
+		with hn462732(programmer, "read") as device:
 			device.chip_enable = True
 
 			for device.address in tqdm(device.address_bus, desc = "Reading"):
