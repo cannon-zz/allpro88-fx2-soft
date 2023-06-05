@@ -87,6 +87,30 @@ class m27cx_width8_program_enable(object):
 
 
 
+class m27c32(m27cx_width8_pulse_ce):
+	# this chip's Vpp is shared with !OE so the pin configuration
+	# requires some custom treatment.  NOTE:  programming not yet
+	# supported (I've only needed to dump these so far)
+	socket_name = "DIP24"
+	voltage_maps = {
+		"read": {
+			12: 0.0,	# GND
+			#20: 5.0,	# !OE/Vpp
+			24: 5.0		# Vcc
+		},
+		#"program": {
+		#	12: 0.0,	# GND
+		#	20: 12.75,	# !OE/Vpp
+		#	24: 6.25	# Vcc
+		#}
+	}
+	address_bus_pins = (8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21)
+	data_bus_pins = (9, 10, 11, 13, 14, 15, 16, 17)
+	chip_enable_pin = 18
+	output_enable_pin = 20
+
+
+
 class m27c256(m27cx_width8_pulse_ce):
 	socket_name = "DIP28"
 	voltage_maps = {
@@ -241,4 +265,4 @@ def write(device_cls):
 						raise ValueError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
 
 
-read(m27c4001)
+read(m27c32)
