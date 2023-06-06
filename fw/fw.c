@@ -56,7 +56,9 @@ void main(void) {
  ENABLE_SUDAV();
  ENABLE_USBRESET();
  ENABLE_HISPEED(); 
- ENABLE_SUSPEND();
+/* [kipp]:  I disabled this because it interfers with the use of the WAKEUP
+ * pin as a GPIO for sensing VBUS */
+ //ENABLE_SUSPEND();
  ENABLE_RESUME();
 
  EA=1;
@@ -78,6 +80,9 @@ void main(void) {
        handle_setupdata();
      }
 
+/* [kipp]:  I disabled this because it interfers with the use of the WAKEUP
+ * pin as a GPIO for sensing VBUS */
+#if 0
      if (dosuspend) {
         dosuspend=FALSE;
         do {
@@ -107,6 +112,7 @@ void main(void) {
         }
 
      }
+#endif
 
  } // end while
 

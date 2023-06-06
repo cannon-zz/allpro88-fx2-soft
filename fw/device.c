@@ -844,6 +844,53 @@ void main_init(void)
 	/* enable autopointers.  for both, increment on access. */
 
 	AUTOPTRSETUP = 0x07;
+
+	/* set up WAKEUP pin handling.  WAKEUP pin is used to monitor USB
+	 * VBUS:  high = USB VBUS is present, low = USB VBUS has been lost,
+	 * which could mean the cable is disconnected or that the host has
+	 * been turned off.  in the latter case, we must turn off the
+	 * pull-up resistor on the D+ line to prevent us from attempting to
+	 * back-power the host through the USB bus.
+	 *
+	 * if the pin is ever in the active, or true, state, that gets
+	 * latched and stored in the WU bit.  the meaning of "active" is
+	 * selected by the WUPOL bit:  0 = active low; 1 = active high.
+	 * the WU bit is cleared to 0 by writing a 1 to it.  if the WAKEUP
+	 * pin is still active the bit is immediately latched back into the
+	 * 1 state.
+	 *
+	 * changing the pin's polarity latches a state change into the WU
+	 * bit, so when configuring the pin we need to clear the state
+	 * twice to ensure the WU bit is indicating the actual state of the
+	 * pin.
+	 *
+	 * see example code in "Guide to a Successful EZ-USB FX2LP Hardware
+	 * Design"
+	 *
+	 * so that we only have to run code when the state changes, rather
+	 * than whenever the pin is active, we switch the polarity so that
+	 * "active" is whatever state the pin is currently not in.  this
+	 * leads to a race condition where if the pin toggles state during
+	 * the time the handler code is running the state change could be
+	 * missed.  a timing capacitor is on the pin, and we assume the the
+	 * RC time constant is long enough that the pin cannot change state
+	 * in the time required to execute the handler code.  that's not
+	 * guaranteed to be true:  if a "pulse" command is executed with a
+	 * very long time delay, it could block the main loop from cycling
+	 * for longer than the time constant on the WAKEUP pin, but that
+	 * would require a remarkable set of coincidences to occur so we
+	 * pretend its impossible.  the initial polarity choice is
+	 * irrelevant, if we guess wrong the first iteration through the
+	 * main loop will set it properly.
+	 *
+	 * FIXME:  should be able to do all of this with interrupts, but it
+	 * took so much screwing around to get just this much to work that
+	 * I don't want to tempt fate
+	 */
+
+	WAKEUPCS = bmWU | bmDPEN | bmWUEN;
+	WAKEUPCS = bmWU | bmDPEN | bmWUEN;
+	ERESI = 1;	/* enable WAKEUP interrupts */
 }
 
 
@@ -1738,6 +1785,47 @@ void main_loop(void)
 	/* uncomment to blink the green idle LED at 1 Hz */
 
 	/*blink_idle_1hz();*/
+
+	/* check state of WAKEUP pin (monitors USB VBUS). */
+
+	if(WAKEUPCS & bmWU) {
+		/* WAKEUP pin state has changed */
+
+		if(WAKEUPCS & bmWUPOL) {
+			/* low-->high transition occured */
+			/* USB cable is connected and host is powered;
+			 * ensure pull-up resistor is connected to D+ */
+
+			USBCS &= ~bmDISCON;
+
+			/* clear latched WAKEUP pin state flag, and change
+			 * polarity to active low */
+			WAKEUPCS = bmWU | bmDPEN | bmWUEN;
+			WAKEUPCS = bmWU | bmDPEN | bmWUEN;
+		} else {
+			/* high-->low transition occured */
+			/* USB cable is disconnected or host not powered.
+			 * disconnect pull-up resistor from D+ to avoid
+			 * back-powering host through the USB cable. */
+
+			USBCS |= bmDISCON;
+			/* FIXME:  should we do a hardware reset on the
+			 * programmer?  if it gets left with power applied
+			 * to pins in the socket when someone turns off
+			 * their computer for the night, maybe it would be
+			 * a good idea to kill power to the socket.  I
+			 * don't know if that's more or less likely to
+			 * damage a part that might be in the socket, and
+			 * what if the disconnect is just a momentary bad
+			 * connection on the cable, if it might damage a
+			 * part to do a hardware reset that would suck. */
+
+			/* clear latched WAKEUP pin state flag, and change
+			 * polarity to active high */
+			WAKEUPCS = bmWU | bmWUPOL | bmDPEN | bmWUEN;
+			WAKEUPCS = bmWU | bmWUPOL | bmDPEN | bmWUEN;
+		}
+	}
 
 	/* if command data is available and there is room for output,
 	 * process */
