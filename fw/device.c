@@ -787,8 +787,9 @@ void main_init(void)
 	IOD = 0xc0;
 
 	/* float the data bus pins in case the programmer is driving them.
-	 * set address and control bus pins for output (pulls /RESET low,
-	 * putting programmer into reset state) */
+	 * set address and control bus pins for output (if it isn't
+	 * already, this now for real pulls /RESET low, putting programmer
+	 * into reset state) */
 	ALLPRO88_DATA_FLOAT;
 	ALLPRO88_ADDRCTRL_DRIVE;
 
