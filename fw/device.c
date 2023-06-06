@@ -777,7 +777,7 @@ void main_init(void)
 	/* configure I/O ports.  clear bits 0 and 1:  ports B and D are I/O
 	 * ports, not FIFO data bus.  port A all pins for I/O port, disable
 	 * alternate functions. */
-	IFCONFIG &= ~0x03;
+	IFCONFIG = 0x80;
 	PORTACFG = 0;
 
 	/* ALLPRO88:  zero data bus, address bus, pull /RESET low, and set
