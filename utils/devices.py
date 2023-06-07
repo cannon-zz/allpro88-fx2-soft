@@ -76,25 +76,10 @@ class power(object):
 		self.active_voltage_map = None
 
 
-class bus_proxy_parallel(object):
+class read_write_proxy(object):
 	"""
 	Descriptor to map the get and set operations of an attribute to the
 	.read() and .write() methods, respectively, of some object.
-
-	Example:
-
-	class some_device(object):
-		def __init__(self, programmer, socket):
-			# initialize a .address_bus instance attribute
-			self.address_bus = allpro88.bus_parallel_ttl(programmer, socket, (1, 2, 3, 4))
-		# define a proxy named .address to perform .read() and
-		# .write() operations on .address_bus
-		address = bus_proxy_parallel("address_bus")
-
-	device = some_device(...)
-	# iterate the address bus over all allowed values
-	for device.address in device.address_bus:
-		...
 	"""
 	def __init__(self, attr_name):
 		"""
@@ -110,11 +95,31 @@ class bus_proxy_parallel(object):
 		"""
 		return self.getter(obj).read()
 
-	def __set__(self, obj, word):
+	def __set__(self, obj, val):
 		"""
-		Call getattr(obj, attr_name).write(word).
+		Call getattr(obj, attr_name).write(val).
 		"""
-		self.getter(obj).write(word)
+		self.getter(obj).write(val)
+
+
+class bus_proxy_parallel(read_write_proxy):
+	"""
+	Example:
+
+	class some_device(object):
+		def __init__(self, programmer, socket):
+			# initialize a .address_bus instance attribute
+			self.address_bus = allpro88.bus_parallel_ttl(programmer, socket, (1, 2, 3, 4))
+		# define a proxy named .address to perform .read() and
+		# .write() operations on .address_bus
+		address = bus_proxy_parallel("address_bus")
+
+	device = some_device(...)
+	# iterate the address bus over all allowed values
+	for device.address in device.address_bus:
+		...
+	"""
+	pass
 
 
 class bus_iic(object):
@@ -261,27 +266,5 @@ class bus_spi(object):
 #
 
 
-class flag_proxy(object):
-	"""
-	Descriptor to map the get and set operations of an attribute to the
-	.read() and .write() methods, respectively, of some object.
-	"""
-	def __init__(self, attr_name):
-		"""
-		attr_name:  name of the attribute whose .read() and
-		.write() methods will be called by this descriptor's
-		.__get__() and .__set__() methods, respectively.
-		"""
-		self.getter = operator.attrgetter(attr_name)
-
-	def __get__(self, obj, objtype = None):
-		"""
-		Call getattr(obj, attr_name).read() and return the result.
-		"""
-		return self.getter(obj).read()
-
-	def __set__(self, obj, value):
-		"""
-		Call getattr(obj, attr_name).write(value).
-		"""
-		self.getter(obj).write(value)
+class flag_proxy(read_write_proxy):
+	pass
