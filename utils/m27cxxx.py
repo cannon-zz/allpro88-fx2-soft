@@ -86,6 +86,14 @@ class m27cx_width8_program_enable(object):
 	program_enable = devices.flag_proxy("program_enable_flag")
 
 
+class m27cx_width16_program_enable(m27cx_width8_program_enable):
+	"""
+	M27Cx style chip, 16 bit data bus, programmed by asserting program enable pin.
+	"""
+	# the parent class also works with 16 bit devices
+	pass
+
+
 class m27c32(m27cx_width8_pulse_ce):
 	# this chip's Vpp is shared with !OE so the pin configuration
 	# requires some custom treatment.  NOTE:  programming not yet
@@ -144,6 +152,23 @@ class m27c512(m27c256):
 		}
 	}
 	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 27, 1)
+
+
+class m27c1024(m27cx_width16_program_enable):
+	socket_name = "DIP40"
+	voltage_maps = {
+		"read": {
+			1: 5.0,
+			11: 0.0,
+			30: 0.0,
+			40: 5.0
+		}
+	}
+	address_bus_pins = (21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32, 33, 34, 35, 36, 37)
+	data_bus_pins = (19, 18, 17, 16, 15, 14, 13, 12, 10, 9, 8, 7, 6, 5, 4, 3)
+	chip_enable_pin = 2
+	output_enable_pin = 20
+	program_enable_pin = 39
 
 
 class m27c4001(m27cx_width8_pulse_ce):
@@ -234,6 +259,19 @@ def read(device_cls):
 				for device.address in tqdm(device.address_bus, desc = "Reading"):
 					device.output_enable = True
 					dump.write(bytearray((device.data,)))
+					device.output_enable = False
+				device.chip_enable = False
+
+
+def read16(device_cls):
+	with open("dump.dat", "wb") as dump:
+		with allpro88.allpro88() as programmer:
+			with device_cls(programmer, "read") as device:
+				device.chip_enable = True
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
+					device.output_enable = True
+					data = device.data
+					dump.write(bytearray((data & 0xff, data >> 8)))
 					device.output_enable = False
 				device.chip_enable = False
 
