@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2020-2022 Kipp Cannon
+ * Copyright (C) 2020-2023 Kipp Cannon
  *
  * This program is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -79,7 +79,7 @@ static BOOL errno = FALSE;
  */
 
 
-static BYTE hex_to_val(char digit)
+static inline BYTE hex_to_val(char digit)
 {
 	digit -= '0';
 	if(digit > 9) {
@@ -96,7 +96,7 @@ error:
 }
 
 
-static BYTE str_to_byte(const char *str)
+static inline BYTE str_to_byte(const char *str)
 {
 	return hex_to_val(str[0]) << 4 | hex_to_val(str[1]);
 }
@@ -133,7 +133,7 @@ static void puts(const char *str)
  */
 
 
-static void puts_byte(BYTE val)
+static inline void puts_byte(BYTE val)
 {
 	static const char hex_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 	XAUTODAT2 = hex_digit[val >> 4];
@@ -141,7 +141,7 @@ static void puts_byte(BYTE val)
 }
 
 
-static void puts_word(WORD val)
+static inline void puts_word(WORD val)
 {
 	puts_byte(MSB(val));
 	puts_byte(LSB(val));
