@@ -454,8 +454,8 @@ class bus_parallel_ttl(bus_parallel):
 
 
 class allpro88(object):
-	idVendor = 0x04b4
-	idProduct = 0x1004
+	idVendor = 0x1209
+	idProduct = 0x000C
 
 	ep_addr_out = 0x02
 	ep_addr_in = 0x86
