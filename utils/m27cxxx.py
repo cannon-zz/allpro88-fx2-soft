@@ -171,6 +171,10 @@ class m27c1024(m27cx_width16_program_enable):
 	program_enable_pin = 39
 
 
+class tms27c210a(m27c1024):
+	pass
+
+
 class m27c4001(m27cx_width8_pulse_ce):
 	socket_name = "DIP32"
 	voltage_maps = {
