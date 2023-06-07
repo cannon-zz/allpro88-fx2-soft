@@ -86,7 +86,6 @@ class m27cx_width8_program_enable(object):
 	program_enable = devices.flag_proxy("program_enable_flag")
 
 
-
 class m27c32(m27cx_width8_pulse_ce):
 	# this chip's Vpp is shared with !OE so the pin configuration
 	# requires some custom treatment.  NOTE:  programming not yet
@@ -109,6 +108,12 @@ class m27c32(m27cx_width8_pulse_ce):
 	chip_enable_pin = 18
 	output_enable_pin = 20
 
+
+class hn462732(m27c32):
+	# NOTE:  requires a 50 ms program pulse and 25 V +/- 1 V program
+	# voltage (that might only be just barely possible with this
+	# programmer)
+	pass
 
 
 class m27c256(m27cx_width8_pulse_ce):
