@@ -43,46 +43,69 @@ class m27cx_width8_pulse_ce(object):
 	chip_enable = devices.flag_proxy("chip_enable_flag")
 	output_enable = devices.flag_proxy("output_enable_flag")
 
+	# read/write
 
-class m27cx_width8_program_enable(object):
+	@classmethod
+	def read_device(cls, imgfile):
+		with allpro88.allpro88() as programmer:
+			with cls(programmer, "read") as device:
+				device.chip_enable = True
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
+					device.output_enable = True
+					imgfile.write(bytearray((device.data,)))
+					device.output_enable = False
+				device.chip_enable = False
+
+	@classmethod
+	def write_device(cls, imgfile):
+		# FIXME:  this has only been tested with one specific part
+		# type.  before using it to burn eeproms confirm the
+		# algorithm is appropriate.  I know of at least one part
+		# that requires a much longer program pulse.
+		with allpro88.allpro88() as programmer:
+			with cls(programmer, "program") as device:
+				# these are the default states, and power
+				# has already been applied to the device at
+				# this point, but let's set these states
+				# explicitly just to be clear
+				device.chip_enable = False
+				device.output_enable = False
+				for address in tqdm(device.address_bus, desc = "Writing", disable = False):
+					device.address = address
+					# read 1 byte from file
+					byte = imgfile.read(1)
+					byte = int.from_bytes(byte, byteorder = sys.byteorder)
+					# write.  repeat until read-back
+					# value matches byte
+					for i in range(25):
+						# write byte to chip
+						device.data = byte
+						device.chip_enable_flag.pulse(100, True, False)
+						device.data = None
+						# read back byte
+						device.output_enable = True
+						verify = device.data
+						device.output_enable = False
+						# equal?
+						if verify == byte:
+							break
+					else:
+						# retries exhausted
+						raise ValueError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
+
+
+class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 	"""
 	M27Cx style chip, 8 bit data bus, programmed by asserting program enable pin.
 	"""
-	# subclasses override these
-	socket_name = ""
-	voltage_maps = {}
-	address_bus_pins = ()
-	data_bus_pins = ()
-	chip_enable_pin = 0
-	output_enable_pin = 0
+	# subclasses override these.  see also parent class
 	program_enable_pin = 0
 
 	def __init__(self, programmer, mode):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets[self.socket_name]
-		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, default_voltage_map = mode)
-		# address and data buses
-		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.address_bus_pins)
-		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.data_bus_pins)
-		# flags
-		self.chip_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.chip_enable_pin)
-		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.output_enable_pin)
+		super(m27cx_width8_program_enable, self).__init__(programmer, mode)
 		self.program_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.program_enable_pin)
 
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	# proxy descriptors
-	address = devices.bus_proxy_parallel("address_bus")
-	data = devices.bus_proxy_parallel("data_bus")
-	chip_enable = devices.flag_proxy("chip_enable_flag")
-	output_enable = devices.flag_proxy("output_enable_flag")
+	# proxy descriptors.  see also parent class
 	program_enable = devices.flag_proxy("program_enable_flag")
 
 
@@ -90,8 +113,19 @@ class m27cx_width16_program_enable(m27cx_width8_program_enable):
 	"""
 	M27Cx style chip, 16 bit data bus, programmed by asserting program enable pin.
 	"""
-	# the parent class also works with 16 bit devices
-	pass
+	# read/write
+
+	@classmethod
+	def read_device(cls, imgfile):
+		with allpro88.allpro88() as programmer:
+			with cls(programmer, "read") as device:
+				device.chip_enable = True
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
+					device.output_enable = True
+					data = device.data
+					imgfile.write(bytearray((data & 0xff, data >> 8)))
+					device.output_enable = False
+				device.chip_enable = False
 
 
 class m27c32(m27cx_width8_pulse_ce):
@@ -250,66 +284,9 @@ class tms28f010(m27c1001):
 
 ###
 #
-# generic read & pulse chip-enable style write (no write routine, yet, for the program-enable style)
+# Entry Point
 #
 ###
 
 
-def read(device_cls):
-	with open("dump.dat", "wb") as dump:
-		with allpro88.allpro88() as programmer:
-			with device_cls(programmer, "read") as device:
-				device.chip_enable = True
-				for device.address in tqdm(device.address_bus, desc = "Reading"):
-					device.output_enable = True
-					dump.write(bytearray((device.data,)))
-					device.output_enable = False
-				device.chip_enable = False
-
-
-def read16(device_cls):
-	with open("dump.dat", "wb") as dump:
-		with allpro88.allpro88() as programmer:
-			with device_cls(programmer, "read") as device:
-				device.chip_enable = True
-				for device.address in tqdm(device.address_bus, desc = "Reading"):
-					device.output_enable = True
-					data = device.data
-					dump.write(bytearray((data & 0xff, data >> 8)))
-					device.output_enable = False
-				device.chip_enable = False
-
-
-def write(device_cls):
-	with open("dump.dat", "rb") as dump:
-		with allpro88.allpro88() as programmer:
-			with device_cls(programmer, "program") as device:
-				# these are the default states, but let's state it
-				# explicitly just to be clear
-				device.chip_enable = False
-				device.output_enable = False
-				for address in tqdm(device.address_bus, desc = "Reading", disable = False):
-					device.address = address
-					# read 1 byte from file
-					byte = dump.read(1)
-					byte = int.from_bytes(byte, byteorder = sys.byteorder)
-					# write.  repeat until read-back value
-					# matches byte
-					for i in range(25):
-						# write byte to chip
-						device.data = byte
-						device.chip_enable_flag.pulse(100, True, False)
-						device.data = None
-						# read back byte
-						device.output_enable = True
-						verify = device.data
-						device.output_enable = False
-						# equal?
-						if verify == byte:
-							break
-					else:
-						# retries exhausted
-						raise ValueError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
-
-
-read(m27c32)
+m27c32.read_device(open("dump.dat", "wb"))
