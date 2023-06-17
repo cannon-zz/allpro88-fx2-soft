@@ -62,6 +62,13 @@ class m27cx_width8_pulse_ce(object):
 		# type.  before using it to burn eeproms confirm the
 		# algorithm is appropriate.  I know of at least one part
 		# that requires a much longer program pulse.
+
+		# FIXME:  there isn't much error checking.  it would be
+		# good to confirm the file is the correct size for the
+		# part, for example, before burning bytes into the part.
+		# most parts have the ability to identify themselves, to
+		# confirm you have the correct part in the programmer, and
+		# this code also doesn't check that.
 		with allpro88.allpro88() as programmer:
 			with cls(programmer, "program") as device:
 				# these are the default states, and power
@@ -108,6 +115,10 @@ class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 	# proxy descriptors.  see also parent class
 	program_enable = devices.flag_proxy("program_enable_flag")
 
+	@classmethod
+	def write_device(cls, imgfile):
+		raise NotImplementedError("not yet implemented for this part")
+
 
 class m27cx_width16_program_enable(m27cx_width8_program_enable):
 	"""
@@ -130,8 +141,7 @@ class m27cx_width16_program_enable(m27cx_width8_program_enable):
 
 class m27c32(m27cx_width8_pulse_ce):
 	# this chip's Vpp is shared with !OE so the pin configuration
-	# requires some custom treatment.  NOTE:  programming not yet
-	# supported (I've only needed to dump these so far)
+	# requires some custom treatment.
 	socket_name = "DIP24"
 	voltage_maps = {
 		"read": {
@@ -149,6 +159,10 @@ class m27c32(m27cx_width8_pulse_ce):
 	data_bus_pins = (9, 10, 11, 13, 14, 15, 16, 17)
 	chip_enable_pin = 18
 	output_enable_pin = 20
+
+	@classmethod
+	def write_device(cls, imgfile):
+		raise NotImplementedError("not yet implemented for this part")
 
 
 class hn462732(m27c32):
