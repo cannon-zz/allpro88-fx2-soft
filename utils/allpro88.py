@@ -25,22 +25,16 @@ class PCR(IntEnum):
 
 
 class PINCON(IntEnum):
-	DISABLE = 0x00
-	# "Ground Driver"
-	GND = 0x01
-	# "Power Source Driver"
-	VDAC = 0x02
-	# "Current Source Driver"
-	VTST = 0x04
-	# "Logic (TTL) High Driver"
-	LOGICH = 0x08
-	# "Pull-up Driver"
-	PULLUP = 0x10
-	LOGICL = 0x20
-	POSCLK = 0x40
-	NEGCLK = 0x60
-	# "Pull-down Driver"
-	PULLDN = 0x80
+	DISABLE = 0x00	# disable ("float") pin
+	GND = 0x01	# turn on FET pulling pin to ground
+	VDAC = 0x02	# turn on DAC output power transistor
+	VTST = 0x04	# turn on current source driver
+	LOGICH = 0x08	# turn on +5 V ("TTL high") driver
+	PULLUP = 0x10	# turn on pull-up driver
+	LOGICL = 0x20	# turn on 0 V ("TTL low") driver
+	POSCLK = 0x40	# turn on +5 V <--> 0 V ("TTL") clock
+	NEGCLK = 0x60	# turn on +5 V <--> 0 V ("TTL") clock (reversed phase)
+	PULLDN = 0x80	# turn on pull-down driver
 
 
 class TIMER_MODE(IntEnum):
@@ -422,7 +416,7 @@ class bus_parallel(object):
 		# float the bus if word is None
 		if word is None:
 			command = "B%01XP-\n" % self.bus_number
-		# otherwise to a range check
+		# otherwise do a range check
 		elif not (0 <= word <= self.max_word):
 			raise ValueError("0x0 <= word <= 0x%X: 0x%X" % (self.max_word, word))
 		# and set the bus equal to word
