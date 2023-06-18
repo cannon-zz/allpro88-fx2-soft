@@ -332,6 +332,9 @@ class flag_ttl_active_low(flag):
 	def __init__(self, socket, pin_number, **kwargs):
 		super(flag_ttl_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.LOGICH, **kwargs)
 
+	def read(self):
+		return not super(flag_ttl_active_low, self).read()
+
 
 class flag_vdac(flag):
 	def __init__(self, socket, pin_number, vdac, **kwargs):
@@ -347,6 +350,9 @@ class flag_vdac_active_low(flag):
 		if vdac <= 0:
 			raise ValueError(vdac)
 		self.socket[self.pin_number].vdac = volt(vdac)
+
+	def read(self):
+		return not super(flag_vdac_active_low, self).read()
 
 
 class bus_parallel(object):
