@@ -21,41 +21,6 @@ from tqdm import tqdm
 import yaml
 
 
-
-def measure_v(channel):
-	"""
-	Report median of 5 measurements
-	"""
-	return numpy.median([channel.measure_v() for i in range(5)])
-
-
-def vtst_measure_r(programmer, channel, max_milliamps):
-	# assume 10 mA is required for the VTST base pull-down circuit
-	vtst_current = 10
-
-	# set VTST voltage limit to max, and start with current
-	# limit set to 0
-	programmer.vtst = 255
-	# we seem to need to warm it up a bit ... ?
-	programmer.itst = vtst_current
-	time.sleep(0.1)
-
-	# ramp current, taking voltage readings.
-	current = list(range(max_milliamps))
-	voltage = []
-	for i in current:
-		programmer.itst = vtst_current + i
-		time.sleep(0.05)
-		voltage.append(measure_v(channel))
-
-	# turn off VTST and disable channel
-	programmer.vtst = 0
-	programmer.itst = 0
-
-	# report resistance
-	return scipy.stats.linregress(current, voltage)[0] * 1000.
-
-
 class channel_driver_test_suite(object):
 	"""
 	Run a series of tests on a single pin driver channel, and collect
@@ -67,6 +32,51 @@ class channel_driver_test_suite(object):
 		self.channel = channel_obj
 
 
+	def measure_v(self, n = 5):
+		"""
+		Measure the voltage on this channel n times (default is 5)
+		and report the median.
+		"""
+		return numpy.median([self.channel.measure_v() for i in range(n)])
+
+
+	def vtst_measure_r(self, max_milliamps):
+		"""
+		Use a ramp on the VTST current limited power supply to
+		measure the resistance between this channel's output and
+		ground.  The channel's configuration register is not
+		modified by this method:  calling code must ensure VTST
+		mode is enabled on this channel (and disabled on all other
+		chanenls) or this function will report nonsense.
+		"""
+		# assume 10 mA is required for the VTST base pull-down
+		# circuit.  FIXME:  this should be taken from the
+		# calibration if available.
+		vtst_current = 10
+
+		# set VTST voltage limit to max
+		self.programmer.vtst = 255
+		# we seem to need to warm it up a bit ... ?
+		self.programmer.itst = vtst_current + max_milliamps
+		time.sleep(0.1)
+
+		# ramp current, taking voltage readings.
+		current = list(range(max_milliamps, -1, -1))
+		voltage = []
+		for i in current:
+			self.programmer.itst = vtst_current + i
+			time.sleep(0.05)
+			voltage.append(self.measure_v())
+
+		# turn off VTST
+		self.programmer.vtst = 0
+		self.programmer.itst = 0
+
+		# report resistance in Ohms (currents and voltages are
+		# measured in milliamperes and volts, respectively)
+		return scipy.stats.linregress(current, voltage)[0] * 1000.
+
+
 	def test_vadj_ramp(self):
 		"""
 		Ramps VADJ up and down in a triangle wave pattern.  NOTE:
@@ -74,6 +84,11 @@ class channel_driver_test_suite(object):
 		requires access to the interior of the programmer.  This
 		code is not intended to be used for self-test purpose.
 		"""
+		# FIXME:  actually, no it doesn't require access to the
+		# interior.  it turns out VADJ and all other power supplies
+		# are brought out to the 96 pin DIN connectors for the
+		# socket module, but I don't know which pins any of them
+		# are on because I can't read the schematic, too blurry.
 		with tqdm(desc = "VADJ", total = 255, mininterval = 0.) as progress:
 			def set_vadj(vadj):
 				self.programmer.vadj = progress.n = vadj
@@ -157,13 +172,13 @@ class channel_driver_test_suite(object):
 		# too high to avoid damage.  I don't know how much power
 		# it's rated for, but at full voltage it would have to
 		# dissipate about 1/4 W.
-		self.vpul_ramp_x = numpy.arange(256)
-		self.vpul_ramp_y = numpy.zeros(256)
+		self.vpul_ramp_x = numpy.arange(128)
+		self.vpul_ramp_y = numpy.zeros(128)
 		for i, dac in enumerate(self.vpul_ramp_x):
 			self.programmer.vpul = dac
 			self.programmer.load_dacs()
 			time.sleep(0.002)	# wait for RC delay
-			self.vpul_ramp_y[i] = measure_v(self.channel)
+			self.vpul_ramp_y[i] = self.measure_v()
 
 		# disable channel
 		self.programmer.vpul = 0
@@ -193,7 +208,7 @@ class channel_driver_test_suite(object):
 			"threshold": threshold,
 			"min": vpul_min
 		}
-		print("\tupdated calibration model:  %.3g dac^2 + %.3g dac + %.3g if dac >= %d else %.3g" % (self.vpul_ramp_cal["poly"] + (threshold, vpul_min)))
+		print("channel %d derived VPUL calibration model:  %.3g dac^2 + %.3g dac + %.3g if dac >= %d else %.3g" % ((self.channel.channel,) + self.vpul_ramp_cal["poly"] + (threshold, vpul_min)))
 		@numpy.vectorize
 		def model(dac):
 			return (a2 * dac + a1) * dac + a0 if dac >= threshold else vpul_min
@@ -202,12 +217,12 @@ class channel_driver_test_suite(object):
 		max_residual = abs(self.vpul_ramp_y[threshold:] - expected[threshold:]).max()
 		rms_residual = ((self.vpul_ramp_y[threshold:] - expected[threshold:])**2.).mean()**0.5
 		failed = max_residual > 0.15
-		print("channel %d VPUL ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+		print("\tw.r.t. system calibration max residual = %.3g V, RMS residual = %.3g V%s" % (max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 
 		expected = model(self.vpul_ramp_x[threshold:])
 		max_residual = abs(self.vpul_ramp_y[threshold:] - expected).max()
 		rms_residual = ((self.vpul_ramp_y[threshold:] - expected)**2.).mean()**0.5
-		print("\tchannel updated model residual = %.3g V, RMS residual = %.3g V" % (max_residual, rms_residual))
+		print("\tw.r.t. channel model residual = %.3g V, RMS residual = %.3g V" % (max_residual, rms_residual))
 
 		# plot the results
 		fig = figure.Figure()
@@ -222,6 +237,7 @@ class channel_driver_test_suite(object):
 		axes.tick_params(which = "both")
 		axes.grid(True, which = "both")
 		axes.set_xlim((0, 256))
+		axes.set_ylim((0, 26))
 		fig.savefig("channel%02d_vpul_ramp.png" % self.channel.channel)
 
 
@@ -247,12 +263,12 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.PULLDN
 
 		# measure resistance.  don't let current exceed 5 mA
-		R = vtst_measure_r(self.programmer, self.channel, 5)
+		R = self.vtst_measure_r(5)
 
-		# disable VTST
+		# disable channel
 		self.channel.config = allpro88.PINCON.DISABLE
 
-		failed = R < 5000.
+		failed = not (5400 * 0.8 <= R <= 5400. * 1.2)	# 5400 kOhm +/- 20%
 		print("channel %d pull-down resistance:  %.0f Ohm%s" % (self.channel.channel, R, "" if not failed else "\t<-- FAILED"))
 
 
@@ -265,9 +281,9 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.LOGICL
 
 		# measure resistance.  don't let current exceed 10 mA
-		R = vtst_measure_r(self.programmer, self.channel, 10)
+		R = self.vtst_measure_r(10)
 
-		# disable VTST
+		# disable channel
 		self.channel.config = allpro88.PINCON.DISABLE
 
 		failed = False
@@ -289,8 +305,10 @@ class channel_driver_test_suite(object):
 		# voltage, a bit less than 1/8 W is being dissipated by the
 		# pull-down resistor, which hopefully is safe.  turn on the
 		# bypass capacitor to reduce noise
-		self.channel.config = allpro88.PINCON.VDAC | allpro88.PINCON.PULLDN
+		self.channel.vdac = 0
+		self.programmer.load_dacs()
 		self.channel.bypass = True
+		self.channel.config = allpro88.PINCON.VDAC | allpro88.PINCON.PULLDN
 
 		# run the DAC from 0 to 255 inclusively and measure the
 		# output voltage
@@ -299,7 +317,7 @@ class channel_driver_test_suite(object):
 		for i, dac in enumerate(self.vdac_ramp_x):
 			self.channel.vdac = dac
 			self.programmer.load_dacs()
-			self.vdac_ramp_y[i] = measure_v(self.channel)
+			self.vdac_ramp_y[i] = self.measure_v()
 
 		# disable output
 		self.channel.vdac = 0
@@ -339,14 +357,14 @@ class channel_driver_test_suite(object):
 		axes.tick_params(which = "both")
 		axes.grid(True, which = "both")
 		axes.set_xlim((0, 256))
+		axes.set_ylim((0, 26))
 		fig.savefig("channel%02d_vdac_ramp.png" % self.channel.channel)
 
 
 	def test_vtst(self):
 		"""
-		VTST is a variable constant-current/constant-voltage supply
-		used either as a current source or as a probe to test for
-		the presence of a part.
+		VTST is a variable constant-current/constant-voltage
+		supply.
 
 		The VTST drive output is delivered to the pin via a PNP
 		transistor whose base is pulled towards ground when the
@@ -409,10 +427,30 @@ class channel_driver_test_suite(object):
 		# output.  the slope gives us the resistance.  again, we
 		# need to not leave the ohmic regime of the circuit, so the
 		# current must be kept to less than 10 mA.
-		idac = list(range(10))
-		R = scipy.stats.linregress(idac, [measure_v(self.channel) for self.programmer.itst in idac])[0] * 1000.
-		self.programmer.itst = 0	# reset to 0
-		print("channel %d VTST base pull-down resistance: %.3g Ohm" % (self.channel.channel, R))
+		idac = list(range(9, -1, -1))
+		v = [self.measure_v() for self.programmer.itst in idac]
+		R, Vec = scipy.stats.linregress(idac, v)[:2]
+		R *= 1000.
+		failed = not (0.4 * 0.8 <= Vec <= 0.4 * 1.2)	# 0.4 V +/- 20%
+		print("channel %d VTST Vec: %.3g V%s" % (self.channel.channel, Vec, "" if not failed else "\t<-- FAILED"))
+		failed = not (68. * 0.8 <= R <= 68 * 1.2)	# 68 Ohm +/- 20%
+		print("channel %d VTST base pull-down resistance: %.3g Ohm%s" % (self.channel.channel, R, "" if not failed else "\t<-- FAILED"))
+
+		# plot the results
+		fig = figure.Figure()
+		FigureCanvas(fig)
+		axes = fig.gca()
+		axes.set_title("Channel %02d VTST Base R" % self.channel.channel)
+		axes.set_xlabel("I (milliamperes)")
+		axes.set_ylabel("Voltage (volts)")
+		axes.scatter(idac, v, marker = ".", color = "k")
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(5))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		#axes.set_xlim((0, 256))
+		#axes.set_ylim((0, 26))
+		fig.savefig("channel%02d_vtst_ramp.png" % self.channel.channel)
 
 		# measure the current limit threshold in the base pull-down
 		# circuit by setting the drive voltage to max and seeing
@@ -435,7 +473,7 @@ class channel_driver_test_suite(object):
 calibration = {
 	"vpul_ramp_cal": []
 }
-with allpro88.allpro88() as programmer:
+with allpro88.allpro88(calibration_file = open("calibration.dat")) as programmer:
 	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected"))
 
 	# turn on power supplies
@@ -492,6 +530,7 @@ with allpro88.allpro88() as programmer:
 	# context manager turns off all power supplies, we don't have to do
 	# that here.
 
+# finally, reduce the VPUL calibration data to a single function
 calibration["vpul_ramp_cal"] = {
 	"poly": (
 		float(numpy.median([cal["poly"][0] for cal in calibration["vpul_ramp_cal"]])),
