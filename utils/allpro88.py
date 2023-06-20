@@ -484,6 +484,7 @@ class allpro88(object):
 		# load calibration data if provided
 		if calibration_file is not None:
 			cal_data = yaml.unsafe_load(calibration_file)
+			# per channel DACs
 			for i, channel in self.channel.items():
 				try:
 					channel_cal_data = cal_data["channel%02d" % i]
@@ -492,6 +493,18 @@ class allpro88(object):
 					# channel
 					continue
 				channel.cal_data = channel_cal_data["vdac_ramp_cal"]
+			# VPUL DAC
+			# FIXME:  since vpul is a class attribute, this
+			# affects all instances of the allpro88 object.
+			# for now we're assuming normal not-crazy people
+			# are only ever using a single programmer at a time
+			# (only own a single programmer) so this is fine,
+			# but we might want to find a way to promote this
+			# to an instance attribute when a custom
+			# calibration is supplied.
+			def vpul_cal_func(dac, cal_data = cal_data["vpul_ramp_cal"]):
+				return max(cal_data["min"], (cal_data["poly"][0] * dac + cal_data["poly"][1]) * dac + cal_data["poly"][2]) if dac >= cal_data["threshold"] else cal_data["min"]
+			self.vpul.cal = vpul_cal_func
 
 		# command queues
 		self.out_queue = []
