@@ -79,20 +79,18 @@ static BOOL errno = FALSE;
  */
 
 
-inline static BYTE hex_to_val(char digit)
+inline static BYTE hex_to_val(unsigned char digit)
 {
 	digit -= '0';
 	if(digit > 9) {
-		if(digit < 'A' - '0')
-			goto error;
-		digit -= 'A' - '0' - 10;
-		if(digit > 0xF)
-			goto error;
+		digit -= 'A' - '0';
+		if(digit > 0xF - 0xA) {
+			errno = TRUE;
+			return 0;
+		}
+		digit += 0xA;
 	}
 	return digit;
-error:
-	errno = TRUE;
-	return 0;
 }
 
 
@@ -775,6 +773,12 @@ void main_init(void)
 	SETCPUFREQ(CLK_48M);
 	SETIF48MHZ();
 
+	/* set 3 LSBs of CKCON register to 0 to reduce read/write strobe
+	 * duration for MOVX instruction to minimum to increase data memory
+	 * access speed */
+
+	CKCON &= 0xf8;
+
 	/* configure I/O ports.  clear bits 0 and 1:  ports B and D are I/O
 	 * ports, not FIFO data bus.  port A all pins for I/O port, disable
 	 * alternate functions. */
@@ -1391,7 +1395,7 @@ __endasm;
  */
 
 
-static BOOL out_buffer_not_empty(void)
+inline static BOOL out_buffer_not_empty(void)
 {
 	return !(EP2468STAT & bmEP2EMPTY);
 }
@@ -1403,7 +1407,7 @@ static BOOL out_buffer_not_empty(void)
  */
 
 
-static BOOL in_buffer_not_full(void)
+inline static BOOL in_buffer_not_full(void)
 {
 	return !(EP2468STAT & bmEP6FULL);
 }
@@ -1688,7 +1692,7 @@ error:
 }
 
 
-static void parse_out_buffer(void)
+inline static void parse_out_buffer(void)
 {
 	char *command = EP2FIFOBUF;
 	WORD n;
