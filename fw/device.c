@@ -79,7 +79,7 @@ static BOOL errno = FALSE;
  */
 
 
-static inline BYTE hex_to_val(char digit)
+inline static BYTE hex_to_val(char digit)
 {
 	digit -= '0';
 	if(digit > 9) {
@@ -96,7 +96,7 @@ error:
 }
 
 
-static inline BYTE str_to_byte(const char *str)
+inline static BYTE str_to_byte(const char *str)
 {
 	return hex_to_val(str[0]) << 4 | hex_to_val(str[1]);
 }
@@ -133,7 +133,7 @@ static void puts(const char *str)
  */
 
 
-static inline void puts_byte(BYTE val)
+inline static void puts_byte(BYTE val)
 {
 	static const char hex_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 	XAUTODAT2 = hex_digit[val >> 4];
@@ -141,7 +141,7 @@ static inline void puts_byte(BYTE val)
 }
 
 
-static inline void puts_word(WORD val)
+inline static void puts_word(WORD val)
 {
 	puts_byte(MSB(val));
 	puts_byte(LSB(val));
@@ -771,17 +771,20 @@ inline static void arm_in_endpoint(void)
 void main_init(void)
 {
 	/* set both IFCLK and CPU CLK to 48 MHz */
+
 	SETCPUFREQ(CLK_48M);
 	SETIF48MHZ();
 
 	/* configure I/O ports.  clear bits 0 and 1:  ports B and D are I/O
 	 * ports, not FIFO data bus.  port A all pins for I/O port, disable
 	 * alternate functions. */
+
 	IFCONFIG = 0x80;
 	PORTACFG = 0;
 
 	/* ALLPRO88:  zero data bus, address bus, pull /RESET low, and set
 	 * /RD and /WR high. */
+
 	IOA = 0x00;
 	IOB = 0x00;
 	IOD = 0xc0;
@@ -790,10 +793,12 @@ void main_init(void)
 	 * set address and control bus pins for output (if it isn't
 	 * already, this now for real pulls /RESET low, putting programmer
 	 * into reset state) */
+
 	ALLPRO88_DATA_FLOAT;
 	ALLPRO88_ADDRCTRL_DRIVE;
 
 	/* programmer hardware reset */
+
 	allpro88_hard_reset();
 
 	/* I can't figure out what to set this to.  the documentation says
@@ -808,6 +813,7 @@ void main_init(void)
 	 * with the original code sets it to 0 (which is where I got the
 	 * idea to try this to figure out WTF is going on).  so I have no
 	 * idea.  all I know is 0 works, 1 doesn't, 2 works, 3 doesn't. */
+
 	SYNCDELAY;
 	REVCTL = 0;
 	SYNCDELAY;
@@ -815,6 +821,7 @@ void main_init(void)
 	/* endpoints 2 and 6 enabled, 1, 4 and 8 disabled.  at power-on all
 	 * FIFO's default to AUTOIN=0 / AUTOOUT=0 meaning the CPU must
 	 * explicitly re-arm them for each packet.  that's what we want */
+
 	EP1OUTCFG = 0;
 	SYNCDELAY;
 	EP1INCFG = 0;
@@ -872,14 +879,14 @@ void main_init(void)
 	 * "active" is whatever state the pin is currently not in.  this
 	 * leads to a race condition where if the pin toggles state during
 	 * the time the handler code is running the state change could be
-	 * missed.  a timing capacitor is on the pin, and we assume the the
-	 * RC time constant is long enough that the pin cannot change state
-	 * in the time required to execute the handler code.  that's not
+	 * missed.  a timing capacitor is on the pin, and we assume the RC
+	 * time constant is long enough that the pin cannot change state in
+	 * the time required to execute the handler code.  that's not
 	 * guaranteed to be true:  if a "pulse" command is executed with a
 	 * very long time delay, it could block the main loop from cycling
 	 * for longer than the time constant on the WAKEUP pin, but that
 	 * would require a remarkable set of coincidences to occur so we
-	 * pretend its impossible.  the initial polarity choice is
+	 * pretend it's impossible.  the initial polarity choice is
 	 * irrelevant, if we guess wrong the first iteration through the
 	 * main loop will set it properly.
 	 *
