@@ -57,5 +57,5 @@ with allpro88.allpro88(calibration_file = open("calibration.dat")) as programmer
 		with canvas(display, dither = True) as draw:
 			draw.line(((0, display.height // 2), (display.width, display.height // 2)), "gray")
 			draw.line(((display.width // 2, 0), (display.width // 2, display.height)), "gray")
-			draw.text((display.width // 2, display.height // 2), "HELLOW WORLD", fill = "white", anchor = "mm")
+			draw.text((display.width // 2, display.height // 2), "HELLO WORLD", fill = "white", anchor = "mm")
 		time.sleep(20)
