@@ -57,6 +57,11 @@ class power(object):
 		self.programmer.load_dacs()
 		# turn on power supplies
 		self.programmer.pcr_enable = True
+		# give VADJ its chance to ramp up.  the power supplies
+		# weren't enabled, yet, when we programmed its control DAC,
+		# so the power supply that DAC controls is only now
+		# ramping.
+		time.sleep(self.programmer.vadj.transient)
 
 	def off(self):
 		# cut power
