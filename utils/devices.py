@@ -133,10 +133,10 @@ class bus_iic(object):
 	to the minimum bus "high" state voltage.
 
 	The methods must be called as followed:  first .start(), then any
-	number of .write_byte() and .read_byte() in any order, finally
-	.stop().  The bit manipulations performed by each method follow
-	correctly from the state the bus has been left in by the preceding
-	method;  different orders will not work.
+	number of .write_byte(), .start(), and .read_byte() in any order,
+	finally .stop().  The bit manipulations performed by each method
+	follow correctly from the state the bus has been left in by the
+	preceding method;  different orders will not work.
 	"""
 	lo = allpro88.PINCON.LOGICL | allpro88.PINCON.PULLUP
 	hi = allpro88.PINCON.PULLUP
@@ -151,12 +151,22 @@ class bus_iic(object):
 		# start in idle state
 		self.sda.config = self.hi
 		self.scl.config = self.hi
+		self.started = False
 
 	def start(self):
-		# do start sequence.  must be in idle state
+		if self.started:
+			# restart sequence
+			self.scl.config = self.lo
+			self.sda.config = self.hi
+			self.scl.config = self.hi
+		# do start sequence.
+		self.wait_scl()
+		self.wait_sda()
 		self.sda.config = self.lo
+		self.started = True
 
 	def stop(self):
+		assert self.started
 		# do stop sequence.  but have just read or written a byte
 		# so first pull clock low, pull data low, raise clock, then
 		# raise data.  bus is left in idle state
@@ -164,8 +174,10 @@ class bus_iic(object):
 		self.sda.config = self.lo
 		self.scl.config = self.hi
 		self.sda.config = self.hi
+		self.started = False
 
 	def write_bit(self, boolean):
+		assert self.started
 		# pull clock low, put bit onto data, raise clock
 		self.scl.config = self.lo
 		self.sda.config = self.hi if boolean else self.lo
