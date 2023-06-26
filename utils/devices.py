@@ -139,7 +139,7 @@ class bus_iic(object):
 	follow correctly from the state the bus has been left in by the
 	preceding method;  different orders will not work.
 	"""
-	lo = allpro88.PINCON.LOGICL | allpro88.PINCON.PULLUP
+	lo = allpro88.PINCON.PULLUP | allpro88.PINCON.LOGICL
 	hi = allpro88.PINCON.PULLUP
 	flt = allpro88.PINCON.PULLUP
 
