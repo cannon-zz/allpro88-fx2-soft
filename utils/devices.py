@@ -179,12 +179,16 @@ class bus_iic(object):
 		# .read_bit() or .stop() will do the correct thing.
 
 	def read_bit(self):
-		# pull clock low, raise clock, read data state
+		assert self.started
+		# pull clock low to complete last operation, float data
+		# line to allow target to drive it, raise clock, read data
+		# state
 		# NOTE:  finally, clock must be pulled low again to
 		# complete the bit.  the calling code will need to ensure
 		# this.  following this with a call to any of .write_bit(),
 		# .read_bit() or .stop() will do the correct thing.
 		self.scl.config = self.lo
+		self.sda.config = self.hi
 		self.scl.config = self.hi
 		return bool(self.sda)
 
