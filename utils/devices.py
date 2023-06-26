@@ -1,4 +1,5 @@
 import operator
+import time
 import allpro88
 
 
@@ -142,9 +143,14 @@ class bus_iic(object):
 	hi = allpro88.PINCON.PULLUP
 	flt = allpro88.PINCON.PULLUP
 
-	def __init__(self, socket, sda, scl):
+	def __init__(self, socket, sda, scl, strict_arbitration = False):
 		# the socket object containing the part
 		self.socket = socket
+		# whether to do additional bus timing and arbitration error
+		# checking.  slows the interface down significantly, but
+		# some parts might require it.  haven't encountered one
+		# yet, though
+		self.strict_arbitration = strict_arbitration
 		# SDA and SCL pins
 		self.sda = socket[sda]
 		self.scl = socket[scl]
@@ -152,6 +158,34 @@ class bus_iic(object):
 		self.sda.config = self.hi
 		self.scl.config = self.hi
 		self.started = False
+
+	#
+	# helpers
+	#
+
+	def wait_sda(self, timeout = 0.5):
+		# no-op if not in strict mode
+		if not self.strict_arbitration:
+			return
+		# wait until sda is hi
+		timeout += time.time()
+		while not bool(self.sda):
+			if time.time() > timeout:
+				raise IOError("bus sda is being held low")
+
+	def wait_scl(self, timeout = 0.5):
+		# no-op if not in strict mode
+		if not self.strict_arbitration:
+			return
+		# wait until sda is hi
+		timeout += time.time()
+		while not bool(self.scl):
+			if time.time() > timeout:
+				raise IOError("bus scl is being low")
+
+	#
+	# bit-banging bus interface
+	#
 
 	def start(self):
 		if self.started:
@@ -173,7 +207,9 @@ class bus_iic(object):
 		self.scl.config = self.lo
 		self.sda.config = self.lo
 		self.scl.config = self.hi
+		self.wait_scl()
 		self.sda.config = self.hi
+		self.wait_sda()
 		self.started = False
 
 	def write_bit(self, boolean):
@@ -185,6 +221,7 @@ class bus_iic(object):
 		# a 4 us pause is required here.  we assume the USB I/O
 		# overhead is more than that, and the pause will take care
 		# of itself
+		self.wait_scl()
 		# NOTE:  finally, clock must be pulled low again to
 		# complete the bit.  the calling code will need to ensure
 		# this.  following this with a call to any of .write_bit(),
@@ -202,6 +239,7 @@ class bus_iic(object):
 		self.scl.config = self.lo
 		self.sda.config = self.hi
 		self.scl.config = self.hi
+		self.wait_scl()
 		return bool(self.sda)
 
 	def write_byte(self, byte):
