@@ -161,36 +161,61 @@ class m27cx_width16_program_enable(m27cx_width8_program_enable):
 
 
 class m27c32(m27cx_width8_pulse_ce):
-	# this chip's Vpp is shared with !OE so the pin configuration
-	# requires some custom treatment.
 	socket_name = "DIP24"
 	voltage_maps = {
 		"read": {
 			12: 0.0,	# GND
-			#20: 5.0,	# !OE/Vpp
 			24: 5.0		# Vcc
 		},
-		#"program": {
-		#	12: 0.0,	# GND
-		#	20: 12.75,	# !OE/Vpp
-		#	24: 6.25	# Vcc
-		#}
+		"program": {
+			12: 0.0,	# GND
+			24: 6.25	# Vcc
+		}
 	}
 	address_bus_pins = (8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19, 21)
 	data_bus_pins = (9, 10, 11, 13, 14, 15, 16, 17)
 	chip_enable_pin = 18
-	output_enable_pin = 20
+	output_enable_pin = 20	# shared with Vpp
+	Vadj = 14.	# volts
+	Vprog = 12.75	# volts
 
-	@classmethod
-	def write_device(cls, imgfile):
-		raise NotImplementedError("not yet implemented for this part")
+	def __init__(self, *args, **kwargs):
+		super(m27c32, self).__init__(*args, **kwargs)
+		# this chip's Vpp is shared with !OE so the pin
+		# configuration requires some custom treatment.
+		if self.power.default_voltage_map == "read":
+			# continue with parent class' configuration (ttl
+			# active low)
+			pass
+		elif self.power.default_voltage_map == "program":
+			self.output_enable_flag = allpro88.flag_vdac_active_low(self.socket, self.output_enable_pin, self.Vprog)
+		else:
+			raise ValueError("unrecognized power configuration: %s" % self.power.default_voltage_map)
+
+	def _write_verify(self, device):
+		# chip enable must be set to True for this part
+		device.output_enable = True
+		device.chip_enable = True
+		verify = device.data
+		device.chip_enable = False
+		device.output_enable = False
+		return verify
 
 
 class hn462732(m27c32):
-	# NOTE:  requires a 50 ms program pulse and 25 V +/- 1 V program
-	# voltage (that might only be just barely possible with this
-	# programmer)
-	pass
+	voltage_maps = {
+		"read": {
+			12: 0.0,	# GND
+			24: 5.0		# Vcc
+		},
+		"program": {
+			12: 0.0,	# GND
+			24: 5.0		# Vcc
+		}
+	}
+	Tpw = 50000	# 50 ms
+	Vadj = 27.	# volts
+	Vprog = 25.	# volts
 
 
 class m27c256(m27cx_width8_pulse_ce):
