@@ -102,15 +102,24 @@ class m27cx_width8_pulse_ce(object):
 						device.data = 0
 						device.data = None
 						# read back byte
-						device.output_enable = True
-						verify = device.data
-						device.output_enable = False
+						verify = self._write_verify(device)
 						# equal?
 						if verify == byte:
 							break
 					else:
 						# retries exhausted
-						raise ValueError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
+						raise IOError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
+
+	def _write_verify(self, device):
+		# for internal use only.  configures the chip for read-back
+		# during programming, reads the byte, and returns
+		# configuration to programming state.  this is separated
+		# out as a separate method so that it can be customized on
+		# a part-by-part basis
+		device.output_enable = True
+		verify = device.data
+		device.output_enable = False
+		return verify
 
 
 class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
