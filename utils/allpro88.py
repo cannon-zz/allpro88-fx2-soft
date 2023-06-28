@@ -230,6 +230,15 @@ class channel_proxy(object):
 		return self.programmer.vth.cal(vdac)
 
 	def pulse(self, microseconds, config, final_config):
+		if microseconds < 0:
+			raise ValueError("pulse duration < 0")
+		if microseconds > 0xffff:
+			# FIXME:  if such a long pulse, longer than ~65 ms
+			# is desired, probably the +/- that can be
+			# tolerated is relaxed enough that the pulse could
+			# be implemented in software, here, on the host
+			# side.
+			raise ValueError("pulse duration too long:  %d us" % microseconds)
 		command = "P%02X%04X%02X%02X\n" % (self.channel, microseconds, config, final_config)
 		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
 		# clear response buffer
