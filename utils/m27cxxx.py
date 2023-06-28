@@ -90,6 +90,16 @@ class m27cx_width8_pulse_ce(object):
 						# write byte to chip
 						device.data = byte
 						device.chip_enable_flag.pulse(device.Tpw, True, False)
+		# I have seen a ROM chip that had been inserted into its
+		# socket backwards, that I was testing to see if it could
+		# be reprogrammed, appear to pass the verification phase in
+		# this loop because, in fact, the chip was totally blown
+		# and the data pins were just floating and retaining
+		# voltage from when they were being driven by the
+		# programmer.  to not be fooled by completely dead parts,
+		# we momentarily ground the pins before attempting a read
+		# back.
+						device.data = 0
 						device.data = None
 						# read back byte
 						device.output_enable = True
