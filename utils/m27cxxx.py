@@ -15,12 +15,14 @@ class m27cx_width8_pulse_ce(object):
 	data_bus_pins = ()
 	chip_enable_pin = 0
 	output_enable_pin = 0
+	Tpw = 100	# program pulse width in microseconds
+	Vadj = "auto"
 
 	def __init__(self, programmer, mode):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
 		# power pins
-		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, default_voltage_map = mode)
+		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj, default_voltage_map = mode)
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.address_bus_pins)
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.data_bus_pins)
@@ -87,7 +89,7 @@ class m27cx_width8_pulse_ce(object):
 					for i in range(25):
 						# write byte to chip
 						device.data = byte
-						device.chip_enable_flag.pulse(100, True, False)
+						device.chip_enable_flag.pulse(device.Tpw, True, False)
 						device.data = None
 						# read back byte
 						device.output_enable = True
