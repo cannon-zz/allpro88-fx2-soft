@@ -2,28 +2,28 @@ from tqdm import tqdm
 import allpro88
 import devices
 
-class st24w04(object):
+class iic_eeprom(object):
+	socket = "DIP8"
+	voltage_maps = {
+		"default": {
+			4: 0.0,	# GND
+			8: 5.0	# Vcc
+		}
+	}
 	device_id = 0b1010
-	blocks = 2
+	blocks = None	# subclass sets to an integer
+	address_pins = ()
 
 	def __init__(self, programmer):
 		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP8"]
+		self.socket = programmer.socket_module.sockets[self.socket]
 		# confiugre VPUL and VTH for I2C bus
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				4: 0.0,
-				8: 5.0
-			}
-		}, vpul = 5.0, vth = 2.0)
+		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vpul = 5.0, vth = 2.0)
+		# IIC bus
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
-		# documentation calls these two pins chip enable lines, but
-		# the value coded onto them must match the two low bits of
-		# the device select code.  they are more conveniently
-		# treated, here, as a two-bit address bus
-		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3))
+		# address select pins
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.address_pins)
 		# flags
-		self.write_protect_enable_flag = allpro88.flag_ttl(self.socket, 1)
 		self.write_control_flag = allpro88.flag_ttl_active_low(self.socket, 7)
 
 	def __enter__(self):
@@ -37,8 +37,21 @@ class st24w04(object):
 
 	# proxy descriptors
 	address = devices.bus_proxy_parallel("address_bus")
-	write_protect_enable = devices.flag_proxy("write_protect_enable_flag")
 	write_control = devices.flag_proxy("write_control_flag")
+
+	def select_code(self, block, r_not_w):
+		raise NotImplementedError("subclass must provide this method")
+
+
+class st24w04(iic_eeprom):
+	blocks = 2
+	address_pins = (2, 3)
+
+	def __init__(self, *args, **kwargs):
+		super(st24w04, self).__init__(*args, **kwargs)
+		self.write_protect_enable_flag = allpro88.flag_ttl(self.socket, 1)
+
+	write_protect_enable = devices.flag_proxy("write_protect_enable_flag")
 
 	def select_code(self, block, r_not_w):
 		assert 0 <= block < self.blocks
@@ -46,38 +59,23 @@ class st24w04(object):
 		# construct the device select code
 		return self.device_id << 4 | self.address << 2 | block << 1 | r_not_w
 
-class microchip_24lc16b(object):
-	device_id = 0b1010
+
+class atmel_24c02n(iic_eeprom):
+	blocks = 1
+	# the address pins are not connected
+	address_pins = (1, 2, 3)
+
+	def select_code(self, block, r_not_w):
+		assert 0 <= block < self.blocks
+		assert r_not_w in (0, 1)
+		# construct the device select code
+		return self.device_id << 4 | self.address << 1 | r_not_w
+
+
+class microchip_24lc16b(iic_eeprom):
 	blocks = 8
-
-	def __init__(self, programmer):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP8"]
-		# confiugre VPUL and VTH for I2C bus
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				4: 0.0,
-				8: 5.0
-			}
-		}, vpul = 5.0, vth = 2.0)
-		self.i2c = devices.bus_iic(self.socket, 5, 6)
-		# flags
-		self.write_protect_flag = allpro88.flag_ttl(self.socket, 7)
-		# pins 1, 2, 3 ("address") are not connected
-		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (1, 2, 3))
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	# proxy descriptors
-	address = devices.bus_proxy_parallel("address_bus")
-	write_protect = devices.flag_proxy("write_protect_flag")
+	# the address pins are not connected
+	address_pins = (1, 2, 3)
 
 	def select_code(self, block, r_not_w):
 		assert 0 <= block < self.blocks
@@ -88,8 +86,7 @@ class microchip_24lc16b(object):
 
 with open("dump.dat", "wb") as dump:
 	with allpro88.allpro88() as programmer:
-		with st24w04(programmer) as device:
-		#with microchip_24lc16b(programmer) as device:
+		with atmel_24c02n(programmer) as device:
 			device.address = 0
 			for block in range(device.blocks):
 				# send start bit
