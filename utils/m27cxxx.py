@@ -342,6 +342,24 @@ class tms28f010(m27c1001):
 	socket_name = "PLCC32"
 
 
+class am29f040(tms28f010):
+	# NOTE:  this part does not require any special programming
+	# voltages.  it simply requires the write-enable pin to be set to
+	# True (pulled low)
+	voltage_maps = {
+		"read": {
+			16: 0.0,	# GND
+			32: 5.0		# Vcc
+		},
+		"program": {
+			16: 0.0,	# GND
+			32: 5.0		# Vcc
+		}
+	}
+	address_bus_pins = (12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2, 30, 1)
+
+
+
 ###
 #
 # Entry Point
@@ -349,4 +367,4 @@ class tms28f010(m27c1001):
 ###
 
 
-m27c32.read_device(open("dump.dat", "wb"))
+am29f040.read_device(open("dump.dat", "wb"))
