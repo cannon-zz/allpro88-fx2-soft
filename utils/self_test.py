@@ -105,22 +105,22 @@ class channel_driver_test_suite(object):
 
 	def test_logich(self, trials = 40, max_lo = 0.2, min_hi = 3.9):
 		"""
-		Toggle the channel between logic high and ground several
-		times, measure the voltage in each state, and confirm it is
-		in the allowed range.  Raise ValueError if the test fails.
-		Otherwise, returns the highest voltage measured in the GND
-		state, and the lowest voltage measured in the LOGICH state.
+		Toggle the channel between TTL logic high and logic low
+		several times, measure the voltage in each state, and
+		confirm it is in the allowed range.  Returns the highest
+		voltage measured in the logic low state, and the lowest
+		voltage measured in the logic high state.
 
-		Logic TTL high is generated locally on each pin driver
-		board by a 78L05 regulator IC.  Failure of this test for a
-		group of 8 channels likely indicates failure of that
-		regulator IC or of the bus interface circuitry on the pin
-		driver board.  If other tests pass suspect the regulator
-		IC.  The "TTL high" output is driven onto the channel by
-		the same analogue circuity used to drive the clock signal
-		onto the channel.  If a clock signal can be delivered but
-		not the "TTL high" signal, the analogue electronics is not
-		at fault.
+		The TTL logic high supply voltage is generated locally on
+		each pin driver board by a 78L05 regulator IC.  Failure of
+		this test for a group of 8 channels likely indicates
+		failure of that regulator IC or of the bus interface
+		circuitry on the pin driver board.  If other tests pass
+		suspect the regulator.  The "TTL high" output is driven
+		onto the channel by the same analogue circuity used to
+		drive the clock signal onto the channel.  If a clock signal
+		can be delivered but not the "TTL high" signal, the
+		analogue electronics is not at fault.
 		"""
 		print("toggling channel %d LOGICL <--> LOGICH %d times:" % (self.channel.channel, trials))
 		lowest_hi, highest_lo = 100.0, 0.0
@@ -145,19 +145,30 @@ class channel_driver_test_suite(object):
 		# the lowest achievable output voltage
 
 		# configure channel for pull-up and turn on the pull-down
-		# driver.  for the pull-up supply specifically, this
+		# driver.  without the pull-down resistor turned on, these
+		# measurements don't work, we need something to drain
+		# charge out of the circuit.  we also make a point of not
+		# using the bypass capacitor on the channel (would help
+		# stabilize the voltage while measuring it) because the
+		# resistance in the circuit leads to too high a time
+		# constant, and then unless inconveniently long delays are
+		# added the voltage measurements become unreliable.  even
+		# without the bypass capacitor, we need to wait a bit for
+		# stray capacitance.
+		#
+		# for the pull-up supply specifically, the pull-down
 		# resistance is only 2.7 kOhm to ground, because the
 		# pull-up driver drives the mid-point of the pull-down
-		# circuit's 5.4 kOhm resistor.  at full voltage, the
-		# resistor must dissipate about 1/4 W.  I don't know what
-		# it's rated for, but we don't do that for very long so I
-		# *hope* it's OK.  without the resitor turned on, these
-		# measurements don't work, we need something to drain
-		# charge out of the circuit.  we do not use the bypass
-		# capacitors because the resistance leads to too high a
-		# time constant, and it becomes tricky to time voltage
-		# measurements well.  even without, we need to sometimes
-		# wait a bit for stray capacitance.
+		# circuit's 5.4 kOhm resistor.  I don't know what power the
+		# resistor is rated for dissipating, but if we assume the
+		# pull down current path has been designed to work safely
+		# in conjunction with a pin DAC at it's maximum output
+		# voltage, then because only 1/2 of that total resistance
+		# is between the pull-up voltage source and ground we
+		# assume here that we can safely ramp the pull-up voltage
+		# to 1/2 of its maximum value (to limit the current flowing
+		# through the 1/2 pull-down resistor to what it would be in
+		# the VDAC case).
 		self.channel.config = allpro88.PINCON.PULLUP | allpro88.PINCON.PULLDN
 		self.channel.bypass = False	# make sure it's off
 		# discharge the circuit
