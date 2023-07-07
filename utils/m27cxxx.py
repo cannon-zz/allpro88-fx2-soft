@@ -433,10 +433,10 @@ class am29f040(tms28f010):
 	address_bus_pins = (12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2, 30, 1)
 
 
-class ds1230y(m27cx_width8_program_enable):
-	# NOTE:  this is a battery-backed RAM.  it does not require any
-	# special programming voltages.  it simply requires the
-	# write-enable pin to be set to True (pulled low)
+class x28c64(m27cx_width8_program_enable):
+	# NOTE:  this is an EEPROM.  it does not require any special
+	# programming voltages.  it simply requires the write-enable pin to
+	# be set to True (pulled low)
 	socket = "DIP28"
 	voltage_maps = {
 		"read": {
@@ -448,11 +448,18 @@ class ds1230y(m27cx_width8_program_enable):
 			28: 5.0		# Vcc
 		}
 	}
-	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 1)
+	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2)
 	data_bus_pins = (11, 12, 13, 15, 16, 17, 18, 19)
 	chip_enable_pin = 20
 	output_enable_pin = 22
 	program_enable_pin = 27
+
+
+class ds1230y(x28c64):
+	# NOTE:  this is a battery-backed RAM.  it does not require any
+	# special programming voltages.  it simply requires the
+	# write-enable pin to be set to True (pulled low)
+	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 1)
 
 
 ###
