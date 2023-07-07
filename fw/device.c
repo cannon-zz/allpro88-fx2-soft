@@ -568,7 +568,7 @@ static WORD allpro88_channel_addr(BYTE channel)
  */
 
 
-static void allpro88_set_PINCON(BYTE channel, enum ALLPRO88_PINCON_BITS val)
+inline static void allpro88_set_PINCON(BYTE channel, enum ALLPRO88_PINCON_BITS val)
 {
 	/* config register is at offset 0 from the start of the register
 	 * group for each channel */
@@ -586,7 +586,7 @@ static void allpro88_set_PINCON(BYTE channel, enum ALLPRO88_PINCON_BITS val)
  */
 
 
-static void allpro88_set_PINDAC(BYTE channel, BYTE val)
+inline static void allpro88_set_PINDAC(BYTE channel, BYTE val)
 {
 	/* DAC register is at offset 3 from the start of the register group
 	 * for each channel */
@@ -612,7 +612,7 @@ inline static void allpro88_xfer_PINDACs(void)
  */
 
 
-static void allpro88_set_PINBYPASS(BYTE channel, BOOL enable)
+inline static void allpro88_set_PINBYPASS(BYTE channel, BOOL enable)
 {
 	if(channel < 0x28)
 		allpro88_write(0x0280 + channel, enable);
