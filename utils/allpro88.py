@@ -28,13 +28,13 @@ class PINCON(IntEnum):
 	DISABLE = 0x00	# disable ("float") pin
 	GND = 0x01	# turn on FET pulling pin to ground
 	VDAC = 0x02	# turn on DAC output power transistor
-	VTST = 0x04	# turn on current source driver
+	VTST = 0x04	# turn on current- and voltage-limited source driver
 	LOGICH = 0x08	# turn on +5 V ("TTL high") driver
-	PULLUP = 0x10	# turn on pull-up driver
-	LOGICL = 0x20	# turn on 0 V ("TTL low") driver
+	PULLUP = 0x10	# turn on pull-up driver (2.7 kOhm to VPUL source)
+	LOGICL = 0x20	# turn on 0 V ("TTL low") driver (50 Ohm to ground)
 	POSCLK = 0x40	# turn on +5 V <--> 0 V ("TTL") clock
-	NEGCLK = 0x60	# turn on +5 V <--> 0 V ("TTL") clock (reversed phase)
-	PULLDN = 0x80	# turn on pull-down driver
+	NEGCLK = 0x60	# turn on 0 V <--> +5 V ("TTL") clock (reversed phase)
+	PULLDN = 0x80	# turn on pull-down driver (5.4 kOhm to ground)
 
 
 class TIMER_MODE(IntEnum):
