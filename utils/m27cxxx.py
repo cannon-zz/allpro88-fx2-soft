@@ -141,6 +141,30 @@ class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 		raise NotImplementedError("not yet implemented for this part")
 
 
+class m27cx_width16_pulse_ce(m27cx_width8_pulse_ce):
+	"""
+	M27Cx style chip, 16 bit data bus, programmed by pulsing chip enable.
+	"""
+	# read/write
+
+	@classmethod
+	def read_device(cls, imgfile):
+		with allpro88.allpro88() as programmer:
+			with cls(programmer, "read") as device:
+				device.chip_enable = True
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
+					device.output_enable = True
+					data = device.data
+					# write low byte then high byte
+					imgfile.write(bytearray((data & 0xff, data >> 8)))
+					device.output_enable = False
+				device.chip_enable = False
+
+	@classmethod
+	def write_device(cls, imgfile):
+		raise NotImplementedError("not yet implemented for this part")
+
+
 class m27cx_width16_program_enable(m27cx_width8_program_enable):
 	"""
 	M27Cx style chip, 16 bit data bus, programmed by asserting program enable pin.
@@ -155,9 +179,14 @@ class m27cx_width16_program_enable(m27cx_width8_program_enable):
 				for device.address in tqdm(device.address_bus, desc = "Reading"):
 					device.output_enable = True
 					data = device.data
+					# write low byte then high byte
 					imgfile.write(bytearray((data & 0xff, data >> 8)))
 					device.output_enable = False
 				device.chip_enable = False
+
+	@classmethod
+	def write_device(cls, imgfile):
+		raise NotImplementedError("not yet implemented for this part")
 
 
 class m27c32(m27cx_width8_pulse_ce):
@@ -263,6 +292,51 @@ class m27c1024(m27cx_width16_program_enable):
 	chip_enable_pin = 2
 	output_enable_pin = 20
 	program_enable_pin = 39
+
+
+class msm538002e(m27cx_width16_pulse_ce):
+	# this part is not writable.  we choose to subclass "pulse CE"
+	# because there is no program enable pin.
+
+	# this part can be configured for 8 bit or 16 bit data buses.  what
+	# is here is the 16 bit configuration because it is assumed this
+	# part will only be used in applications that require a 16 bit data
+	# bus (otherwise a lower pin count component would probably be more
+	# convenient to work with).  in 8 bit mode half the data bus pins
+	# are used, and one of the unused pins is repurposed as a new
+	# least(est)-significant bit for the address bus.  all of the
+	# memory is accessible in either configuration:  it is either
+	# organized as 16 bit words or as twice as many 8 bit words.  for
+	# that reason is mostly irrelevant what the organization is assumed
+	# to be.  for the purpose of dumping an existing part and writing
+	# the data into a replacement, it's completely irrelevant.
+	socket_name = "DIP42"
+	voltage_maps = {
+		"read": {
+			22: 5.0,
+			12: 0.0,
+			31: 0.0
+		}
+	}
+	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 41, 40, 39, 38, 37, 36, 35, 34, 33, 2, 1)
+	data_bus_pins = (14, 16, 18, 20, 23, 25, 27, 29, 15, 17, 19, 21, 24, 26, 28, 30)
+
+	def __init__(self, programmer, mode):
+		super(m27cx_width16_pulse_ce, self).__init__(programmer, mode)
+		# .byte_mode_flag's default is set to False (logic high).
+		# this is the default default for the active low flag
+		# class, but we write it explicitly here just to be clear
+		# that it's required
+		self.byte_mode_flag = allpro88.flag_ttl_active_low(self.socket, 32, default = False)
+
+	# no proxy provided because this pin's state must be held fixed to
+	# logic False for the address and data bus configurations to be
+	# valid
+	#byte_mode = devices.flag_proxy("byte_mode_flag")
+
+	@classmethod
+	def write_device(cls, imgfile):
+		raise NotImplementedError("MSM538002 is a mask ROM:  not writable")
 
 
 class tms27c210a(m27c1024):
