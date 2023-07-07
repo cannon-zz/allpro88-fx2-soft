@@ -4,9 +4,9 @@ from tqdm import tqdm
 
 def blink_idle(programmer, n = 10):
 	for i in tqdm(range(n), desc = "blink IDLE LED"):
-		programmer.write_command("=", 0x030c, 0x02)
+		programmer.write_command("=", 0x030c, allpro88.PCR.NIDLE)
 		time.sleep(0.5)
-		programmer.write_command("=", 0x030c, 0x00)
+		programmer.write_command("=", 0x030c, allpro88.PCR.DISABLE)
 		time.sleep(0.5)
 
 def blink_zif_pin1(programmer, n = 10):
@@ -18,7 +18,7 @@ def blink_zif_pin1(programmer, n = 10):
 		channel.config = allpro88.PINCON.GND
 	# PCR enable
 	programmer.pcr_enable = True
-	# ZIF socket pin 1 between VTST and ground
+	# toggle DIP48 socket pin 1 between VTST and ground n times
 	channel = programmer.socket_module.sockets["DIP48"][1]
 	for i in tqdm(range(n), desc = "blink DIP pin 1"):
 		channel.config = allpro88.PINCON.VTST
@@ -28,12 +28,7 @@ def blink_zif_pin1(programmer, n = 10):
 	# set all pins to disable
 	for channel in programmer.channel.values():
 		channel.config = allpro88.PINCON.DISABLE
-	# power supplies back to 0
-	programmer.vtst = 0
-	programmer.itst = 0
-	programmer.vadj = 0
-	# PCR disable
-	programmer.pcr_enable = False
+	# programmer context manager will zero and turn off power supplies
 
 
 with allpro88.allpro88() as programmer:
