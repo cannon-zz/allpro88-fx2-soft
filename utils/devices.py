@@ -144,6 +144,25 @@ class bus_iic(object):
 	flt = allpro88.PINCON.PULLUP
 
 	def __init__(self, socket, sda, scl, strict_arbitration = False):
+		"""
+		socket:  the socket object containing the part
+		sda:  the pin number for SDA
+		scl:  the pin number for SCL
+
+		if strict_arbitration is True then the bit banging
+		algorithm will insert checks to ensure the target device
+		has released the SDA and/or SCL lines at times when it
+		would be allowed to hold them low to extend I/O cycles, for
+		example if the part needs extra time to write data into
+		flash memory.  since the bit banging algorithm is sooo
+		slooow, it is almost certainly already going slowly enough
+		to provide the time delays any part might require and
+		adding the extra checking only slows it down even more.
+		for this reason the default is to disable the checks (set
+		strict_arbitration to False).  if you encounter a part that
+		seems to not be working reliably, try setting
+		strict_arbitration to True and see if that helps.
+		"""
 		# the socket object containing the part
 		self.socket = socket
 		# whether to do additional bus timing and arbitration error
@@ -177,7 +196,7 @@ class bus_iic(object):
 		# no-op if not in strict mode
 		if not self.strict_arbitration:
 			return
-		# wait until sda is hi
+		# wait until scl is hi
 		timeout += time.time()
 		while not bool(self.scl):
 			if time.time() > timeout:
@@ -243,6 +262,7 @@ class bus_iic(object):
 		return bool(self.sda)
 
 	def write_byte(self, byte):
+		assert 0 <= byte <= 255
 		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
 			self.write_bit(byte & bit)
 		# read the ack state
@@ -260,7 +280,7 @@ class bus_iic(object):
 	def scan(self):
 		"""
 		Scan the IIC bus and report the addresses that generate an
-		ACK for a read operation.
+		ACK for a read operation.  Returns a list of the addresses.
 		"""
 		found = []
 		for address in range(128):
