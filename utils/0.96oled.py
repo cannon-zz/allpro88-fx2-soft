@@ -44,8 +44,7 @@ class oled_module(object):
 		return False
 
 	def select_code(self, r_not_w):
-		# ensure these are 0 or 1
-		r_now_w = 1 if r_not_w else 0
+		assert r_not_w in (0, 1)
 		# construct the device select code
 		return self.device_id << 2 | self.address << 1 | r_not_w
 
