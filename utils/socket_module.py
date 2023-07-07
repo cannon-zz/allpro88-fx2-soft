@@ -66,8 +66,9 @@ class socket_module(object):
 		corresponds to so that a probe can be inserted into the
 		socket.
 
-		Raises KeyError if the channel number does not correspond
-		to one of the socket's pins.
+		Raises KeyError if there is no socket with the given name
+		or if the channel number does not correspond to one of that
+		socket's pins.
 		"""
 		for pin_number, channel_obj in self.sockets[socket_name].items():
 			if channel_obj.channel == channel:
