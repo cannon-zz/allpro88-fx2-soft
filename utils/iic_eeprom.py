@@ -102,10 +102,10 @@ with open("dump.dat", "wb") as dump:
 				if not ack:
 					raise ValueError("device did not ack")
 				# send a new start bit and a read command
+				# cancel the write operation by sending a
+				# new start bit and a read command
 				device.i2c.start()
-				# send a read command
-				ack = device.i2c.write_byte(device.select_code(block, 1))
-				if not ack:
+				if not device.i2c.write_byte(device.select_code(block, 1)):
 					raise ValueError("device did not ack")
 				# read bytes one-by-one, only ack final
 				# byte
