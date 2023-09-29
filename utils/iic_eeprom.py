@@ -1,3 +1,4 @@
+import math
 from tqdm import tqdm
 from . import allpro88
 from . import devices
@@ -13,6 +14,7 @@ class iic_eeprom(object):
 	device_id = 0b1010
 	# subclass sets to integers
 	blocks = None
+	block_length = 256
 	# most chips use these pins or some subset as a chip select
 	# mechanism.  subclasses can customize as needed.  these pins will
 	# be set low by default.
@@ -94,14 +96,18 @@ with open("dump.dat", "wb") as dump:
 				device.i2c.start()
 				# set the internal address pointer by
 				# sending a write command with the desired
-				# start address (0)
-				ack = device.i2c.write_byte(device.select_code(block, 0))
-				if not ack:
+				# start address (0).  we assume the start
+				# address requires as many bytes as are
+				# needed to encode the length of a block.
+				# e.g., a block length of 256 bytes
+				# requires a 1 byte adddress, a block
+				# length of 4096 requires a two byte start
+				# address.
+				if not device.i2c.write_byte(device.select_code(block, 0)):
 					raise ValueError("device did not ack")
-				ack = device.i2c.write_byte(0x00)
-				if not ack:
-					raise ValueError("device did not ack")
-				# send a new start bit and a read command
+				for i in range(math.ceil(math.log2(device.block_length) / 8)):
+					if not device.i2c.write_byte(0x00):
+						raise ValueError("device did not ack")
 				# cancel the write operation by sending a
 				# new start bit and a read command
 				device.i2c.start()
@@ -109,7 +115,7 @@ with open("dump.dat", "wb") as dump:
 					raise ValueError("device did not ack")
 				# read bytes one-by-one, only ack final
 				# byte
-				for i in tqdm(range(256), desc = "Block %d" % block):
-					dump.write(bytearray((device.i2c.read_byte(ack = i < 255),)))
+				for i in tqdm(range(device.block_length), desc = "Block %d" % block):
+					dump.write(bytearray((device.i2c.read_byte(ack = i < device.block_length - 1),)))
 				# send stop bit
 				device.i2c.stop()
