@@ -12,7 +12,10 @@ class iic_eeprom(object):
 	}
 	device_id = 0b1010
 	blocks = None	# subclass sets to an integer
-	address_pins = ()
+	# most chips use these pins or some subset as a chip select
+	# mechanism.  subclasses can customize as needed.  these pins will
+	# be set low by default.
+	address_pins = (1, 2, 3)
 
 	def __init__(self, programmer):
 		self.programmer = programmer
@@ -62,8 +65,6 @@ class st24w04(iic_eeprom):
 
 class atmel_24c02n(iic_eeprom):
 	blocks = 1
-	# the address pins are not connected
-	address_pins = (1, 2, 3)
 
 	def select_code(self, block, r_not_w):
 		assert 0 <= block < self.blocks
@@ -75,7 +76,6 @@ class atmel_24c02n(iic_eeprom):
 class microchip_24lc16b(iic_eeprom):
 	blocks = 8
 	# the address pins are not connected
-	address_pins = (1, 2, 3)
 
 	def select_code(self, block, r_not_w):
 		assert 0 <= block < self.blocks
