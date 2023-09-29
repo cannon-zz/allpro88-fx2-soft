@@ -11,7 +11,8 @@ class iic_eeprom(object):
 		}
 	}
 	device_id = 0b1010
-	blocks = None	# subclass sets to an integer
+	# subclass sets to integers
+	blocks = None
 	# most chips use these pins or some subset as a chip select
 	# mechanism.  subclasses can customize as needed.  these pins will
 	# be set low by default.
