@@ -1,10 +1,10 @@
-import allpro88
 import select
 import sys
 import termios
 import time
 from tqdm import tqdm
 import tty
+from . import allpro88
 
 tty_old_settings = termios.tcgetattr(sys.stdin)
 tty.setcbreak(sys.stdin.fileno())

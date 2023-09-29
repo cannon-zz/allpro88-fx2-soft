@@ -1,7 +1,7 @@
 import sys
 from tqdm import tqdm
-import allpro88
-import devices
+from . import allpro88
+from . import devices
 
 
 class m27cx_width8_pulse_ce(object):

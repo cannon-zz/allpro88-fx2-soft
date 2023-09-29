@@ -1,7 +1,7 @@
 import sys
 from tqdm import tqdm
-import allpro88
-import devices
+from . import allpro88
+from . import devices
 
 
 class D_flip_flop(object):

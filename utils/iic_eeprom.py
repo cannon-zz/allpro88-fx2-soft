@@ -1,6 +1,6 @@
 from tqdm import tqdm
-import allpro88
-import devices
+from . import allpro88
+from . import devices
 
 class iic_eeprom(object):
 	socket = "DIP8"

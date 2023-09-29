@@ -1,4 +1,3 @@
-import allpro88
 import matplotlib
 from matplotlib import figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -19,6 +18,7 @@ import sys
 import time
 from tqdm import tqdm
 import yaml
+from . import allpro88
 
 
 class channel_driver_test_suite(object):

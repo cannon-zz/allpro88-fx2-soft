@@ -1,7 +1,7 @@
 import time
 from tqdm import tqdm
-import allpro88
-import devices
+from . import allpro88
+from . import devices
 
 from luma.core.interface.serial import i2c
 from luma.oled.device import ssd1306

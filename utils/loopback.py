@@ -1,6 +1,6 @@
-import allpro88
 import random
 from tqdm import tqdm
+from . import allpro88
 
 with allpro88.allpro88() as programmer:
 	for i in tqdm(range(100000), desc = "loopback test"):

@@ -1,6 +1,6 @@
-import allpro88
 import time
 from tqdm import tqdm
+from . import allpro88
 
 def blink_idle(programmer, n = 10):
 	for i in tqdm(range(n), desc = "blink IDLE LED"):

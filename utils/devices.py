@@ -1,6 +1,6 @@
 import operator
 import time
-import allpro88
+from . import allpro88
 
 
 class power(object):

@@ -1,6 +1,6 @@
 from tqdm import tqdm
-import allpro88
-import devices
+from . import allpro88
+from . import devices
 
 class w25x10avaiz(object):
 	def __init__(self, programmer):
