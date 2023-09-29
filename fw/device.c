@@ -264,12 +264,12 @@ inline static void ALLPRO88_ADDR_SET(WORD addr)
 {
 	/* the low byte of the 12 bit address */
 	IOB = LSB(addr);
-	/* ACT, /RD, /WR and /RESET are set high, and combined with the
+	/* /ACT, /RD, /WR and /RESET are set high, and combined with the
 	 * high nibble of the 12 bit address */
 	IOD = 0xe0 | MSB(addr);
 }
 
-#define ALLPRO88_ACT    PD4
+#define ALLPRO88_NACT   PD4
 #define ALLPRO88_NRESET PD5
 #define ALLPRO88_NWR    PD6
 #define ALLPRO88_NRD    PD7
