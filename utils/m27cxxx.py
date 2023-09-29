@@ -383,6 +383,27 @@ class nm27c256v(m27cx_width8_pulse_ce):
 	output_enable_pin = 25
 
 
+class d2764a(m27cx_width8_program_enable):
+	socket_name = "DIP28"
+	voltage_maps = {
+		"read": {
+			1: 5.0,		# Vpp
+			14: 0.0,	# GND
+			28: 5.0,	# Vcc
+		},
+		"program": {
+			1: 12.5,	# Vpp
+			14: 0.0,	# GND
+			28: 5.0,	# Vcc
+		}
+	}
+	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2)
+	data_bus_pins = (11, 12, 13, 15, 16, 17, 18, 19)
+	chip_enable_pin = 20
+	output_enable_pin = 22
+	program_enable_pin = 27
+
+
 class m27c1001(m27cx_width8_program_enable):
 	socket_name = "DIP32"
 	voltage_maps = {
