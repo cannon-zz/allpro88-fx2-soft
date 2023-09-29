@@ -66,6 +66,17 @@ class st24w04(iic_eeprom):
 		return self.device_id << 4 | self.address << 2 | block << 1 | r_not_w
 
 
+class stm24c32(iic_eeprom):
+	blocks = 1
+	block_length = 4096
+
+	def select_code(self, block, r_not_w):
+		assert 0 <= block < self.blocks
+		assert r_not_w in (0, 1)
+		# construct the device select code
+		return self.device_id << 4 | self.address << 1 | r_not_w
+
+
 class atmel_24c02n(iic_eeprom):
 	blocks = 1
 
