@@ -312,11 +312,15 @@ class flag(object):
 		# set initial state
 		if PINCON.VDAC not in (active, inactive, flt):
 			self.socket[self.pin_number].vdac = 0
-		self.socket[self.pin_number].bypass = False
+		self.channel.bypass = False
 		self.write(self.default)
 
+	@property
+	def channel(self):
+		return self.socket[self.pin_number]
+
 	def read(self):
-		return bool(self.socket[self.pin_number])
+		return bool(self.channel)
 
 	def bool_to_config(self, boolean):
 		"""
@@ -326,10 +330,10 @@ class flag(object):
 		return self.flt if boolean is None else self.active if boolean else self.inactive
 
 	def write(self, boolean):
-		self.socket[self.pin_number].config = self.bool_to_config(boolean)
+		self.channel.config = self.bool_to_config(boolean)
 
 	def pulse(self, microseconds, boolean, final_boolean):
-		self.socket[self.pin_number].pulse(microseconds, self.bool_to_config(boolean), self.bool_to_config(final_boolean))
+		self.channel.pulse(microseconds, self.bool_to_config(boolean), self.bool_to_config(final_boolean))
 
 
 class flag_ttl(flag):
@@ -350,7 +354,7 @@ class flag_vdac(flag):
 		super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
 		if vdac <= 0:
 			raise ValueError(vdac)
-		self.socket[self.pin_number].vdac = volt(vdac)
+		self.channel.vdac = volt(vdac)
 
 
 class flag_vdac_active_low(flag):
@@ -358,7 +362,7 @@ class flag_vdac_active_low(flag):
 		super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
 		if vdac <= 0:
 			raise ValueError(vdac)
-		self.socket[self.pin_number].vdac = volt(vdac)
+		self.channel.vdac = volt(vdac)
 
 	def read(self):
 		return not super(flag_vdac_active_low, self).read()
