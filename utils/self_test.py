@@ -32,12 +32,12 @@ class channel_driver_test_suite(object):
 		self.channel = channel_obj
 
 
-	def measure_v(self, n = 5):
+	def measure_v(self):
 		"""
-		Measure the voltage on this channel n times (default is 5)
-		and report the median.
+		Measure the voltage on this channel 5 times and report the
+		median.
 		"""
-		return numpy.median([self.channel.measure_v() for i in range(n)])
+		return self.channel.measure_v(5)
 
 
 	def vtst_measure_r(self, max_milliamps):

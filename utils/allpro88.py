@@ -1,4 +1,5 @@
 from enum import IntEnum
+import numpy
 import time
 import usb.core
 import yaml
@@ -220,14 +221,19 @@ class channel_proxy(object):
 		state, = self.programmer.write_command("?", self.address)
 		return bool(state & 1)
 
-	def measure_v(self):
+	def measure_v(self, n = 1):
 		"""
 		Use bisection search with VTH to measure the voltage on a
 		pin.  NOTE:  VTH is left set to (an approximation of) the
 		measured voltage.
 		"""
-		vdac, = self.programmer.write_command("M", self.channel)
-		return self.programmer.vth.cal(vdac)
+		n = int(n)
+		assert n > 0
+		measurements = []
+		for i in range(n):
+			vdac, = self.programmer.write_command("M", self.channel)
+			measurements.append(self.programmer.vth.cal(vdac))
+		return numpy.median(measurements)
 
 	def pulse(self, microseconds, config, final_config):
 		if microseconds < 0:
