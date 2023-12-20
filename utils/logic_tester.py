@@ -75,6 +75,40 @@ class D_flip_flop(object):
 			previous = False
 
 
+class NAND_2(object):
+	# FIXME:  this is hard-coded for TTL I/O
+	def __init__(self, programmer, socket, in_pins, out_pin):
+		self.programmer = programmer
+		self.socket = socket
+
+		self.in_pins = in_pins
+		self.out_pin = out_pin
+
+		self.in_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.in_pins)
+		self.out_flag = allpro88.flag_ttl(self.socket, self.out_pin, default = None)
+
+	inp = devices.bus_proxy_parallel("in_bus")
+	out = devices.flag_proxy("out_flag")
+
+	def test(self):
+		# check input test vectors
+		for i in tqdm(range(1024), desc = "testing NAND"):
+			x = i & self.in_bus.max_word
+			self.inp = x
+			result = self.out
+			expected = x != self.in_bus.max_word
+			if result != expected:
+				raise ValueError("input vector %x expected %d got %d" % (x, expected, result))
+		# check output high and low voltages
+		self.inp = self.in_bus.max_word
+		v_low = self.out_flag.channel.measure_v(5)
+		self.inp = 0
+		v_high = self.out_flag.channel.measure_v(5)
+		print("output voltages:  low = %g V, high = %g V" % (v_low, v_high))
+		if v_low > 0.4 or v_high < 2.4:
+			raise ValueError("output voltages bad")
+
+
 class CD4013B(object):
 	"""
 	Dual D flip-flop.
@@ -110,6 +144,43 @@ class CD4013B(object):
 			flip_flop.test()
 
 
+class SN7400(object):
+	"""
+	Quad 2-input NAND
+	"""
+	def __init__(self, programmer, Vdd = 5.0):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP14"]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				7:	0,
+				14:	Vdd
+			}
+		})
+		# two D type flip-flops
+		self.gates = [
+			NAND_2(self.programmer, self.socket, (1, 2), 3),
+			NAND_2(self.programmer, self.socket, (4, 5), 6),
+			NAND_2(self.programmer, self.socket, (10, 9), 8),
+			NAND_2(self.programmer, self.socket, (13, 12), 11)
+		]
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	def test(self):
+		for i, gate in enumerate(self.gates, 1):
+			print("testing gate %d" % i)
+			gate.test()
+
+
 with allpro88.allpro88() as programmer:
-	with CD4013B(programmer) as device:
+	with SN7400(programmer) as device:
 		device.test()
