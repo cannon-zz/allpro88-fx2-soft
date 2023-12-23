@@ -15,7 +15,7 @@ with allpro88.allpro88() as programmer:
 	# PCR enable
 	programmer.pcr_enable = True
 	# set all pins to ground
-	for channel in programmer.channel.values():
+	for channel in programmer.channels:
 		channel.config = allpro88.PINCON.GND
 
 	print("j = channel -, k = channel +, q = quit")
@@ -33,9 +33,9 @@ with allpro88.allpro88() as programmer:
 						break
 					progress.n = n
 					progress.refresh()
-				programmer.channel[n].config = allpro88.PINCON.LOGICH
+				programmer.channels[n].config = allpro88.PINCON.LOGICH
 				time.sleep(0.5)
-				programmer.channel[n].config = allpro88.PINCON.GND
+				programmer.channels[n].config = allpro88.PINCON.GND
 				time.sleep(0.5)
 	except KeyboardInterrupt:
 		pass

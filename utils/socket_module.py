@@ -53,7 +53,7 @@ class socket_module(object):
 
 	`	Used by subclasses to initialize themselves.
 		"""
-		return dict((pin, programmer.channel[channel]) for pin, channel in pin_to_channel_mapping.items())
+		return dict((pin, programmer.channels[channel]) for pin, channel in pin_to_channel_mapping.items())
 
 
 	def pin_lookup(self, socket_name, channel):

@@ -14,7 +14,7 @@ def blink_zif_pin1(programmer, n = 10):
 	programmer.vtst = allpro88.volt(3.)
 	programmer.itst = 15	# 15 mA
 	# set all pins to ground
-	for channel in programmer.channel.values():
+	for channel in programmer.channels:
 		channel.config = allpro88.PINCON.GND
 	# PCR enable
 	programmer.pcr_enable = True
@@ -26,7 +26,7 @@ def blink_zif_pin1(programmer, n = 10):
 		channel.config = allpro88.PINCON.GND
 		time.sleep(0.5)
 	# set all pins to disable
-	for channel in programmer.channel.values():
+	for channel in programmer.channels:
 		channel.config = allpro88.PINCON.DISABLE
 	# programmer context manager will zero and turn off power supplies
 

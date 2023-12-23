@@ -609,17 +609,17 @@ class allpro88(object):
 		# it doesn't hurt to be cautious
 		self.device.set_configuration()
 
-		# initialize channel proxy dictionary.  NOTE:  this step
-		# must be completed before initializing the .socket_module
-		# attribute (the socket_module classes use this dictionary
-		# to initialize their pin mappings
-		self.channel = dict((i, channel_proxy(self, i)) for i in range(88))
+		# initialize channel proxy list.  NOTE:  this step must be
+		# completed before initializing the .socket_module
+		# attribute.  the socket_module classes use this list to
+		# initialize their pin mappings
+		self.channels = [channel_proxy(self, i) for i in range(88)]
 
 		# load calibration data if provided
 		if calibration_file is not None:
 			cal_data = yaml.unsafe_load(calibration_file)
 			# per channel DACs
-			for i, channel in self.channel.items():
+			for i, channel in enumerate(self.channels):
 				try:
 					channel_cal_data = cal_data["channel%02d" % i]
 				except KeyError:
@@ -668,7 +668,7 @@ class allpro88(object):
 
 		# ensure all channel drivers are disabled (off), the DAC
 		# voltages are 0'ed and the bypass capacitors disabled
-		for channel in self.channel.values():
+		for channel in self.channels:
 			channel.config = PINCON.DISABLE
 			channel.bypass = False
 			channel.vdac = 0
@@ -696,7 +696,7 @@ class allpro88(object):
 
 		# ensure all channel drivers are disabled (off), the DAC
 		# voltages are 0'ed and the bypass capacitors disabled
-		for channel in self.channel.values():
+		for channel in self.channels:
 			channel.config = PINCON.DISABLE
 			channel.bypass = False
 			channel.vdac = 0

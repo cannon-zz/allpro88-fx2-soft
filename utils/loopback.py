@@ -23,5 +23,5 @@ with allpro88.allpro88() as programmer:
 	programmer.pcr_enable = True
 	for i in tqdm(range(70000), desc = "voltage read speed test"):
 		# my unit only has 48 channels installed
-		programmer.channel[random.randint(0, 47)].measure_v()
+		programmer.channels[random.randint(0, 47)].measure_v()
 	programmer.pcr_enable = False

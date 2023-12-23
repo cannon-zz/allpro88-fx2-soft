@@ -499,8 +499,8 @@ with allpro88.allpro88(calibration_file = open("calibration.dat")) as programmer
 		calibration_name = "channel%02d" % channel
 		calibration[calibration_name] = {}
 
-		test_suite = channel_driver_test_suite(programmer, programmer.channel[channel])
-		print("channel %d --> pin driver group %d, DAC U%d, hybrid H%d, hybrid channel %d" % ((channel,) + programmer.channel[channel].physical))
+		test_suite = channel_driver_test_suite(programmer, programmer.channels[channel])
+		print("channel %d --> pin driver group %d, DAC U%d, hybrid H%d, hybrid channel %d" % ((channel,) + programmer.channels[channel].physical))
 		try:
 			print("channel %d --> DIP48 pin %d" % (channel, programmer.socket_module.pin_lookup("DIP48", channel)))
 		except KeyError:
