@@ -289,6 +289,7 @@ class channel_proxy(object):
 		shorter pulse, but a 5 us pulse will be generated in those
 		cases.
 		"""
+		microseconds = int(microseconds)
 		if microseconds < 0:
 			raise ValueError("pulse duration < 0")
 		if microseconds > 0xffff:
