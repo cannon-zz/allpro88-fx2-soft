@@ -222,7 +222,7 @@ class channel_proxy(object):
 		# integer channel number
 		self.channel = channel
 		# start of group of addresses for this channel
-		self.address = programmer.pin_addr(channel)
+		self.address = programmer.channel_addr(channel)
 		# bypass capacitor control register
 		# FIXME:  the bypass capacitor feature including its
 		# associated control logic and address decode circuitry
@@ -798,7 +798,7 @@ class allpro88(object):
 	#
 
 	@staticmethod
-	def pin_addr(pin):
+	def channel_addr(pin):
 		"""
 		Returns the start address of the register group
 		corresponding to the given pin number.
