@@ -8,15 +8,27 @@ from socket_module import socket_modules
 
 #
 # NOTE NOTE NOTE:  in all of what follows, "channel number" means a pin
-# channel number according to my numbering convention, NOT any of the
-# channel numbering conventions shown in the ALLPRO88 technical
+# driver channel number according to my numbering convention, NOT any of
+# the channel numbering conventions shown in the ALLPRO88 technical
 # documentation (I've identified at least two).  by my convention channels
 # are numbered sequentially from 0 in the order of their control register
 # addresses.
 #
 
 
+#
+# =============================================================================
+#
+#                           Register Bit Definitions
+#
+# =============================================================================
+#
+
+
 class PCR(IntEnum):
+	"""
+	PCR (power supply control register) configuration bits.
+	"""
 	# power supplies off, red busy LED off, green idle LED on
 	DISABLE = 0x00
 	# enables power supplies, and lights red busy LED
@@ -26,6 +38,9 @@ class PCR(IntEnum):
 
 
 class PINCON(IntEnum):
+	"""
+	Pin driver configuration register bits.
+	"""
 	DISABLE = 0x00	# disable ("float") pin
 	GND = 0x01	# turn on FET pulling pin to ground
 	VDAC = 0x02	# turn on DAC output power transistor
@@ -53,6 +68,15 @@ class TIMER_MODE(IntEnum):
 	# NOTE:  setting mode 0x07 enables both high and low output drivers
 	# and will damage the circuit
 	POLARITY = 0x80
+
+
+#
+# =============================================================================
+#
+#                          Firmware Command Interface
+#
+# =============================================================================
+#
 
 
 class command(object):
@@ -108,6 +132,15 @@ class command(object):
 
 	def __str__(self):
 		return self.cmd
+
+
+#
+# =============================================================================
+#
+#                           Channel Driver Interface
+#
+# =============================================================================
+#
 
 
 class volt(float):
@@ -223,8 +256,10 @@ class channel_proxy(object):
 
 	def measure_v(self, n = 1):
 		"""
-		Use bisection search with VTH to measure the voltage on a
-		pin.  NOTE:  VTH is left set to (an approximation of) the
+		Use bisection search with VTH to measure the voltage on
+		this channel's pin.  Repeat the measurement n times
+		(default = 1) and report the median of the measurements.
+		NOTE:  VTH is left set to (an approximation of) the
 		measured voltage.
 		"""
 		n = int(n)
@@ -236,14 +271,33 @@ class channel_proxy(object):
 		return numpy.median(measurements)
 
 	def pulse(self, microseconds, config, final_config):
+		"""
+		Switch this channel's configuration to config, hold it for
+		the given number of microseconds, then switch the
+		configuration to final_config.
+
+		It is common for programmable devices to require a short
+		pulse on a single pin to affect the programming operation.
+		Usually there are strict requirements for the duration of
+		the pulse.  This method is provided to meet the needs of
+		such parts.
+
+		NOTE:  the firmware generates pulse durations that are
+		quite accurately timed to the integer microsecond, however
+		the shortest pulse the firmware can generate is
+		approximately 5 us.  It is not an error to request a
+		shorter pulse, but a 5 us pulse will be generated in those
+		cases.
+		"""
 		if microseconds < 0:
 			raise ValueError("pulse duration < 0")
 		if microseconds > 0xffff:
-			# FIXME:  if such a long pulse, longer than ~65 ms
-			# is desired, probably the +/- that can be
-			# tolerated is relaxed enough that the pulse could
-			# be implemented in software, here, on the host
-			# side.
+			# FIXME:  if such a long pulse, longer than ~65 ms,
+			# is desired then probably also the duration does
+			# not need to be controled to microsecond
+			# precision.  if the tolerance can be relaxed
+			# enough, the pulse could be implemented in
+			# software, here, on the host side.
 			raise ValueError("pulse duration too long:  %d us" % microseconds)
 		command = "P%02X%04X%02X%02X\n" % (self.channel, microseconds, config, final_config)
 		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
@@ -256,6 +310,10 @@ class channel_proxy(object):
 
 	@property
 	def bypass(self):
+		"""
+		Boolean controlling the state of this channels' bypass
+		capacitor.
+		"""
 		raise NotImplementedError
 
 	@bypass.setter
@@ -279,11 +337,25 @@ class channel_proxy(object):
 		#, hybrid identifier #, channel # on hybrid).
 		"""
 		return (
-			self.channel // 8,	# group number, group #
-			self.channel % 8 + 1,	# DAC chip ident., U#
-			(self.channel % 8) // 2 + 1,	# hybrid ident., H#
-			(self.channel % 8) % 2	# hybrid channel number
+			# group # printed on motherboard PCB
+			self.channel // 8,
+			# DAC chip ident., U# printed on channel driver PCB
+			self.channel % 8 + 1,
+			# hybrid ident., H# printed on channel driver PCB
+			(self.channel % 8) // 2 + 1,
+			# hybrid channel number (as numbered by me for my
+			# hybrid tester jig)
+			(self.channel % 8) % 2
 		)
+
+
+#
+# =============================================================================
+#
+#                           Channel Driver Wrappers
+#
+# =============================================================================
+#
 
 
 class flag(object):
@@ -292,7 +364,7 @@ class flag(object):
 	initial value.  The pin can be used for output or input.  To set
 	the state of the pin, i.e., to use the pin for output, write a
 	boolean value.  To use the pin for input, set it to None to float
-	the pin.  To read the state of the pins, read a value from the bus.
+	the pin.  To read the state of the pin, read a value.
 
 	The pin is initialized to the value set by the keyword argument
 	default.
@@ -325,7 +397,10 @@ class flag(object):
 	def bool_to_config(self, boolean):
 		"""
 		Convert boolean value to corresponding channel
-		configuration register value.
+		configuration register value.  The return value is
+		self.active or self.inactive if boolean is (equivalent to)
+		True or False, respectively.  If boolean is None then
+		self.flt is returned.
 		"""
 		return self.flt if boolean is None else self.active if boolean else self.inactive
 
@@ -333,15 +408,28 @@ class flag(object):
 		self.channel.config = self.bool_to_config(boolean)
 
 	def pulse(self, microseconds, boolean, final_boolean):
+		"""
+		Set the pin driver channel configuration to the state
+		corresponding to boolean, hold it for the given number of
+		microseconds, then set it to the state corresponding to
+		final_boolean.  See .bool_to_config() for the mapping from
+		boolean value to flag state.
+		"""
 		self.channel.pulse(microseconds, self.bool_to_config(boolean), self.bool_to_config(final_boolean))
 
 
 class flag_ttl(flag):
+	"""
+	Boolean pin configured for active high TTL logic levels.
+	"""
 	def __init__(self, socket, pin_number, **kwargs):
 		super(flag_ttl, self).__init__(socket, pin_number, active = PINCON.LOGICH, inactive = PINCON.LOGICL, **kwargs)
 
 
 class flag_ttl_active_low(flag):
+	"""
+	Boolean pin configured for active low TTL logic levels.
+	"""
 	def __init__(self, socket, pin_number, **kwargs):
 		super(flag_ttl_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.LOGICH, **kwargs)
 
@@ -350,7 +438,13 @@ class flag_ttl_active_low(flag):
 
 
 class flag_vdac(flag):
+	"""
+	Boolean pin configured for active high VDAC programmed logic levels.
+	"""
 	def __init__(self, socket, pin_number, vdac, **kwargs):
+		"""
+		vdac = voltage to be used for high state.
+		"""
 		super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
 		if vdac <= 0:
 			raise ValueError(vdac)
@@ -358,7 +452,13 @@ class flag_vdac(flag):
 
 
 class flag_vdac_active_low(flag):
+	"""
+	Boolean pin configured for active low VDAC programmed logic levels.
+	"""
 	def __init__(self, socket, pin_number, vdac, **kwargs):
+		"""
+		vdac = voltage to be used for high state.
+		"""
 		super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
 		if vdac <= 0:
 			raise ValueError(vdac)
@@ -377,9 +477,10 @@ class bus_parallel(object):
 	float the pins.  To read the state of the pins, read a value from
 	the bus.
 
-	A bus may be any number of bits between 1 and 32, inclusively.  Up
-	to 8 buses may be defined and in use simultaneously.  These are
-	limitations of the programmer interface firmware.
+	A bus may be any number of bits in size between 1 and 32,
+	inclusively.  Up to 8 buses may be defined and in use
+	simultaneously.  These are limitations of the programmer interface
+	firmware.
 
 	default sets the initial state of the bus, which will be passed to
 	.write() to perform the configuration.  If not specified, or set to
@@ -472,7 +573,20 @@ class bus_parallel_ttl(bus_parallel):
 		super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE, **kwargs)
 
 
+#
+# =============================================================================
+#
+#                        ALLPRO88 Programmer Interface
+#
+# =============================================================================
+#
+
+
 class allpro88(object):
+	#
+	# USB information
+	#
+
 	idVendor = 0x1209
 	idProduct = 0x000C
 

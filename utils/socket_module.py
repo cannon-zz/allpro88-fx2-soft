@@ -125,6 +125,7 @@ class socket_module_AP88_PLCC(socket_module):
 	"""
 	name = "AP88 PLCC"
 	module_id = 0x11
+		# PIN NUMBER	CHANNEL NUMBER
 	sockets = {
 		# 20 pin PLCC socket
 		"PLCC20": {
