@@ -4,6 +4,15 @@ from . import allpro88
 from . import devices
 
 
+#
+# =============================================================================
+#
+#                              Functional Blocks
+#
+# =============================================================================
+#
+
+
 class D_flip_flop(object):
 	# FIXME:  this is hard-coded for TTL I/O
 	def __init__(self, programmer, socket, D_pin, clk_pin, S_pin, R_pin, Q_pin, Qbar_pin):
@@ -109,6 +118,15 @@ class NAND_2(object):
 			raise ValueError("output voltages bad")
 
 
+#
+# =============================================================================
+#
+#                                    Chips
+#
+# =============================================================================
+#
+
+
 class CD4013B(object):
 	"""
 	Dual D flip-flop.
@@ -158,7 +176,7 @@ class SN7400(object):
 				14:	Vdd
 			}
 		})
-		# two D type flip-flops
+		# four 2-input NAND gates
 		self.gates = [
 			NAND_2(self.programmer, self.socket, (1, 2), 3),
 			NAND_2(self.programmer, self.socket, (4, 5), 6),
@@ -179,6 +197,14 @@ class SN7400(object):
 		for i, gate in enumerate(self.gates, 1):
 			print("testing gate %d" % i)
 			gate.test()
+
+#
+# =============================================================================
+#
+#                                     Main
+#
+# =============================================================================
+#
 
 
 with allpro88.allpro88() as programmer:

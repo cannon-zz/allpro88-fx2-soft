@@ -3,8 +3,68 @@ import time
 from . import allpro88
 
 
+#
+# =============================================================================
+#
+#                           Device Power Management
+#
+# =============================================================================
+#
+
+
 class power(object):
+	"""
+	Device power management.  Sequences application of voltages to a
+	part, provides for selection from among several voltage
+	configurations.  Calling the .on() and .off() methods from the
+	.__enter__() and .__exit__() methods of a context manager will
+	ensure the power to the part is safetly removed in the event of a
+	softwre crash.
+	"""
 	def __init__(self, programmer, socket, voltage_maps, vadj = "auto", vpul = 0.0, vth = 1.5, default_voltage_map = "default"):
+		"""
+		programmer:  allpro88 programmer instance
+
+		socket:  the socket instance for the part
+
+		voltage_maps:  a dictionary mapping voltage map names to
+		dictionaries of pin number -to- voltage mappings, with pin
+		numbers for the socket and (float) voltages in volts;  one
+		of the mappings must have the name of default_voltage_map;
+		in the pin number -to- voltage mapping, pins whose voltages
+		are 0 will be connected to ground, all others will have the
+		given voltage (in volts) applied).  all pins given in the
+		voltage map, including ground pins, will have bypass
+		capacitors applied to them to help stabilize the voltages
+		at the part.
+
+		vadj:  the voltage to set the programmers main variable
+		power supply to;  all other power supply voltages are
+		derived from this via linear regulators so this voltage
+		needs to be a volt or two higher than the highest required
+		voltage.  if set to "auto" (the default) the appropriate
+		value will be derived from all required voltages known to
+		this instance.  see also the .max() method.  the option of
+		setting this voltage manually is provided for applications
+		where a higher voltage will be needed but is not initially
+		known to this instance.
+
+		vpul:  the voltage to set the pull-up voltage to.  this
+		voltage is supplied to the pull-up resistors in the channel
+		drivers.  the default is 0 V.
+
+		vth:  the voltage for the comparators used to test the
+		state of pins.  the default is 1.5 V, which is a compromise
+		voltage usually acceptable for 3.3 V through 5 V logic
+		parts.  NOTE:  use of the voltage measurement function on
+		any pin will leave this power supply's voltage set to the
+		an approximation of the measured pin voltage, and it will
+		need to be reset to return to using the comparators as
+		digital inputs.  see .reset_vth().
+
+		default_voltage_map:  the name of the voltage map to use at
+		start-up.
+		"""
 		if default_voltage_map not in voltage_maps:
 			raise KeyError("voltage_maps must include '%s'" % default_voltage_map)
 		self.programmer = programmer
@@ -40,6 +100,12 @@ class power(object):
 		self.programmer.vth = self.vth
 
 	def on(self, voltage_map = None):
+		"""
+		Turn the power supplies on, applying power to the part.
+		Use the voltages in voltage_map.  If voltage_map is None
+		(the default) then the default voltage map is used as
+		configured by the .__init__() method.
+		"""
 		self.active_voltage_map = self.voltage_maps[voltage_map if voltage_map is not None else self.default_voltage_map]
 		# configure pins.  dacs will be loaded below, with main
 		# dacs
@@ -65,6 +131,9 @@ class power(object):
 		time.sleep(self.programmer.vadj.transient)
 
 	def off(self):
+		"""
+		Turn power supplies off.
+		"""
 		# cut power
 		self.programmer.pcr_enable = False
 		# set dacs to 0
@@ -82,10 +151,34 @@ class power(object):
 		self.active_voltage_map = None
 
 
+#
+# =============================================================================
+#
+#                 Class descriptors to make I/O more readable
+#
+# =============================================================================
+#
+
+
 class read_write_proxy(object):
 	"""
 	Descriptor to map the get and set operations of an attribute to the
 	.read() and .write() methods, respectively, of some object.
+
+	Example:
+
+	class thing(object):
+		def __init__(self):
+			# instance attribute with .read() and .write()
+			# methods
+			self.f = open("/dev/null")
+
+		# assigning to and retrieving the value of .nul wraps the
+		# .write() and .read() methods, respectively, of .f
+		nul = read_write_proxy("f")
+
+	x = thing()
+	x.nul = "this is written to /dev/null"
 	"""
 	def __init__(self, attr_name):
 		"""
@@ -108,6 +201,20 @@ class read_write_proxy(object):
 		self.getter(obj).write(val)
 
 
+#
+# Boolean state pins
+#
+
+
+class flag_proxy(read_write_proxy):
+	pass
+
+
+#
+# Parallel bus
+#
+
+
 class bus_proxy_parallel(read_write_proxy):
 	"""
 	Example:
@@ -128,12 +235,17 @@ class bus_proxy_parallel(read_write_proxy):
 	pass
 
 
+#
+# IIC aka I2C bus
+#
+
+
 class bus_iic(object):
 	"""
 	IIC (aka I2C) bus.  NOTE:  must set VPUL = VCC for the chip and VTH
 	to the minimum bus "high" state voltage.
 
-	The methods must be called as followed:  first .start(), then any
+	The methods must be called as follows:  first .start(), then any
 	number of .write_byte(), .start(), and .read_byte() in any order,
 	finally .stop().  The bit manipulations performed by each method
 	follow correctly from the state the bus has been left in by the
@@ -308,9 +420,18 @@ class bus_iic(object):
 		self.stop()
 
 
+#
+# SPI bus
+#
+
+
 class bus_spi(object):
 	"""
 	SPI bus.  Calling code must set VTH for the device to VCC - 1 V.
+
+	An SPI bus clocks one byte in each direction simultaneously,
+	master->slave and slave->master, using the MOSI and MISO data
+	lines, respectively.
 	"""
 	hi = allpro88.PINCON.VDAC
 	lo = allpro88.PINCON.LOGICL
@@ -330,6 +451,10 @@ class bus_spi(object):
 		self.mosi.config = self.lo
 
 	def transfer_byte(self, out_byte):
+		"""
+		Clocks out_byte out to the part, while clocking a byte in
+		from the part.  The return value is the byte clocked in.
+		"""
 		in_byte = 0
 		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
 			self.mosi.config = self.hi if (out_byte & bit) else self.lo
@@ -338,12 +463,3 @@ class bus_spi(object):
 			if self.miso:
 				in_byte |= bit
 		return in_byte
-
-
-#
-# Boolean state pins
-#
-
-
-class flag_proxy(read_write_proxy):
-	pass
