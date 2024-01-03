@@ -1,3 +1,4 @@
+import random
 import sys
 from tqdm import tqdm
 from . import allpro88
@@ -197,6 +198,81 @@ class SN7400(object):
 		for i, gate in enumerate(self.gates, 1):
 			print("testing gate %d" % i)
 			gate.test()
+
+
+class SN74245(object):
+	"""
+	Octal bus transciever
+	"""
+	def __init__(self, programmer, Vdd = 5.0):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP20"]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				10:	0,
+				20:	Vdd
+			}
+		})
+		# control
+		self.direction_flag = allpro88.flag_ttl(self.socket, 1)
+		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, 19)
+		# bus
+		self.A_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3, 4, 5, 6, 7, 8, 9))
+		self.B_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (18, 17, 16, 15, 14, 13, 12, 11))
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	# True = A->B;  False = B->A
+	direction = devices.flag_proxy("direction_flag")
+	# True = drive output;  False = float output
+	output_enable = devices.flag_proxy("output_enable_flag")
+	A = devices.bus_proxy_parallel("A_bus")
+	B = devices.bus_proxy_parallel("B_bus")
+
+	def test(self):
+		for i in tqdm(range(4096), desc = "testing transceiver"):
+			# disable outputs
+			self.output_enable = False
+
+			# choose a random value
+			val = random.randint(0, 255)
+
+			# choose a direction.  float the output bus, write the
+			# value to the input bus
+			self.direction = direction = random.choice((True, False))
+			if direction:
+				self.A = val
+				self.B = None
+			else:
+				self.A = None
+				self.B = val
+
+			# turn on the output and test.   confirm output
+			# voltages
+			self.output_enable = True
+			if direction:
+				out_val = self.B
+				volts_out = [channel.measure_v() for channel in self.B_bus.channels]
+			else:
+				out_val = self.A
+				volts_out = [channel.measure_v() for channel in self.A_bus.channels]
+			self.power.reset_vth()
+
+			#print("%s:  input = %02X, output = %02X" % ("A->B" if direction else "B->A", val, out_val))
+			if out_val != val:
+				raise ValueError("%s:  input = 0x%02X, output = 0x%02X" % ("A->B" if direction else "B->A", val, out_val))
+			for bit, v in zip((0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80), volts_out):
+				if ((val & bit) and (v < 2.4)) or (not (val & bit) and (v > 0.4)):
+					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts_out)))
+
 
 #
 # =============================================================================
