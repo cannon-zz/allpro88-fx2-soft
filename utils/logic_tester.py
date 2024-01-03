@@ -274,6 +274,77 @@ class SN74245(object):
 					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts_out)))
 
 
+class SN74273(object):
+	"""
+	Octal D-type latch.
+	"""
+	def __init__(self, programmer, Vdd = 5.0):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP20"]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				10:	0,
+				20:	Vdd
+			}
+		})
+		# control
+		self.clear_flag = allpro88.flag_ttl_active_low(self.socket, 1)
+		self.clock_flag = allpro88.flag_ttl(self.socket, 11)
+		# bus
+		self.D_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (3, 4, 7, 8, 13, 14, 17, 18))
+		self.Q_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 5, 6, 9, 12, 15, 16, 19))
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	clear = devices.flag_proxy("clear_flag")
+	clock = devices.flag_proxy("clock_flag")
+	D = devices.bus_proxy_parallel("D_bus")
+	Q = devices.bus_proxy_parallel("Q_bus")
+
+	def test(self):
+		# reset
+		self.clear = True
+		self.clear = False
+
+		for i in tqdm(range(4096), desc = "testing latch"):
+			# choose a random value
+			val = random.randint(0, 255)
+
+			# clock it into the latch
+			self.D = val
+			self.clock = True
+			self.clock = False
+
+			# zero then float the input
+			self.D = 0
+			self.D = None
+
+			# confirm the output
+			out_val = self.Q
+
+			# confirm (floating) input and output voltages
+			volts_in = [channel.measure_v() for channel in self.D_bus.channels]
+			volts_out = [channel.measure_v() for channel in self.Q_bus.channels]
+			self.power.reset_vth()
+
+			# test and report errors
+			if out_val != val:
+				raise ValueError("input = 0x%02X, output = 0x%02X" % (val, out_val))
+			if not all(1.25 <= v <= 1.6 for v in volts_in):
+				raise ValueError("input voltages out of range: %s" % ", ".join("%.3g V" % v for v in volts_in))
+			for bit, v in zip((0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80), volts_out):
+				if ((val & bit) and (v < 2.4)) or (not (val & bit) and (v > 0.4)):
+					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts_out)))
+
+
 #
 # =============================================================================
 #
