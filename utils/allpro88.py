@@ -499,6 +499,7 @@ class bus_parallel(object):
 		if not (1 <= len(pin_numbers) <= 32):
 			raise ValueError("bus width out of range: 1 <= %d <= 32" % len(pin_numbers))
 		self.programmer = programmer
+		self.socket = socket
 		self.bus_number = self.programmer.get_unused_bus(self)
 		self.pin_numbers = tuple(pin_numbers)
 		self.max_word = (1 << len(pin_numbers)) - 1
@@ -511,11 +512,15 @@ class bus_parallel(object):
 		# clear response
 		self.programmer.read_responses()
 		# set initial state
-		for pin_number in self.pin_numbers:
+		for channel in self.channels:
 			if PINCON.VDAC not in (active, inactive, flt):
-				socket[pin_number].vdac = 0
-			socket[pin_number].bypass = False
+				channel.vdac = 0
+			channel.bypass = False
 		self.write(self.default)
+
+	@property
+	def channels(self):
+		return tuple(self.socket[pin_number] for pin_number in self.pin_numbers)
 
 	def read(self):
 		"""
