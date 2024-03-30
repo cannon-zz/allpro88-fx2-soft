@@ -425,6 +425,10 @@ class m27c1001(m27cx_width8_program_enable):
 	program_enable_pin = 31
 
 
+class d27c010(m27c1001):
+	pass
+
+
 class m27c2001(m27c1001):
 	address_bus_pins = (12, 11, 10, 9, 8, 7, 6, 5, 27, 26, 23, 25, 4, 28, 29, 3, 2, 30)
 
