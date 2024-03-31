@@ -59,7 +59,18 @@ class m27cx_width8_pulse_ce(object):
 				device.chip_enable = False
 
 	@classmethod
-	def write_device(cls, imgfile):
+	def write_device(cls, imgfile, skip_bytes = 0xff):
+		"""
+		imfile = file object from which to read bytes
+
+		skip_bytes = erased parts typically reset to 0xff, so we
+		don't need to write these values to the part.  only 0 bits
+		are actually written to eproms. 1 bits do not change the
+		contents of the part.  an all-1's value, therefore, is a
+		no-op.  whatever value skip_bytes is set to will not be
+		written to the part (default = 0xff).  set to None to
+		disable this feature.
+		"""
 		# FIXME:  this has only been tested with one specific part
 		# type.  before using it to burn eeproms confirm the
 		# algorithm is appropriate.  I know of at least one part
@@ -80,12 +91,15 @@ class m27cx_width8_pulse_ce(object):
 				device.chip_enable = False
 				device.output_enable = False
 				for address in tqdm(device.address_bus, desc = "Writing", disable = False):
-					device.address = address
 					# read 1 byte from file
 					byte = imgfile.read(1)
 					byte = int.from_bytes(byte, byteorder = sys.byteorder)
+					# skip no-op bytes
+					if skip_bytes is not None and byte == skip_bytes:
+						continue
 					# write.  repeat until read-back
 					# value matches byte
+					device.address = address
 					for i in range(25):
 						# write byte to chip
 						device.data = byte
