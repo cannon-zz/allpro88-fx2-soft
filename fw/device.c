@@ -174,13 +174,14 @@ inline static void newline(void)
 
 
 /*
- * Port A = data bus
- * Port B = address bus low byte
+ * Port A = address bus low byte
+ * Port B = data bus
  * Port D[0:3] = address bus bits 8,9,10,11
- * Port D[4] = activity LED / PSEN (depends on board configuration)
- * Port D[5] = /RESET
- * Port D[6] = /WR
- * Port D[7] = /RD
+ * Port D[4] = /RESET
+ * Port D[5:7] = GPIO connector pins 2,3,4
+ * CTL0 = /WR
+ * CTL1 = /ACT activity LED control, 0 = on, 1 = off
+ * CTL2 = /RD
  *
  * the address and control lines are wired into the inputs of SN74LS244N
  * bus driver chips, and the data bus into an SN74LS245N bi-directional bus
@@ -256,23 +257,20 @@ inline static void newline(void)
  */
 
 
-#define ALLPRO88_DATA_FLOAT do { OEA = 0x00; } while(0)
-#define ALLPRO88_DATA_DRIVE do { OEA = 0xff; } while(0)
-#define ALLPRO88_DATA IOA
-#define ALLPRO88_ADDRCTRL_DRIVE do {OEB = OED = 0xff; } while(0)
+#define ALLPRO88_DATA_FLOAT do { OEB = 0x00; } while(0)
+#define ALLPRO88_DATA_DRIVE do { OEB = 0xff; } while(0)
+#define ALLPRO88_DATA IOB
+#define ALLPRO88_ADDRCTRL_DRIVE do {OEA = 0xff ; OED = 0x1f; } while(0)
 inline static void ALLPRO88_ADDR_SET(WORD addr)
 {
 	/* the low byte of the 12 bit address */
-	IOB = LSB(addr);
-	/* /ACT, /RD, /WR and /RESET are set high, and combined with the
-	 * high nibble of the 12 bit address */
-	IOD = 0xe0 | MSB(addr);
+	IOA = LSB(addr);
+	/* /RESET is set high, and combined with the high nibble of the 12
+	 * bit address */
+	IOD = 0x10 | MSB(addr);
 }
 
-#define ALLPRO88_NACT   PD4
-#define ALLPRO88_NRESET PD5
-#define ALLPRO88_NWR    PD6
-#define ALLPRO88_NRD    PD7
+#define ALLPRO88_NRESET PD4
 
 
 /*
@@ -318,13 +316,13 @@ static BYTE allpro88_read(WORD addr)
 	/* drive address and pull /RD low.  no delay between the two is
 	 * used, the instruction timing is sufficient.  */
 	ALLPRO88_ADDR_SET(addr);
-	ALLPRO88_NRD = 0;
+	GPIFIDLECTL = 0x01;
 	/* wait 83.3 ns for gate delays and bus settling */
 	NOP;
 	/* latch data bus */
 	data = ALLPRO88_DATA;
 	/* raise /RD */
-	ALLPRO88_NRD = 1;
+	GPIFIDLECTL = 0x07;
 
 	return data;
 }
@@ -404,11 +402,11 @@ static void allpro88_write(WORD addr, BYTE data)
 	ALLPRO88_DATA_DRIVE;
 	NOP; NOP;
 	/* pull /WR low.  clocks AD7226s */
-	ALLPRO88_NWR = 0;
+	GPIFIDLECTL = 0x04;
 	/* hold data and /WR for 500 ns.  DAC0832 setup time */
 	NOP; NOP; NOP; NOP; NOP; NOP;
 	/* raise /WR.  clocks HCT273s and DAC0832s */
-	ALLPRO88_NWR = 1;
+	GPIFIDLECTL = 0x07;
 	/* don't worry about final hold time.  firmware not fast enough to
 	 * violate it. */
 }
@@ -642,8 +640,8 @@ static void allpro88_hard_reset(void)
 
 	/* hold /RESET low */
 	ALLPRO88_NRESET = 0;
-	/* set /RD, /WR high (order doesn't matter) */
-	ALLPRO88_NRD = ALLPRO88_NWR = 1;
+	/* set /ACT, /RD, /WR high */
+	GPIFIDLECTL = 0x07;
 	/* set data bus to all zero, but float it */
 	ALLPRO88_DATA_FLOAT;
 	ALLPRO88_DATA = 0;
@@ -781,17 +779,22 @@ void main_init(void)
 
 	/* configure I/O ports.  clear bits 0 and 1:  ports B and D are I/O
 	 * ports, not FIFO data bus.  port A all pins for I/O port, disable
-	 * alternate functions. */
+	 * alternate functions.  CTL[0:3] set to open-drain mode. */
 
 	IFCONFIG = 0x80;
 	PORTACFG = 0;
+	GPIFCTLCFG = 0x07;
 
 	/* ALLPRO88:  zero data bus, address bus, pull /RESET low, and set
-	 * /RD and /WR high. */
+	 * /RD, /WR and /ACT high.  NOTE:  the purpose is not to
+	 * necessarily set the pin states at this stage, only to set their
+	 * configurations into a known state.  they will be enabled for
+	 * output as needed in the next step */
 
 	IOA = 0x00;
 	IOB = 0x00;
-	IOD = 0xc0;
+	IOD = 0x00;
+	GPIFIDLECTL = 0x07;
 
 	/* float the data bus pins in case the programmer is driving them.
 	 * set address and control bus pins for output (if it isn't
@@ -1751,18 +1754,17 @@ inline static void parse_out_buffer(void)
 
 /*
  * blinks an LED connected in series with a current limit resistor between
- * VCC and port A bit 0 (ALLPRO 88 data bus bit 0) at 1 Hz.  some FX2
+ * VCC and port A bit 0 (ALLPRO 88 address bus bit 0) at 1 Hz.  some FX2
  * development boards include such an LED.  it might need to be enabled
  * using a jumper.
  */
 
 
-static void blink_data0_1hz(void)
+static void blink_A0_1hz(void)
 {
-	ALLPRO88_DATA_DRIVE;
-	ALLPRO88_DATA = 0;
+	ALLPRO88_ADDR_SET(0);
 	delay(500);
-	ALLPRO88_DATA = 1;
+	ALLPRO88_ADDR_SET(1);
 	delay(500);
 }
 
@@ -1793,9 +1795,9 @@ static void blink_idle_1hz(void)
 void main_loop(void)
 {
 	/* uncomment this to blink an LED connected to bit 0 of the ALLPRO
-	 * 88 data bus at 1 Hz */
+	 * 88 address bus (FX2 chip's port A bit 0) at 1 Hz */
 
-	/*blink_data0_1hz();*/
+	/*blink_A0_1hz();*/
 
 	/* uncomment to blink the green idle LED at 1 Hz */
 
