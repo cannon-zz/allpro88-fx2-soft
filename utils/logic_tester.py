@@ -1,3 +1,4 @@
+import math
 import random
 import sys
 from tqdm import tqdm
@@ -198,6 +199,86 @@ class SN7400(object):
 		for i, gate in enumerate(self.gates, 1):
 			print("testing gate %d" % i)
 			gate.test()
+
+
+class SN74244(object):
+	"""
+	Octal line driver
+	"""
+	def __init__(self, programmer, Vdd = 5.0):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP20"]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				10:	0,
+				20:	Vdd
+			}
+		})
+		# control
+		self.output_enable_1_flag = allpro88.flag_ttl_active_low(self.socket, 1)
+		self.output_enable_2_flag = allpro88.flag_ttl_active_low(self.socket, 19)
+		# bus
+		self.A_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 4, 6, 8, 11, 13, 15, 17))
+		self.Y_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (18, 16, 14, 12, 9, 7, 5, 3))
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	output_enable_1 = devices.flag_proxy("output_enable_1_flag")
+	output_enable_2 = devices.flag_proxy("output_enable_2_flag")
+	A = devices.bus_proxy_parallel("A_bus")
+	Y = devices.bus_proxy_parallel("Y_bus")
+
+	def test(self):
+		highest_lo = 0.
+		lowest_hi = math.inf
+		for i in tqdm(range(4096), desc = "testing driver"):
+			# disable outputs
+			self.output_enable_1 = self.output_enable_2 = False
+
+			# drain charge from the output by grounding, then
+			# allow to float again
+			self.Y = 0
+			self.Y = None
+
+			# choose a random value, write to the input bus
+			val = random.randint(0, 255)
+			self.A = val
+
+			# confirm output voltages in floating state
+			volts_flt = [channel.measure_v() for channel in self.Y_bus.channels]
+			self.power.reset_vth()
+
+			# enable output, check value, and confirm voltages
+			self.output_enable_1 = self.output_enable_2 = True
+			out_val = self.Y
+			volts = [channel.measure_v() for channel in self.Y_bus.channels]
+			self.power.reset_vth()
+
+			if out_val != val:
+				#print("input = 0x%02X, output = 0x%02X" % (val, out_val))
+				raise ValueError("input = 0x%02X, output = 0x%02X" % (val, out_val))
+			#print(", ".join("%.3g V" % v for v in volts))
+			#print(", ".join("%.3g V" % v for v in volts_flt))
+			#if not all(1.25 <= v <= 1.6 for v in volts_in):
+			#	raise ValueError("input voltages out of range: %s" % ", ".join("%.3g V" % v for v in volts_in))
+			for bit, v in zip((0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80), volts):
+				if ((val & bit) and (v < 2.4)) or (not (val & bit) and (v > 0.4)):
+					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts)))
+				if val & bit:
+					if v < lowest_hi:
+						lowest_hi = v
+				else:
+					if v > highest_lo:
+						highest_lo = v
+		print("lowest high output = %.3g V, highest low output = %.3g V" % (lowest_hi, highest_lo))
 
 
 class SN74245(object):
