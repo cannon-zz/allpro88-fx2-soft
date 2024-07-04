@@ -37,6 +37,7 @@
 #include <delay.h>
 #include <fx2macros.h>
 #include <eputils.h>
+#include <gpif.h>
 
 
 /*
@@ -182,85 +183,9 @@ inline static void newline(void)
  * CTL0 = /WR
  * CTL1 = /ACT activity LED control, 0 = on, 1 = off
  * CTL2 = /RD
- *
- * the address and control lines are wired into the inputs of SN74LS244N
- * bus driver chips, and the data bus into an SN74LS245N bi-directional bus
- * driver.  those chips are guaranteed to recognize anything over 2 V as a
- * logic high level, so they should provide the required level shifting
- * from the FX2's 3.3 V logic outputs to 5 V logic inside the programmer.
- * the FX2's documentation says it has 5 V tolerant inputs, so the 5 V
- * output of the 245N on the data bus during read operations is
- * acceptable.  no level shifting is required to connect the FX2 directly
- * to the ALLPRO88's interface.  from the ALLPRO88's service manual, the
- * /RD line controls the direction of the 245N, so be careful not to pull
- * /RD low while driving the data bus.
- *
- * NOTE:  I measure 200 Ohm between every I/O line and both +5 V and GND
- * inside the programmer.  I don't understand this.  there are Vishay
- * MDP1605 331/471G resistor arrays on the board beside the ribbon cable
- * pin header which I assume are terminating the cable.  they should have
- * 330 Ohm / 470 Ohm 2% resistors in them, one to +5 V and one to GND.  I'm
- * not sure which resistor goes in which direction, but neither should be
- * only 200 Ohm.  in any case, there are termination resistors to both the
- * positive supply rail and ground, so regardless of what the values are
- * there are a number of consequences:
- *
- * 1.  with the FX2 chip powered down, all I/O lines should be pulled to
- * approximately 2.5 V by these resistors.  I had previously believed that
- * this is a problem for the FX2, because I got the impression from
- * something that its inputs must not be driven when the chip is powered
- * off, i.e., they must not be raised to a potential above the supply
- * voltage.  however, more recently I've rechecked the documentation and I
- * don't see that restriction, and anyway that would make them not 5 V
- * tolerant if it was true (the chip runs on 3.3 V).  the only restriction
- * is that the GPIO lines must not have more than 5 V to ground placed on
- * them, but there is no statement about the chip being powered when this
- * happens.  I now believe it is safe to power the programmer before
- * powering the FX2 chip.
- *
- * 2.  when an FX2 output pin is pulled low, there is only a 200 Ohm
- * resistor between it and a +5 V rail, so 25 mA of current will flow.
- * when pulled high, to about 3 V, it's only between 0.25 V and 0.5 V above
- * the potential of that node in the termination resitor array, with a 200
- * Ohm resistance to ground, so much less current will flow, about 2 mA.
- * the chip can only source or sink a maximum of 4 mA on any GPIO pin, so
- * it should have no trouble pulling the programmer's inputs to logic high
- * levels, but will not be able to pull them to logic low levels.  even if
- * I'm wrong about the resistances, and the resistor package markings give
- * the correct values, the difference is only about a factor of 2, so the
- * chip must still sink about 12 mA and source 1 mA on every GPIO line, so
- * no matter what the correct resistance really is the chip will struggle
- * to pull pins to logic low.  to work with an unmodified ALLPRO88
- * programmer, buffer circuits will be needed.  alternatively, the
- * termination resistors could be removed from the ALLPRO's motherboard
- * altogether, maybe replaced with something comfortably above 1.3 kOhm.
- * the Vishay datasheet says there are resistor arrays in all kinds of
- * values, but neither digikey, nor mouser, nor marutsu sells the MDP1605
- * configuration in higher than a 680 Ohm / 680 Ohm variant, which would
- * still not be high enough.
- *
- * I removed the termination resistors from my unit.  I replaced them with
- * sockets, so they can be re-installed or removed again easily.  they are
- * not needed in my case, anyway, because I have connected the FX2 board
- * directly to the pin header on the ALLPRO's motherboard, inside the unit,
- * so there's no ribbon cable inductance or capacitance, and only a short
- * physical signal path between the FX2's GPIO pins and the ALLPRO's bus
- * interface chips.  this also means I don't have to worry about the order
- * in which I apply power to things.  the 74LS series bus driver chips
- * tolerate normal input voltages even without power supplied to the chips,
- * so the FX2 can be powered on and driving the ALLPRO's inputs without
- * damaging them even when the ALLPRO is powered off.
- *
- * ultimately, I ended up using one of the empty sockets to get +5 V and
- * GND into a custom FX2 based controller board, which gave me even more
- * reason to want the resistor arrays removed.
  */
 
 
-#define ALLPRO88_DATA_FLOAT do { OEB = 0x00; } while(0)
-#define ALLPRO88_DATA_DRIVE do { OEB = 0xff; } while(0)
-#define ALLPRO88_DATA IOB
-#define ALLPRO88_ADDRCTRL_DRIVE do {OEA = 0xff ; OED = 0x1f; } while(0)
 inline static void ALLPRO88_ADDR_SET(WORD addr)
 {
 	/* the low byte of the 12 bit address */
@@ -276,55 +201,125 @@ inline static void ALLPRO88_ADDR_SET(WORD addr)
 /*
  * read a byte from the ALLPRO 88.  notes on timing:
  *
- * 74HCT251 (pin driver comparator output register).  the comparator
- * outputs are always present on the data inputs so there is no switching
- * time to account for in that regard.  the select lines are driven by the
- * pin driver address bus which is synthesized from the external address
- * bus by TIBPAL16L8-25CN programmable logic devices which have a 25 ns
- * maximum propogation delay.  from select pins settling to output pin
- * being valid is at most about 50 ns, and from output enable pin to output
- * bin being valid is at most about 38 ns, which likely can be assumed to
- * occur concurrently.  the output enable is generated from the /RD line
- * and a board /SELECT line produced by the same programmable logic
- * devices.  these propogate through two 74HCT02 quad nor gate elements
- * before driving the output enable line, which adds an additional 52 ns of
- * delay.  from external address bus being set to 74HCT251 being ready to
- * respond to /RD is a total of about 75 ns;  from /RD being pulled low to
- * the chip's output being valid is about 90 ns.  I see no reason why this
- * can't all be occuring concurrently.  in the worst case scenario the data
- * bus undergoes some rapid switching as the HCT251's output enable goes
- * active before its select logic has settled, but as long as the receiving
- * end waits appropriately long for the dust to settle it should be fine.
- * anyway, at least 1 instruction cycle (83 ns) must elapse between setting
- * the address bus and pulling /RD low, and adding the two stages of nor
- * gate delay to that the output enable signal almost certainly can't go
- * active until after the select logic has had time to settle.
+ * 74HCT251 (8-to-1 multiplexer used as pin driver comparator register).
+ * the comparator outputs are always present on the muxer's inputs so there
+ * is no switching time to account for in that regard.  the muxer's select
+ * lines are driven by the pin driver address bus which is synthesized from
+ * the external address bus by TIBPAL16L8-25CN programmable logic devices
+ * which have a 25 ns maximum propogation delay.  from the muxer's select
+ * pins settling to output pin being valid is at most about 50 ns, and from
+ * output enable pin to output pin being valid is at most about 38 ns,
+ * but these two processes likely can occur concurrently (if the select
+ * pins and output enable are all activated simultaneously, it will take 50
+ * ns for the output to be valid, not 88 ns).  the output enable is
+ * generated from the /RD line and a board /SELECT line produced by the
+ * same programmable logic devices.  these propogate through two 74HCT02
+ * quad nor gate elements before driving the output enable line, which adds
+ * an additional 52 ns of delay.  from external address bus being set to
+ * 74HCT251 being ready to respond to /RD is a total of about 75 ns;  from
+ * /RD being pulled low to the chip's output being valid is about 90 ns.  I
+ * see no reason why this can't all be occuring concurrently.  in the worst
+ * case scenario the data bus undergoes some rapid switching as the
+ * HCT251's output enable goes active before its select logic has settled,
+ * but as long as the receiving end waits appropriately long for the dust
+ * to settle it should be fine.  anyway, at least 1 instruction cycle (83
+ * ns) must elapse between setting the address bus and pulling /RD low, and
+ * adding the two stages of nor gate delay to that the output enable signal
+ * almost certainly can't go active until after the select logic has had
+ * time to settle.
  *
  * the HCT251's output is buffered by a 74LS245 transceiver with an 8 ns
- * propagation time and about 25 ns time to change direction, so from
- * the chip's output settling to it appearing on the programmer's external
- * data bus there is an additional 32 ns.
+ * propagation time and about 25 ns time to change direction, which occurs
+ * when /RD is pulled low, so from the 8-to-1 muxer chip's output settling
+ * to it appearing on the programmer's external data bus there is an
+ * additional 32 ns.
+ *
+ * address bus -to- HCT251's select pins valid = 25 ns
+ * address bus -to- board /SELECT valid = 25 ns
+ * /RD, /SELECT -to- HCT251 output enable valid = 52 ns
+ * /RD -to- LS245 direction change complete = 25 ns
+ * HCT251 output enable, select pins -to- output valid = 50 ns
+ * HCT251 output valid -to- FX2 input valid = 8 ns
+ *
+ * altogether (not to scale):
+ *
+ *            | >=25 ns |
+ * ADDR ------<========================>-------
+ *  /RD -----------------______________--------
+ *                      |
+ * DATA ---------------------------<======>----
+ *                      | >=110 ns |
+ *
+ * set address bus, wait 25 ns, pull /RD low, wait 110 ns, latch data bus,
+ * release /RD and address bus
+ *
+ * at 48 MHz:
+ *	110 ns = 5.3 periods (round up to 6 = 125 ns)
+ *
+ * one fx2 instruction cycle is 4 clock cycles, or about 83.3 ns, so the
+ * time between setting the address bus ports and triggering the GPIF
+ * waveform (several instruction cycles) is already much longer than the
+ * minimum 25 ns address bus setup time, so no explicit delay for the
+ * address bus setup time is included anywhere.
+ *
+ * default single-byte read waveform is in descriptor 2
+ *
+ * S0 = don't sample data bus, pull /RD and /ACT low, hold for 6 cycles
+ * S1 = sample data bus, pull /RD and /ACT low, uncond. branch to S7
+ * S2 = not used
+ * S3 = not used
+ * S4 = not used
+ * S5 = not used
+ * S6 = not used
+ * S7 = reserved (go to idle state)
+ *
+ * NOTE:  normally the waveform microcode is generated by a
+ * Cypress-supplied windows program.  I don't have access to that program,
+ * nor to a windows system on which to run it, so I have to construct the
+ * microcode by hand.  the microcode format is adequately documented, but I
+ * have found *ZERO* documentation on what the contents of the S7 state
+ * should be.  all reference manuals I have found simply say "reserved".
+ * in my first attempts I left it all zeros and things didn't work right.
+ * apart from not knowing what the S7 vector should be set to, I had other
+ * bugs in my microcode, and altogether the result was enough to damage my
+ * ALLPRO88.  in fixing the GPIF microcode, to find clues about what the S7
+ * vector should be set to, I looked for, and found, example waveform
+ * microcode in various FX2 projects sprinkled around online here and
+ * there.  I fixed my other microcode bugs, and tweaked the S7 state code
+ * based on what I had found online, all at the same time.  the microcode
+ * now works well.  I'm afraid to experiment with the S7 state vector to
+ * see what of it is necessary, so I've left it as is.  in all examples I
+ * found, the "length" was 7, the "opcode" was 0, the "logic" was 0x3f, and
+ * the "output" was set to whatever state the control lines should be in in
+ * the idle state.
  */
+
+
+static const BYTE gpif_read_waveform[] = {
+/*            S0    S1    S2    S3    S4    S5    S6    S7 */
+/* length */ 0x06, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+/* opcode */ 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+/* output */ 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+/* logic  */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3f
+};
 
 
 static BYTE allpro88_read(WORD addr)
 {
-	BYTE data;
-
-	/* set data bus for input */
-	ALLPRO88_DATA_FLOAT;
-	/* drive address and pull /RD low.  no delay between the two is
-	 * used, the instruction timing is sufficient.  */
+	/* wait until GPIF "done" bit is set */
+	while(!GPIFDONE);
+	/* drive address */
 	ALLPRO88_ADDR_SET(addr);
-	GPIFIDLECTL = 0x01;
-	/* wait 83.3 ns for gate delays and bus settling */
-	NOP;
-	/* latch data bus */
-	data = ALLPRO88_DATA;
-	/* raise /RD */
-	GPIFIDLECTL = 0x07;
-
-	return data;
+	/* immediately trigger GPIF single byte read using a dummy read
+	 * operation.  no delay is required, instruction cycle time is
+	 * sufficient delay. */
+	/* FIXME:  does the compiler turn this into a read operation?
+	 * 2024-07-23 w/ SDCC 4.4.0 the answer is yes. */
+	(void) XGPIFSGLDATLX;
+	/* wait until GPIF "done" bit is set */
+	while(!GPIFDONE);
+	/* retrieve the data */
+	return XGPIFSGLDATLNOX;
 }
 
 
@@ -341,7 +336,8 @@ static BYTE allpro88_read(WORD addr)
  * 30 ns after /WR is raised.  the /XFER timings are essentially identical,
  * except the data bits in question are the outputs of the input latch not
  * the external data bus, so the latch must have had latched the data at
- * least 320 ns prior to a low-to-high transition of /XFER, etc.
+ * least 320 ns (3.84 instruction cycles) prior to a low-to-high transition
+ * of /XFER, etc.
  *
  * 74HCT273 octal latches (pin driver config registers).  data is latched
  * on low-to-high transition of clock (/WR line).  /WR must be held low for
@@ -357,9 +353,11 @@ static BYTE allpro88_read(WORD addr)
  *
  * the data bus is buffered by a 74LS245 transceiver with an 8 ns
  * propagation time and about 25 ns time to change direction, and on the
- * pin driver modules by a 74HCT244 with a 13 ns propagation time, so from
- * when the data bus is set it takes a worst-case time of about 46 ns
- * before the value appears on the input pins to a device.
+ * pin driver modules by a 74HCT244 with a 13 ns propagation time.  the
+ * direction of the 74LS245 is controlled by the /RD line and so there is
+ * no change-of-direction delay when only a write is occuring.  so from
+ * when the data bus is set it takes about 46 ns before the value appears
+ * on the input pins to a device.
  *
  * the /WR lines for the pin driver DAC chips and pin driver HCT273 config
  * latches are synthesized from the pin driver address bus by 74HCT138
@@ -367,48 +365,70 @@ static BYTE allpro88_read(WORD addr)
  * the pin driver address lines are synthesized from the external address
  * by TIBPAL16L8-25CN programmable logic devices which have a 25 ns maximum
  * propogation delay, so from when the address bus is set it takes about
- * 100 ns before the /WR signal will be routed to the correct physical
- * chip.  for the HCT273's, there's an additional 74HCT02 quad nor gate
- * used as an inverter delaying one of the address lines, but because the
- * HCT273 has negligible setup and hold requirements compared to the
+ * 65 ns before the /WR signal will be routed to the correct physical chip.
+ * for the HCT273's, there's an additional 74HCT02 quad nor gate used as an
+ * inverter delaying one of the address lines by about 26 ns, but because
+ * the HCT273 has negligible setup and hold requirements compared to the
  * DAC0832 chips we don't bother adding anything extra for that.
  *
- * at 48 MHz, a clock cycle is about 21 ns.  the fx2's NOP instruction is 1
- * "instruction cycle", which the documentation says is 4 clock cycles =
- * 83.3 ns.  therefore, 6 NOP = 0.5 us.  kevtris' documentation also speaks
- * of inserting a 0.5 us pause in the I/O cycle, but doesn't say in what
- * part of it exactly (read, write, setup, hold?).  the DAC0832 setup time
- * for writes is likely what he means.
+ * altogether (not to scale):
+ *
+ *            | >=65 ns    |
+ * ADDR ------<==================================>-------
+ *  /WR --------------------__________-------------------
+ *                         | >=500 ns |
+ * DATA ---------<===============================>-------
+ *               | >=75 ns |          | >= 30 ns |
+ *
+ * set address bus, set data bus, wait 75 ns, pull /WR low, wait 500 ns,
+ * raise /WR, wait 30 ns, release buses.
+ *
+ * at 48 MHz:
+ *	500 ns = 24.0 periods
+ *	75 ns = 3.6 periods
+ *	65 ns = 3.2 periods
+ *	30 ns = 1.4 periods
+ *
+ * one fx2 instruction cycle is 4 clock cycles, or about 83.3 ns, so the
+ * time between setting the address bus ports and triggering the GPIF
+ * waveform (a minimum of 1 instruction) is already longer than the minimum
+ * 65 ns address bus setup time, but then the data bus setup delay included
+ * in the waveform model provides another 75 ns on top of that, so there's
+ * more than enough altogether.
+ *
+ * default single-byte write waveform is in descriptor 3
+ *
+ * S0 = drive data bus, ctl lines high, hold for 1 clock cycle
+ * S1 = drive data bus, ctl lines high, hold for 1 clock cycle
+ * S2 = drive data bus, ctl lines high, hold for 1 clock cycle
+ * S3 = drive data bus, ctl lines high, hold for 1 clock cycle
+ * S4 = drive data bus, pull /WR and /ACT low, hold for 24 clock cycles
+ * S5 = drive data bus, ctl lines high, hold for 1 clock cycle
+ * S6 = drive data bus, ctl lines high, hold for 1 clock cycle
+ * S7 = reserved (go to idle state)
  */
+
+
+static const BYTE gpif_write_waveform[] = {
+/*            S0    S1    S2    S3    S4    S5    S6    S7 */
+/* length */ 0x01, 0x01, 0x01, 0x01, 0x18, 0x01, 0x01, 0x07,
+/* opcode */ 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x00,
+/* output */ 0x07, 0x07, 0x07, 0x07, 0x04, 0x07, 0x07, 0x07,
+/* logic  */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3f
+};
 
 
 static void allpro88_write(WORD addr, BYTE data)
 {
-	/* drive address.  100 ns must elapse before the internal
-	 * electronics can be assumed to have figured out how to respond to
-	 * this, which is about 1.5 instruction cycles.  we assume the time
-	 * spent configuring the data bus takes at least this much time */
+	/* wait until GPIF "done" bit is set */
+	while(!GPIFDONE);
+	/* drive address.  the waveform starts with a 75 ns hold time after
+	 * setting the data bus, and the additional instruction cycle delay
+	 * to trigger the GPIF waveform provides more than enough total
+	 * hold time for the address bus */
 	ALLPRO88_ADDR_SET(addr);
-	/* drive data bus.  about 46 ns is required before this can be
-	 * assumed to be present on any device (about 0.5 instruction
-	 * cycles), plus whatever time is required for it to actually
-	 * stabilize.  one NOP used for the AD7226 setup time is 30 ns
-	 * longer than needed, and there is the time required to actually
-	 * execute the pull-/WR-low instruction, which together should
-	 * provide enough total wait time for the data bus to propogate and
-	 * settle, but rather than risk it I put a second NOP in (167 ns
-	 * total). */
-	ALLPRO88_DATA = data;
-	ALLPRO88_DATA_DRIVE;
-	NOP; NOP;
-	/* pull /WR low.  clocks AD7226s */
-	GPIFIDLECTL = 0x04;
-	/* hold data and /WR for 500 ns.  DAC0832 setup time */
-	NOP; NOP; NOP; NOP; NOP; NOP;
-	/* raise /WR.  clocks HCT273s and DAC0832s */
-	GPIFIDLECTL = 0x07;
-	/* don't worry about final hold time.  firmware not fast enough to
-	 * violate it. */
+	/* trigger GPIF single byte write */
+	XGPIFSGLDATLX = data;
 }
 
 
@@ -630,21 +650,20 @@ static void allpro88_hard_reset(void)
 
 	/*
 	 * the /RESET line clears all configuration registers (octal latch
-	 * chips) back to 0.  we pull it low (active), clear data, address
-	 * and control buses to a known safe state, wait a while, then
-	 * raise /RESET to take the circuitry out of hardware reset.  we
-	 * leave the data bus floating (but internally, within the FX2, set
-	 * to 0), the address bus set to 0, and /RD, /WR and /RESET all
-	 * high (inactive).
+	 * chips) back to 0.  that disables all channel outputs, and turns
+	 * off all power supplies.  we pull it low (active), ensure the /RD
+	 * and /WR control lines (and /ACT) are high (inactive), wait a
+	 * while, then raise /RESET to take the circuitry out of hardware
+	 * reset.  the data bus is floating during all of this.  finally,
+	 * the address bus set to 0, and /RESET set high (inactive) taking
+	 * the harware out of reset.
 	 */
 
-	/* hold /RESET low */
+	/* set /RESET low */
 	ALLPRO88_NRESET = 0;
-	/* set /ACT, /RD, /WR high */
+	/* abort any pending waveforms, set /ACT, /RD, /WR high */
+	GPIFABORT = 0xFF;
 	GPIFIDLECTL = 0x07;
-	/* set data bus to all zero, but float it */
-	ALLPRO88_DATA_FLOAT;
-	ALLPRO88_DATA = 0;
 	/* wait a while (1 ms) */
 	delay(1);
 	/* zero the address bus (raises /RESET) */
@@ -672,12 +691,9 @@ static void allpro88_hard_reset(void)
 	allpro88_xfer_PINDACs();
 
 	/*
-	 * zero and float the data bus again.  zero the address bus.  leave
-	 * /RD, /WR and /RESET high.
+	 * zero the address bus (leave /RESET high).
 	 */
 
-	ALLPRO88_DATA_FLOAT;
-	ALLPRO88_DATA = 0;
 	ALLPRO88_ADDR_SET(0);
 }
 
@@ -769,7 +785,7 @@ void main_init(void)
 	/* set both IFCLK and CPU CLK to 48 MHz */
 
 	SETCPUFREQ(CLK_48M);
-	SETIF48MHZ();
+	/*SETIF48MHZ();*/	/* done below when IFCONFIG is set */
 
 	/* set 3 LSBs of CKCON register to 0 to reduce read/write strobe
 	 * duration for MOVX instruction to minimum to increase data memory
@@ -777,36 +793,11 @@ void main_init(void)
 
 	CKCON &= 0xf8;
 
-	/* configure I/O ports.  clear bits 0 and 1:  ports B and D are I/O
-	 * ports, not FIFO data bus.  port A all pins for I/O port, disable
-	 * alternate functions.  CTL[0:3] set to open-drain mode. */
+	/* enable autopointers.  for both, increment on access. */
 
-	IFCONFIG = 0x80;
-	PORTACFG = 0;
-	GPIFCTLCFG = 0x07;
+	AUTOPTRSETUP = 0x07;
 
-	/* ALLPRO88:  zero data bus, address bus, pull /RESET low, and set
-	 * /RD, /WR and /ACT high.  NOTE:  the purpose is not to
-	 * necessarily set the pin states at this stage, only to set their
-	 * configurations into a known state.  they will be enabled for
-	 * output as needed in the next step */
-
-	IOA = 0x00;
-	IOB = 0x00;
-	IOD = 0x00;
-	GPIFIDLECTL = 0x07;
-
-	/* float the data bus pins in case the programmer is driving them.
-	 * set address and control bus pins for output (if it isn't
-	 * already, this now for real pulls /RESET low, putting programmer
-	 * into reset state) */
-
-	ALLPRO88_DATA_FLOAT;
-	ALLPRO88_ADDRCTRL_DRIVE;
-
-	/* programmer hardware reset */
-
-	allpro88_hard_reset();
+	/* configure endpoints */
 
 	/* I can't figure out what to set this to.  the documentation says
 	 * over and over that for basically every configuration you can
@@ -827,20 +818,89 @@ void main_init(void)
 
 	/* endpoints 2 and 6 enabled, 1, 4 and 8 disabled.  at power-on all
 	 * FIFO's default to AUTOIN=0 / AUTOOUT=0 meaning the CPU must
-	 * explicitly re-arm them for each packet.  that's what we want */
+	 * explicitly re-arm them for each packet.  that's what we want.
+	 * endpoints 2, 4, 6, 8 have a WORDWIDE bit that must be cleared to
+	 * 0 (see below). */
 
 	EP1OUTCFG = 0;
-	SYNCDELAY;
 	EP1INCFG = 0;
-	SYNCDELAY;
+	EP2CFG = 0b10100010;	/* valid, out, bulk, 512 bytes, dbl buff'd */
 	EP4CFG = 0;
-	SYNCDELAY;
+	EP6CFG = 0b11100010;	/* valid, in, bulk, 512 bytes, dbl buff'd */
 	EP8CFG = 0;
 	SYNCDELAY;
-	EP2CFG = 0b10100010;	/* valid, out, bulk, 512 bytes, dbl buff'd */
+	EP2FIFOCFG &= ~bmWORDWIDE;
 	SYNCDELAY;
-	EP6CFG = 0b11100010;	/* valid, in, bulk, 512 bytes, dbl buff'd */
+	EP4FIFOCFG &= ~bmWORDWIDE;
 	SYNCDELAY;
+	EP6FIFOCFG &= ~bmWORDWIDE;
+	SYNCDELAY;
+	EP8FIFOCFG &= ~bmWORDWIDE;
+	SYNCDELAY;
+
+	/* configure GPIF
+	 * IFCONFIG bits:
+	 *	7:	1 = GPIF clock source is internal
+	 *	6:	1 = GPIF clock is 48 MHz
+	 *	5:	0 = disable clock output
+	 *	4:	0 = clock polarity is default
+	 *	3:	1 = GPIF in async mode (CTL are R/W strobes)
+	 *	2:	0 = default (not used for this chip version)
+	 *	1, 0:	1,0 = GPIF master, port B is data bus low byte
+	 * NOTE: to *not* use port D as the data bus high byte (to use it
+	 * as a GPIO port), all WORDWIDE config bits must be set to 0.
+	 * they default to 1, so they had to be cleared above.
+	 *
+	 * set CTL[0:2] (/WR, /ACT, /RD) to open-drain mode, and set their
+	 * idle states high.  by default, the data bus is tri-stated when
+	 * idle.
+	 *
+	 * NOTE:  GPIF waveforms cannot be loaded until the part is in GPIF
+	 * mode.
+	 */
+
+	IFCONFIG = 0xCA;	/* 0b11001010 */
+	GPIFABORT = 0xFF;	/* abort any pending waveforms */
+	GPIFCTLCFG = 0x07;	/* /WR, /ACT, /RD non-tristate, open-drain */
+	GPIFIDLECTL = 0x07;	/* /WR, /ACT, /RD high when idle */
+
+	/*
+	 * install waveform data.  default single read waveform at offset
+	 * 2, single write waveform at offset 3.
+	 */
+
+	{
+	BYTE i;
+	for(i = 0; i < 32; i++) {
+		(&GPIF_WAVE_DATA)[64 + i] = gpif_read_waveform[i];
+		(&GPIF_WAVE_DATA)[96 + i] = gpif_write_waveform[i];
+	}
+	}
+
+	/*
+	 * configure I/O ports.  port A (address bus low byte) all pins for
+	 * I/O port, disable alternate functions.  zero ALLPRO88 address
+	 * bus, pull /RESET low.  NOTE:  the power-on default state for the
+	 * ports is input mode, so at this stage the pins are tri-stated.
+	 * we are not actually setting their states, we are setting what
+	 * state they will be driven to when we switch them to output mode
+	 * in the next step.  finally, configure address bus and /RESET
+	 * GPIO pins for output set address and control bus pins for output
+	 * (if it isn't already, this now for real pulls /RESET low,
+	 * putting programmer into reset state)
+	 */
+
+	PORTACFG = 0;
+	IOA = 0x00;	/* address bus low byte = 0 */
+	IOD = 0x00;	/* address bus high nibble = 0, set /RESET = 0 */
+	OEA = 0xff;	/* address bus low byte output enable */
+	OED = 0x1f;	/* address bus high nibble, /RESET output enable */
+
+	/* now we can control the programmer through its interface bus.  it
+	 * is currently held in the reset state.  perform a full hardware
+	 * reset */
+
+	allpro88_hard_reset();
 
 	/* arm end-point 2.  I don't know why this has to be done twice.  I
 	 * think it's because the chip boots up believing the buffers are
@@ -854,10 +914,6 @@ void main_init(void)
 
 	arm_out_endpoint();
 	arm_out_endpoint();
-
-	/* enable autopointers.  for both, increment on access. */
-
-	AUTOPTRSETUP = 0x07;
 
 	/* set up WAKEUP pin handling.  WAKEUP pin is used to monitor USB
 	 * VBUS:  high = USB VBUS is present, low = USB VBUS has been lost,
