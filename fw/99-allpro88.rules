@@ -1,0 +1,4 @@
+# update idVendor and idProduct if needed
+ACTION!="add|change", GOTO="allpro88_end"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="000c", MODE="666"
+LABEL="allpro88_end"
