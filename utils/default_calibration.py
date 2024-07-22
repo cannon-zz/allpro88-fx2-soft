@@ -1,0 +1,31 @@
+import math
+import numpy
+import yaml
+
+#
+# Using measured VDAC calibration data for a unit, compute a typical
+# calibration function to be used as the default VDAC curve for
+# un-calibrated units.
+#
+
+def geometric_mean(vec):
+	return math.exp(numpy.log(vec).mean())
+
+cal_data = yaml.unsafe_load(open("calibration.dat"))
+
+vdac_ramp_cal = {"min": [], "poly": []}
+
+for i in range(48):
+	channel_cal = cal_data["channel%02d" % i]["vdac_ramp_cal"]
+	vdac_ramp_cal["min"].append(channel_cal["min"])
+	vdac_ramp_cal["poly"].append(channel_cal["poly"])
+vdac_ramp_cal["min"] = numpy.median(vdac_ramp_cal["min"])
+
+def coeff(polys, n):
+	return [poly[n] for poly in polys]
+
+vdac_ramp_cal["poly"] = (
+	numpy.median(coeff(vdac_ramp_cal["poly"], 0)),
+	numpy.median(coeff(vdac_ramp_cal["poly"], 1)),
+	numpy.median(coeff(vdac_ramp_cal["poly"], 2))
+)
