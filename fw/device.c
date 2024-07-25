@@ -762,6 +762,7 @@ inline static void arm_out_endpoint(void)
 	 * FIFO interface.  we aren't using the FIFO interface, we're using
 	 * the pins for GPIO, so we must always set this bit to 1 when
 	 * re-arming. */
+	SYNCDELAY;
 	EP2BCL = 0x80;
 	SYNCDELAY;
 }
@@ -773,6 +774,7 @@ inline static void arm_in_endpoint(void)
 	 * from the start of the buffer.  write byte-count high byte first.
 	 * end-point is armed when low byte is written */
 	WORD n = MAKEWORD(AUTOPTRH2, AUTOPTRL2) - EP6FIFOBUF;
+	SYNCDELAY;
 	EP6BCH = MSB(n);
 	SYNCDELAY;
 	EP6BCL = LSB(n);
@@ -992,6 +994,7 @@ static void reset_fifos(void)
 	RESETFIFO(0x02);
 	RESETFIFO(0x06);
 #else
+	SYNCDELAY;
 	FIFORESET = 0x80;
 	SYNCDELAY;
 	FIFORESET = 0x06;
