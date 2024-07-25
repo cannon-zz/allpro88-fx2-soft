@@ -1419,17 +1419,21 @@ inline static BOOL in_buffer_not_full(void)
  * command format.  all numbers are in base 16, only upper-case numerals
  * are recognized, and the numbers must be the width indicated (with
  * leading 0's as needed).  all commands are terminated by newline, \n,
- * 0x0a.  commands may not straddle packet boundaries.
+ * 0x0a.  a packet may contain multiple commands, their outputs will be
+ * concatenated into a single response packet.  commands may not straddle
+ * packet boundaries.
  *
  * =XXXXYY	write YY to address XXXX
- * ?XXXX	read address XXXX, report the value
+ * ?XXXX	read address XXXX, report the value as YY
  * BXT<cmd>	bus commands, use bus number X for command.  bus type, T,
  *		is one of 'P' (parallel bus), FIXME add more
  * EXXXX	echo the number XXXX (loop-back test)
- * MXX		run voltage measurement sequence on channel XX, report VTH DAC
+ * MXX		run voltage measurement sequence on channel XX, report VTH
+ *		DAC as YY
  * PXXYYYYAABB	pulse channel XX to state AA for YYYY microseconds,
  *		returning to state BB
- * V  		run VADJ voltage measurement sequence report VADJTH DAC
+ * V  		run VADJ voltage measurement sequence report VADJTH DAC as
+ *		YY
  *
  * bus commands:
  *
@@ -1439,7 +1443,7 @@ inline static BOOL in_buffer_not_full(void)
  *	tt : pin configuration register value for "true" state
  *	ff : pin configuration register value for "false" state
  *	zz : pin configuration register value for "float" state
- *	ww : width of bus in bits, 1 <= width <= 32
+ *	ww : width of bus in bits, 0x01 <= width <= 0x20
  *	C1..CN : channel number for bit n (least significant to most
  *		significant).  must supply exactly as many as the bus width
  *		(no more, no less).
