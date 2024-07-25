@@ -24,3 +24,5 @@ BASENAME=firmware
 
 include ../lib/fx2.mk
 
+serial.a51 :
+	uuidgen | python3 gen_serial.py >serial.a51

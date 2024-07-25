@@ -719,6 +719,28 @@ class allpro88(object):
 		return False
 
 
+	@property
+	def serial_number(self):
+		"""
+		The serial number reported by the USB interface's firmware,
+		as a string.  This is not necessarily the historical serial
+		number of the programmer hardware, nor is it necessarily a
+		"number", or in any specific format, although it is
+		expected to be a string that is suitable for use in
+		constructing file names and messages for users.  The
+		purpose is to provide an ID unique to each programmer so
+		calibration files and other hardware-specific data can be
+		associated with the correct device, in the event that more
+		than one unit is conencted to or available to a given host.
+		The value is chosen at firmware compile time, and by
+		default it is a UUID, but the developer could choose to set
+		it manually to the programmer's original serial number for
+		consistency and/or nostalgia, if that number is known (if
+		the sticker hasn't been lost).
+		"""
+		return self.device.serial_number
+
+
 	def get_unused_bus(self, bus_obj = None):
 		# NOTE:  the range() must match the size of the bus
 		# definition array in the firmware source

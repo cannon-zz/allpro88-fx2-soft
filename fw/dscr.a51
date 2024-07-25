@@ -63,10 +63,10 @@ _dev_dscr:
 	.db	64			; packet size (ep0)
 	.dw	0x0912			; vendor id (https://pid.codes/)
 	.dw	0x0C00			; product id (https://pid.codes/1209/000C/)
-	.dw	0x0100			; version id
+	.dw	0x0002			; version id
 	.db	1			; manufacturure str idx
 	.db	2			; product str idx
-	.db	0			; serial str idx
+	.db	4			; serial str idx
 	.db	1			; n configurations
 dev_dscr_end:
 
@@ -263,6 +263,8 @@ _string3:
 	.ascii	'O'
 	.db	0
 string3end:
+
+.include "serial.a51"
 
 _dev_strings_end:
 	.dw 0x0000	; just in case someone passes an index higher than the end to the firmware
