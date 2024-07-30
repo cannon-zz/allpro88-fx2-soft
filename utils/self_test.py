@@ -1,3 +1,4 @@
+import argparse
 import matplotlib
 from matplotlib import figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -482,9 +483,24 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 
+def parse_command_line():
+	parser = argparse.ArgumentParser(
+		description = "ALLPRO88 Self Test"
+	)
+	parser.add_argument("-c", "--channel", metavar = "number", type = int, choices = range(88), action = "append", help = "Test only this channel (integer in [0, 87] inclusively).  May be specified multiples times.  If not specified, all channels are tested in sequence.")
+	options = parser.parse_args()
+	if options.channel is None:
+		options.channel = list(range(48))
+	return options
+
+
+options = parse_command_line()
+
+
 calibration = {
 	"vpul_ramp_cal": []
 }
+
 with allpro88.allpro88(calibration_file = open("calibration.dat")) as programmer:
 	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected"))
 
@@ -496,7 +512,7 @@ with allpro88.allpro88(calibration_file = open("calibration.dat")) as programmer
 	# VADJ = max
 	programmer.vadj = 255
 
-	for channel in range(48):
+	for channel in options.channel:
 		calibration_name = "channel%02d" % channel
 		calibration[calibration_name] = {}
 
