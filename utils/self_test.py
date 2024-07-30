@@ -121,7 +121,29 @@ class channel_driver_test_suite(object):
 		onto the channel by the same analogue circuity used to
 		drive the clock signal onto the channel.  If a clock signal
 		can be delivered but not the "TTL high" signal, the
-		analogue electronics is not at fault.
+		analogue electronics is not at fault, the fault is in the
+		digital decode logic.
+
+		A small, approximately 10 Ohm, resistor is in series with
+		the TTL high output, so loads cause the voltage to sag.
+		If, with no configured load, the output switches, but does
+		not achieve the expected voltage, suspect a partial short
+		to ground.  If the low TTL voltage problem is common to all
+		channels on the same pin driver board, suspect the
+		regulator or one or more stuck bits in the digital control
+		electronics.  If the problem is unique to a channel, then
+		checking the behaviour of that channel's VPUL and VTST
+		outputs (which are especially sensitive to current paths to
+		ground) can provide a clue as to the location of the fault.
+		If VPUL and VTST exhibit no unusual behaviour, the fault is
+		almost certainly the VTTL reverse protection diode, the
+		output transistor, or the demux driver chip, all on the
+		hybrid module.  Also suspect the VDAC output reverse
+		protection diode on the pin driver carrier board.  Enabling
+		both VDAC output and the ground-drive transistor overloads
+		this diode, possibly causing it to fail and thereafter
+		providing a path to ground through the VDAC power
+		transistor's emitter bias circuit.
 		"""
 		print("toggling channel %d LOGICL <--> LOGICH %d times:" % (self.channel.channel, trials))
 		lowest_hi, highest_lo = 100.0, 0.0
