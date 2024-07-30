@@ -169,7 +169,7 @@ class dacregister(object):
 
 	@staticmethod
 	def ensure_dac_value(dac):
-		# test type cast to int
+		# verify int compatibility
 		dac = int(dac)
 		# verify range
 		if not 0 <= dac <= 255:
