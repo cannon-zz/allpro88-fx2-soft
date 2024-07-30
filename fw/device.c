@@ -699,14 +699,22 @@ static void allpro88_hard_reset(void)
 
 
 /*
- * use a bisection search with VTH to measure the voltage on a channel
+ * use a bisection search with VTH to measure the voltage on a channel.
+ * returns the VTH DAC count value that sets VTH to within 1 LSB of the
+ * voltage on the given channel.
  *
- * NOTE:  VTH is, obviously, left modified by this operation
+ * NOTE:  VTH is left modified by this operation, it is left set to its
+ * approximation of the measured voltage.
  *
  * the VTH slew rate is about 2.5 V/us.  we need to ensure enough time
  * passes between setting VTH and reading the comparator state.  what's
- * here seems to be OK, but I've made no effort to ensure the timing is
- * good so watch for that if changes to this code are made.
+ * here seems to be OK, but I've not carefully tested it, nor am I certain
+ * I measured the slew rate correctly (it seems quite slow).  experiments
+ * seem to prove that the 60 NOPs are not required at all, but I've left
+ * them in just to be safe.  obviously only the first iteration would need
+ * them anyway, the second shouldn't need more than 30, the third not more
+ * than 15, and so on.  FIXME:  re-check the slew rate, and get rid of the
+ * NOPs if it's true they aren't needed.
  */
 
 
@@ -717,6 +725,13 @@ static BYTE allpro88_measure_pin_voltage(BYTE channel)
 	BYTE test_bit;
 	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
 		allpro88_set_VTH(vdac | test_bit);
+		/* 60 NOPs = 5 us pause = 12.5 V slew delay */
+		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
 		if(allpro88_read(addr) & 1)
 			vdac |= test_bit;
 	}
