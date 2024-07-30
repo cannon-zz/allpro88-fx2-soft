@@ -229,7 +229,7 @@ class channel_driver_test_suite(object):
 		# value?  "agree" = residual < 10 mV.  find the threshold
 		# where this occurs.
 		output_good = abs(model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32]) < 0.01
-		assert any(output_good), "cannot construct VPUL model:  no measured voltages are consistent with fit"
+		assert any(output_good), "cannot construct VPUL model:  no measured voltages are consistent with fit:\nx = %s\ny = %s\nresidual = %s" % (self.vpul_ramp_x[:32], self.vpul_ramp_y[:32], model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32])
 		threshold = max(i for i, val in enumerate(output_good) if not val) + 1
 		assert threshold >= 3
 		#for i in range(32):
