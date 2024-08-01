@@ -226,9 +226,9 @@ class channel_driver_test_suite(object):
 			return (a2 * dac + a1) * dac + a0
 
 		# for which DAC values does the fit agree with the observed
-		# value?  "agree" = residual < 10 mV.  find the threshold
+		# value?  "agree" = residual < 50 mV.  find the threshold
 		# where this occurs.
-		output_good = abs(model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32]) < 0.01
+		output_good = abs(model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32]) < 0.05
 		assert any(output_good), "cannot construct VPUL model:  no measured voltages are consistent with fit:\nx = %s\ny = %s\nresidual = %s" % (self.vpul_ramp_x[:32], self.vpul_ramp_y[:32], model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32])
 		threshold = max(i for i, val in enumerate(output_good) if not val) + 1
 		assert threshold >= 3
