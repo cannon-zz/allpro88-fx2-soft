@@ -653,8 +653,7 @@ static void allpro88_hard_reset(void)
 	 * chips) back to 0.  that disables all channel outputs, and turns
 	 * off all power supplies.  we pull it low (active), ensure the /RD
 	 * and /WR control lines (and /ACT) are high (inactive), wait a
-	 * while, then raise /RESET to take the circuitry out of hardware
-	 * reset.  the data bus is floating during all of this.  finally,
+	 * while.  the data bus is floating during all of this.  finally,
 	 * the address bus set to 0, and /RESET set high (inactive) taking
 	 * the harware out of reset.
 	 */
