@@ -154,36 +154,101 @@ class volt(float):
 class dacregister(object):
 	"""
 	Write a value to a DAC register.  Provides type conversion and
-	range checking to ensure the value written is allowed.
+	range checking to ensure the value written is allowed, and will
+	optionally apply a volts-to-DAC count calibration function.
 	"""
-	def __init__(self, address, transient = 0., cal = (lambda dac: dac * 25.5/256.)):
-		self.address = address
-		# transient response time.  for convenience, the DAC
-		# control proxy can enforce a delay after changing a DAC to
-		# give the respective voltage time to settle, so that that
-		# doesn't have to be added manually to every script
-		self.transient = transient
-		# calibration function mapping numeric DAC value to
-		# potential in volts
-		self.cal = cal
+	def __init__(self, address = None, transient = 0., cal_key = None):
+		# fixed register address, if known.  if not known, or None,
+		# the .address() method must be overridden.
 
-	@staticmethod
-	def ensure_dac_value(dac):
-		# verify int compatibility
-		dac = int(dac)
+		self._address = address
+
+		# transient response time in seconds.  for convenience,
+		# this code can enforce a pause after changing a DAC, to
+		# give the respective voltage time to slew.  this removes
+		# the need to include those pauses in calling code
+		# everywhere they are required.
+		#
+		# NOTE:  it is possible, and often convenient, to set
+		# various DACs before turning on the power supplies that
+		# drive the DACs, so that when power is applied the pins of
+		# a part ramp up in voltage together.  obviously when that
+		# is done the pause that should be included to allow for
+		# voltage slews needs to be inserted when the power
+		# supplies are turned on, not when the DAC register is set.
+		# with that example in mind, the inclusion of the transient
+		# pause feature here does not guarantee that all voltage
+		# slew pauses associated with a given DAC are necessarily
+		# accounted for.  thought should always be put into where a
+		# delay might still be needed.
+
+		self.transient = transient
+
+		# calibration function look-up key.  you might think it
+		# would make more sense to simply set the calibration
+		# function here directly instead of this nonsense of a key
+		# that we use to look up in a dictionary elsewhere.  the
+		# problem is that a descriptor (used to implement an
+		# attribute of a class) is only a single instance:  there
+		# is one instance of the descriptor class for the class
+		# definition to which it is attached, there is not a new
+		# instance of the descriptor for each instance of the
+		# class.  that means that data stored in the descriptor
+		# instance is shared across all instances of the class
+		# whose attribute it is being used to implement.  we cannot
+		# store any data here that we might want to configure
+		# differently for different programmers.  therefore we
+		# cannot put the calibration curve itself here, only a
+		# shared key used to look up the programmer-specific
+		# calibration function in a table stored elsewhere.
+
+		self.cal_key = cal_key
+
+	def address(self, obj):
+		# subclasses override this if they need something other
+		# than a single, known, fixed, address.
+		assert self._address is not None
+		return self._address
+
+	def cal(self, dac, obj):
+		"""
+		Convert DAC count to voltage.  If this descriptor was
+		initialized with cal_key set to None (the default) then a
+		default generic calibration function is used.  Otherwise,
+		obj.cal[self.cal_key] is retrieved, and the result of
+		passing the DAC value to that function is used as the
+		return value.
+		"""
+		if self.cal_key is None:
+			# default calibration
+			return dac * 25.5 / 256.
+		return obj.cal[self.cal_key](dac)
+
+	def __set__(self, obj, val):
+		"""
+		Set the DAC register.  If the value is a volt object, the
+		calibration function is applied to convert the voltage to
+		an integer count, which is then written to the DAC
+		register.  Otherwise, the value supplied is converted to an
+		integer, and then written to the DAC register.  In both
+		cases, before writing the integer DAC count to the register
+		it is confirmed to be in [0, 255].  If any of the
+		conversion steps or safety checks fail, an exception will
+		be raised, typically ValueError, but OverflowError and
+		others are possible depending on the nature of the failure.
+		"""
+		# if the calling code has given us a volt value, convert to
+		# DAC count
+		if type(val) is volt:
+			dac = self.invcal(val, obj)
+		else:
+			# verify int compatibility
+			dac = int(val)
 		# verify range
 		if not 0 <= dac <= 255:
 			raise ValueError("0 <= dac <= 255:  %d" % dac)
 		# OK
-		return dac
-
-	def __set__(self, obj, dac):
-		# if the calling code has given us a volt value, convert to
-		# DAC count
-		if type(dac) is volt:
-			dac = self.invcal(dac)
-		# write value to programmer register
-		obj.write_command("=", self.address, self.ensure_dac_value(dac))
+		obj.write_command("=", self.address(obj), dac)
 		time.sleep(self.transient)
 
 	def invcal(self, v):
@@ -205,15 +270,21 @@ class dacregister(object):
 			else:	# cal > v:
 				hi = dac
 		dac = round(dac)
-		assert 0 <= dac <= 255
+		assert type(dac) is int
 		# some calibration mappings predict a constant output below
 		# some threshold.  if we've chosen a DAC setting in such an
 		# interval, choose the lowest such DAC setting (typically
 		# 0, but check).
-		while dac and self.cal(dac - 1) == self.cal(dac):
+		while dac > 0 and self.cal(dac - 1, obj) == self.cal(dac, obj):
 			dac -= 1
-		assert 0 <= dac <= 255
 		return dac
+
+
+class vdacregister(dacregister):
+	# version of dacregister that gets the address dynamically from the
+	# object to which it is attached.
+	def address(self, obj):
+		return obj.address + 3
 
 
 class channel_proxy(object):
@@ -242,9 +313,20 @@ class channel_proxy(object):
 		else:
 			# only first 48 channels have bypass capacitors
 			self.bypass_address = None
-		# set calibration model.  3-tuple giving polynomial
-		# coefficients starting with highest order.
-		self.cal_data = cal_data
+		# set the calibration
+		self.set_cal(cal_data)
+
+	vdac = vdacregister(cal_key = "VDAC")
+
+	def write_command(self, *args, **kwargs):
+		# plumbing for the vdac descriptor
+		return self.programmer.write_command(*args, **kwargs)
+
+	def set_cal(self, cal_data):
+		poly2, poly1, poly0 = cal_data["poly"]
+		self.cal = {
+			"VDAC": (lambda dac: max(cal_data["min"], (poly2 * dac + poly1) * dac + poly0))
+		}
 
 	def __bool__(self):
 		"""
@@ -267,7 +349,7 @@ class channel_proxy(object):
 		measurements = []
 		for i in range(n):
 			vdac, = self.programmer.write_command("M", self.channel)
-			measurements.append(self.programmer.vth.cal(vdac))
+			measurements.append(self.programmer.vth.cal(vdac, self.programmer))
 		return numpy.median(measurements)
 
 	def pulse(self, microseconds, config, final_config):
@@ -305,8 +387,6 @@ class channel_proxy(object):
 		# clear response buffer
 		self.programmer.read_responses()
 
-	vdac = property(fset = lambda self, dac: self.programmer.write_command("=", self.address + 3, dacregister.ensure_dac_value(self.invcal(dac) if type(dac) is volt else dac)))
-
 	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
 
 	@property
@@ -324,11 +404,6 @@ class channel_proxy(object):
 		# capacitors on channels that don't have them.
 		if self.bypass_address is not None:
 			self.programmer.write_command("=", self.bypass_address, 1 if boolean else 0)
-
-	def cal(self, dac):
-		return max(self.cal_data["min"], (self.cal_data["poly"][0] * dac + self.cal_data["poly"][1]) * dac + self.cal_data["poly"][2])
-
-	invcal = dacregister.invcal
 
 	@property
 	def physical(self):
@@ -620,30 +695,6 @@ class allpro88(object):
 		# initialize their pin mappings
 		self.channels = [channel_proxy(self, i) for i in range(88)]
 
-		# load calibration data if provided
-		if calibration_file is not None:
-			cal_data = yaml.unsafe_load(calibration_file)
-			# per channel DACs
-			for i, channel in enumerate(self.channels):
-				try:
-					channel_cal_data = cal_data["channel%02d" % i]
-				except KeyError:
-					# no calibration data for this
-					# channel
-					continue
-				channel.cal_data = channel_cal_data["vdac_ramp_cal"]
-			# VPUL DAC
-			# FIXME:  since vpul is a class attribute, this
-			# affects all instances of the allpro88 object.
-			# for now we're assuming normal not-crazy people
-			# are only ever using a single programmer at a time
-			# (only own a single programmer) so this is fine,
-			# but we might want to find a way to promote this
-			# to an instance attribute when a custom
-			# calibration is supplied.
-			def vpul_cal_func(dac, cal_data = cal_data["vpul_ramp_cal"]):
-				return max(cal_data["min"], (cal_data["poly"][0] * dac + cal_data["poly"][1]) * dac + cal_data["poly"][2]) if dac >= cal_data["threshold"] else cal_data["min"]
-			self.vpul.cal = vpul_cal_func
 
 		# command queues
 		self.out_queue = []
@@ -661,6 +712,11 @@ class allpro88(object):
 
 		# keep track of what bus numbers are in use
 		self.bus = {}
+
+		# install calibration model (defaults if no calibration
+		# model file is provided)
+		self.cal = {}
+		self.set_calibration(calibration_file)
 
 
 	def __enter__(self):
@@ -717,6 +773,55 @@ class allpro88(object):
 
 		# done.  if an exception has occured, continue processing
 		return False
+
+
+	def set_calibration(self, calibration_file):
+		# first, install default calibrations.
+		#
+		# NOTE:  other code might grab and retain a reference to
+		# .cal, therefore do not delete it and create a new object
+		# but, instead, clear its contents and re-populate it with
+		# the new model.
+
+		self.cal.clear()
+
+		# programmer DAC curves
+		self.cal.update({
+			"VTH": (lambda dac: -1.01764700e-02 + 9.96709040e-02 * dac + 5.55818066e-07 * dac*dac),
+			"VADJ": (lambda dac: 0.371637285 + 0.117641953 * dac + -9.13385655e-07 * dac*dac),
+			"VPUL": (lambda dac: max(0., (7.14173430688944e-07 * dac + 0.09954692191382541) * dac + -0.7873764486422744))
+		})
+
+		# now overwrite with calibration model is one has been
+		# supplied
+
+		if calibration_file is None:
+			return
+		cal_model_data = yaml.unsafe_load(calibration_file)
+
+		# programmer DAC curves
+
+		# VPUL DAC
+		def vpul_cal_func(dac, cal_data = cal_model_data["vpul_ramp_cal"]):
+			poly2, poly1, poly0 = cal_data["poly"]
+			return max(cal_data["min"], (poly2 * dac + poly1) * dac + poly0) if dac >= cal_data["threshold"] else cal_data["min"]
+		self.cal["VPUL"] = vpul_cal_func
+
+		# per channel DAC curves
+
+		for i, channel in enumerate(self.channels):
+			try:
+				channel_cal_data = cal_model_data["channel%02d" % i]
+			except KeyError:
+				# no calibration data for this channel.
+				# e.g., this is not a full 88-channel unit.
+				# FIXME:  after figuring out how to
+				# determine which channels are installed,
+				# should add a check here to ensure that
+				# all installed channels get calibration
+				# data.
+				continue
+			channel.set_cal(channel_cal_data["vdac_ramp_cal"])
 
 
 	@property
@@ -867,15 +972,15 @@ class allpro88(object):
 	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
 
 
-	vsr = dacregister(0x0300, cal = (lambda dac: dac * 255./256. * 0.1))
-	#vth = dacregister(0x0301, cal = (lambda dac: dac * 255./256. * 0.1))
-	vth = dacregister(0x0301, cal = (lambda dac: -1.01764700e-02 + 9.96709040e-02 * dac + 5.55818066e-07 * dac*dac))
-	vadj = dacregister(0x0302, transient = 0.05, cal = (lambda dac: 0.371637285 + dac * 0.117641953 + dac**2. * -9.13385655e-07))
-	vadjth = dacregister(0x0303)
+	vsr = dacregister(address = 0x0300)
+	#vth = dacregister(address = 0x0301)
+	vth = dacregister(address = 0x0301, cal_key = "VTH")
+	vadj = dacregister(address = 0x0302, transient = 0.05, cal_key = "VADJ")
+	vadjth = dacregister(address = 0x0303)
 	# must call .load_dacs() for vpul changes
-	vpul = dacregister(0x0305, cal = (lambda dac: max(0., (7.14173430688944e-07 * dac + 0.09954692191382541) * dac + -0.7873764486422744)))
-	vtst = dacregister(0x0386)
-	itst = dacregister(0x0387)
+	vpul = dacregister(address = 0x0305, cal_key = "VPUL")
+	vtst = dacregister(address = 0x0386)
+	itst = dacregister(address = 0x0387)
 
 
 	def load_dacs(self, transient = 0.001):

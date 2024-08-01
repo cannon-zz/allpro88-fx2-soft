@@ -248,7 +248,7 @@ class channel_driver_test_suite(object):
 		def model(dac):
 			return (a2 * dac + a1) * dac + a0 if dac >= threshold else vpul_min
 
-		expected = numpy.fromiter(map(self.programmer.vpul.cal, self.vpul_ramp_x), "double")
+		expected = numpy.fromiter((self.programmer.vpul.cal(x, self.programmer) for x in self.vpul_ramp_x), "double")
 		max_residual = abs(self.vpul_ramp_y[threshold:] - expected[threshold:]).max()
 		rms_residual = ((self.vpul_ramp_y[threshold:] - expected[threshold:])**2.).mean()**0.5
 		failed = max_residual > 0.15
@@ -361,7 +361,7 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 		# report deviation from calibration model
-		expected = numpy.fromiter(map(self.channel.cal, self.vdac_ramp_x), "double")
+		expected = numpy.fromiter((self.channel.vdac.cal(x, self.channel) for x in self.vdac_ramp_x), "double")
 		max_residual = abs(self.vdac_ramp_y[2:] - expected[2:]).max()
 		rms_residual = ((self.vdac_ramp_y[2:] - expected[2:])**2.).mean()**0.5
 		failed = max_residual > 0.15
