@@ -111,6 +111,11 @@ class command(object):
 			assert val is None
 			self.cmd = "?%04X\n" % addr
 			self.need_response = True
+		elif verb == "C":
+			# retrieve installed channel-driver bit map
+			assert addr is None and val is None
+			self.cmd = "C\n"
+			self.need_response = True
 		elif verb == "E":
 			# echo 4 digit number (USB loop-back test)
 			assert val is None
@@ -332,10 +337,15 @@ class channel_proxy(object):
 		Boolean state = state of comparator.  Set VTH to threshold
 		voltage.
 
-		NOTE:  with VTH and pin driver power supplies off the
-		comparator reports logic 0.  An absent channel reports 1
-		due to pull-up resistors on the bus.  This can be used to
-		determine which channels are installed in the programmer.
+		NOTE:  with VTH and pin driver power supplies off, in
+		some units the comparator reports logic 0 while in others
+		it reports logic 1.  In the two examples I have access to,
+		the behaviour is consistent across all channels:  they
+		either all report 0 in this configuration or all report 1,
+		which suggests that the behaviour is not due to random
+		fluctuations in comparator behaviour, but is a circuit
+		design choice that ensures one or the other results, and
+		that there was a revision in this feature at some point.
 		"""
 		state, = self.programmer.write_command("?", self.address)
 		return bool(state & 1)
@@ -693,15 +703,26 @@ class allpro88(object):
 
 		# firmware resets itself and the programmer.  the
 		# .__enter__() method repeats much of what this does, but
-		# it doesn't hurt to be cautious
+		# it doesn't hurt to be cautious.  we rely on a full reset,
+		# and all the power supplies being turned off, for the
+		# channel presence test to work correctly.
 		self.device.set_configuration()
 
 		# initialize channel proxy list.  NOTE:  this step must be
 		# completed before initializing the .socket_module
 		# attribute.  the socket_module classes use this list to
 		# initialize their pin mappings
-		self.channels = [channel_proxy(self, i) for i in range(88)]
+		self.channels = tuple(channel_proxy(self, i) for i in range(88))
 
+		# these will be populated in the .__enter__() method after
+		# the programmer has been reset and is in a known-safe
+		# state.
+		self.channels_installed = tuple()
+		# retrieve the bit map of installed channels and populate
+		# the tuple of installed channel drivers
+		# FIXME:  not yet in firmware
+		#channel_bit_map, = self.write_command("C")
+		#self.channels_installed = tuple(channel for i, channel in enumerate(self.channels) if (1<<i) & channel_bit_map)
 
 		# command queues
 		self.out_queue = []
@@ -749,6 +770,36 @@ class allpro88(object):
 		self.itst = 0
 		self.vadjth = 0
 		self.vadj = 0
+
+		# now figure out which pin drivers are installed.  channels
+		# that are not installed appear as though their threshold
+		# comparators are in the true state even when the voltage
+		# on the pin is 0.  configure all channels for pull-down,
+		# set VTH to a low voltage and check for pins in the True
+		# state.  NOTE:  this test should be safe even if a part is
+		# inserted into a socket, however the test will yield
+		# incorrect results if something is inserted that has some
+		# external voltage source and is applying voltage to any of
+		# its pins, for example maybe a weird battery-powered
+		# memory device of some kind.
+		# FIXME:  this would be better done by the firmware on
+		# power-on, because parts should not be installed in
+		# sockets when the unit is turned on or off, and so this
+		# would be nearly guaranteed to be harmless, but a part is
+		# almost always installed in a socket when starting up a
+		# tool to dump or program them (which is when this code
+		# here gets run)
+		self.pcr_enable = True
+		self.vadj = 10
+		self.vth = 10
+		for channel in self.channels:
+			channel.config = PINCON.PULLDN
+		self.channels_installed = tuple(channel for channel in self.channels if not channel)
+		for channel in self.channels:
+			channel.config = PINCON.DISABLE
+		self.vth = 0
+		self.vadj = 0
+		self.pcr_enable = False
 
 		# done
 		return self
