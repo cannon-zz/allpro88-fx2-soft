@@ -142,7 +142,7 @@ class channel_driver_test_suite(object):
 		protection diode on the pin driver carrier board.  Enabling
 		both VDAC output and the ground-drive transistor overloads
 		this diode, possibly causing it to fail and thereafter
-		providing a path to ground through the VDAC power
+		provide a path to ground through the VDAC power
 		transistor's emitter bias circuit.
 		"""
 		print("toggling channel %d LOGICL <--> LOGICH %d times:" % (self.channel.channel, trials))
@@ -208,11 +208,11 @@ class channel_driver_test_suite(object):
 		# dissipate about 1/4 W.
 		self.vpul_ramp_x = numpy.arange(128)
 		self.vpul_ramp_y = numpy.zeros(128)
-		for i, dac in enumerate(self.vpul_ramp_x):
+		for dac in self.vpul_ramp_x:
 			self.programmer.vpul = dac
 			self.programmer.load_dacs()
 			time.sleep(0.002)	# wait for RC delay
-			self.vpul_ramp_y[i] = self.measure_v()
+			self.vpul_ramp_y[dac] = self.measure_v()
 
 		# disable channel
 		self.programmer.vpul = 0
@@ -349,10 +349,10 @@ class channel_driver_test_suite(object):
 		# output voltage
 		self.vdac_ramp_x = numpy.arange(256)
 		self.vdac_ramp_y = numpy.zeros(256)
-		for i, dac in enumerate(self.vdac_ramp_x):
+		for dac in self.vdac_ramp_x:
 			self.channel.vdac = dac
 			self.programmer.load_dacs()
-			self.vdac_ramp_y[i] = self.measure_v()
+			self.vdac_ramp_y[dac] = self.measure_v()
 
 		# disable output
 		self.channel.vdac = 0
@@ -510,6 +510,8 @@ def parse_command_line():
 		description = "ALLPRO88 Self Test"
 	)
 	parser.add_argument("-c", "--channel", metavar = "number", type = int, choices = range(88), action = "append", help = "Test only this channel (integer in [0, 87] inclusively).  May be specified multiples times.  If not specified, all installed channels are tested in sequence.")
+	parser.add_argument("--calibration-filename", metavar = "filename", default = "calibration.dat", help = "Set the name of the file from which to load (and, optionally, to which to write) the calibration model.")
+	parser.add_argument("-w", "--write-calibration", action = "store_true", help = "Overwrite the calibration file with a new calibration model derived from the measurements made during the self test.")
 	options = parser.parse_args()
 	return options
 
@@ -521,7 +523,7 @@ calibration = {
 	"vpul_ramp_cal": []
 }
 
-with allpro88.allpro88(calibration_file = open("calibration.dat")) as programmer:
+with allpro88.allpro88(calibration_file = open(options.calibration_filename)) as programmer:
 	print("system ID = 0x%X\nsocket module = %s\nchannels installed:  %s\n" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", tuple(channel.channel for channel in programmer.channels_installed)))
 
 	# turn on power supplies
@@ -590,5 +592,7 @@ calibration["vpul_ramp_cal"] = {
 	"min": float(numpy.median([cal["min"] for cal in calibration["vpul_ramp_cal"]])),
 }
 
-with open("calibration.dat", "w") as calfile:
-	yaml.dump(calibration, calfile)
+if options.write_calibration:
+	print("writing new calibration model to \"%s\"" % options.calibration_filename)
+	with open(options.calibration_filename, "w") as calfile:
+		yaml.dump(calibration, calfile)
