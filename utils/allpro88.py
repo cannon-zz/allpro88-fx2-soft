@@ -1,4 +1,5 @@
 from enum import IntEnum
+import math
 import numpy
 import time
 import usb.core
@@ -256,26 +257,51 @@ class dacregister(object):
 		obj.write_command("=", self.address(obj), dac)
 		time.sleep(self.transient)
 
-	def invcal(self, v):
-		# most calibration mappings are linear or quadratic
-		# polynomials and are easily inverted, but that would
-		# require it be done for each case.  since the number of
-		# possible values is so small, this loop completes in only
-		# a few iterations, and doing it this way has the advantage
-		# of always working without having to remember to invert an
-		# algebraic expression.
-		lo, hi = 0., 255.
-		while hi > lo + 0.5:
-			dac = (hi + lo) / 2.
-			cal = self.cal(dac)
+	def invcal(self, v, obj):
+		"""
+		Convert voltage to DAC count.  Uses a bisection search to
+		invert the .cal() method and returns the integer DAC count
+		value that most closely approximates the requested voltage.
+		Raises ValueError if the requested voltage is above the
+		highest voltage of the DAC.  Voltages that are below the
+		limits of the DAC are mapped to the lowest available
+		voltage.
+		"""
+		# most DAC-to-voltage calibration mappings are linear or
+		# quadratic polynomials, with a cut-off at the low end
+		# below which the voltage is a constant.  rather than
+		# constructing a generic inverse of such functions, because
+		# the number of possible values is so small, we use a
+		# bisection search to invert the calibration by
+		# brute-force.  this loop's worst case completes in just 8
+		# iterations, and doing it this way has the advantage of
+		# always working for any DAC-to-voltage calibration mapping
+		# whose slope doesn't change sign.
+		lo, hi = 0, 256
+		if v >= self.cal(255.5, obj):
+			raise ValueError("voltage too high:  requested %g V > DAC limit of %g V" % (v, self.cal(255, obj)))
+		while hi - lo > 0.5:
+			mid = (hi + lo) / 2
+			cal = self.cal(mid, obj)
 			if cal == v:
+				dac = mid
 				break
 			elif cal < v:
-				lo = dac
+				lo = mid
 			else:	# cal > v:
-				hi = dac
-		dac = round(dac)
-		assert type(dac) is int
+				hi = mid
+		else:
+			dac = lo
+		# can't use round() because it rounds half odd integers up
+		# but half even integers douwn.  round(1.5) == round(2.5).
+		# perhaps if we extended the loop until hi-lo <= 0.25 and
+		# then used round() it would be, statistically speaking, a
+		# better inverse, but *this* algorithm, with the loop above
+		# as-is and the rounding below as-is produces the answers I
+		# want when tested against actual example calibration
+		# curves.
+		dac = min(255, math.floor(dac + 0.5))
+		assert type(dac) is int and 0 <= dac <= 255
 		# some calibration mappings predict a constant output below
 		# some threshold.  if we've chosen a DAC setting in such an
 		# interval, choose the lowest such DAC setting (typically
