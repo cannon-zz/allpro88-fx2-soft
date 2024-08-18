@@ -391,11 +391,11 @@ class channel_proxy(object):
 		"""
 		n = int(n)
 		assert n > 0
-		measurements = []
+		volts = []
 		for i in range(n):
-			vdac, = self.programmer.write_command("M", self.channel)
-			measurements.append(self.programmer.vth.cal(vdac, self.programmer))
-		return numpy.median(measurements)
+			dac, = self.programmer.write_command("M", self.channel)
+			volts.append(self.programmer.vth.cal(dac, self.programmer))
+		return numpy.median(volts)
 
 	def pulse(self, microseconds, config, final_config):
 		"""
