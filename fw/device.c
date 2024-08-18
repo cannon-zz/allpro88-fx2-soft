@@ -586,12 +586,14 @@ static WORD allpro88_channel_addr(BYTE channel)
  */
 
 
+#if 0	/* not used */
 inline static void allpro88_set_PINCON(BYTE channel, enum ALLPRO88_PINCON_BITS val)
 {
 	/* config register is at offset 0 from the start of the register
 	 * group for each channel */
 	allpro88_write(allpro88_channel_addr(channel), val);
 }
+#endif
 
 
 /*
@@ -630,6 +632,7 @@ inline static void allpro88_xfer_PINDACs(void)
  */
 
 
+#if 0	/* not used */
 inline static void allpro88_set_PINBYPASS(BYTE channel, BOOL enable)
 {
 	if(channel < 0x28)
@@ -637,6 +640,7 @@ inline static void allpro88_set_PINBYPASS(BYTE channel, BOOL enable)
 	else if(channel < 0x30)
 		allpro88_write(0x02c0 - 0x28 + channel, enable);
 }
+#endif
 
 
 /*
@@ -1833,6 +1837,7 @@ inline static void parse_out_buffer(void)
  */
 
 
+#if 0	/* not used */
 static void blink_A0_1hz(void)
 {
 	ALLPRO88_ADDR_SET(0);
@@ -1840,6 +1845,7 @@ static void blink_A0_1hz(void)
 	ALLPRO88_ADDR_SET(1);
 	delay(500);
 }
+#endif
 
 
 /*
@@ -1847,6 +1853,7 @@ static void blink_A0_1hz(void)
  */
 
 
+#if 0	/* not used */
 static void blink_idle_1hz(void)
 {
 	allpro88_set_PCR(PCR_NIDLE);
@@ -1854,6 +1861,7 @@ static void blink_idle_1hz(void)
 	allpro88_set_PCR(PCR_DISABLE);
 	delay(500);
 }
+#endif
 
 
 /*
