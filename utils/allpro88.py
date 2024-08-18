@@ -323,9 +323,14 @@ class channel_proxy(object):
 		# allpro88 instance with which we are associated
 		self.programmer = programmer
 		# integer channel number
+		if not 0 <= channel <= 87:
+			raise ValueError(channel)
 		self.channel = channel
-		# start of group of addresses for this channel
-		self.address = programmer.channel_addr(channel)
+		# start address of register group for this channel
+		if self.channel <= 0x27:
+			self.address = self.channel << 4
+		else:
+			self.address = (self.channel + 0x18) << 4
 		# bypass capacitor control register
 		# FIXME:  the bypass capacitor feature including its
 		# associated control logic and address decode circuitry
@@ -1024,17 +1029,6 @@ class allpro88(object):
 	#
 	# higher level interface
 	#
-
-	@staticmethod
-	def channel_addr(pin):
-		"""
-		Returns the start address of the register group
-		corresponding to the given pin number.
-		"""
-		assert 0 <= pin < 88
-		if pin > 0x27:
-			pin += 0x18
-		return pin << 4
 
 	@property
 	def socket_module_id(self):
