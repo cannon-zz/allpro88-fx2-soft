@@ -702,6 +702,69 @@ static void allpro88_hard_reset(void)
 
 
 /*
+ * test for installed pin drivers, and record a bit map.  because this test
+ * requires the main power supplies to be enabled and pin drivers
+ * configured for ground potential this is done only at power-on when there
+ * should not be a part installed in a socket.  it is not repeated as part
+ * of the hardware reset sequence, because that is typically repeated each
+ * time the host software connects to the device.
+ *
+ * installed_channel_drivers is a bit mask, with each bit indicating the
+ * presence of an 8-channel channel driver plug-in board, or "channel
+ * group".  the lowest-order bit is for channel group 0 (channels 0 through
+ * 7 inclusively);  1 = channel group is installed.
+ */
+
+
+__xdata static WORD installed_channel_drivers;
+
+static void scan_installed_channel_drivers(void)
+{
+	BYTE channel;
+	BYTE bit;
+
+	/* turn on main power supply, set VTH to about 1 V */
+	allpro88_set_PCR(PCR_ENABLE | PCR_NIDLE);
+	allpro88_set_VADJ(10);
+	allpro88_set_VTH(10);
+	delay(10 /* ms */);	/* let power supplies slew */
+
+	/* scan the channels.  the channel drivers are implemented as
+	 * plug-in boards, each with 8 channels, so we just check for one
+	 * of the 8 channels for each board to test if that board is
+	 * present.  installed_channel_drivers is a bit mask indicating
+	 * which of the 11 boards are installed.  to test a channel for its
+	 * presence, we set each to pull-down (0 V), and compare the
+	 * voltage to VTH.  missing channels will not respond to the read,
+	 * so the pull-up resistors on the data-bus will set the bus to
+	 * 0xff, making it seem as if the voltage on the pin is above
+	 * threhsold. */
+
+	installed_channel_drivers = 0;
+	for(channel = 0, bit = 1; channel < 88; channel += 8, bit <<= 1) {
+		const WORD addr = allpro88_channel_addr(channel);
+		allpro88_write(addr, PINCON_PULLDN);
+		/* let bus relax.  for channels that aren't installed,
+		 * we're relying on the data bus' pull-up resistors to set
+		 * the bits high.  experiments show that we seem to be able
+		 * to read back the bus too quickly for the pull-up
+		 * resistor time constant:  if we immediately do the port
+		 * read, we still still see the value of PINCON_PULLDN on
+		 * the data bus.  adding a small delay fixes */
+		delay(1 /* ms */);
+		if(!(allpro88_read(addr) & 1))
+			installed_channel_drivers |= bit;
+		allpro88_write(addr, PINCON_DISABLE);
+	}
+
+	/* zero dacs and turn off power supply */
+	allpro88_set_VTH(0);
+	allpro88_set_VADJ(0);
+	allpro88_set_PCR(PCR_DISABLE);
+}
+
+
+/*
  * use a bisection search with VTH to measure the voltage on a channel.
  * returns the VTH DAC count value that sets VTH to within 1 LSB of the
  * voltage on the given channel.
@@ -921,6 +984,10 @@ void main_init(void)
 	 * reset */
 
 	allpro88_hard_reset();
+
+	/* scan for installed channel drivers */
+
+	scan_installed_channel_drivers();
 
 	/* arm end-point 2.  I don't know why this has to be done twice.  I
 	 * think it's because the chip boots up believing the buffers are
@@ -1507,6 +1574,7 @@ inline static BOOL in_buffer_not_full(void)
  * ?XXXX	read address XXXX, report the value as YY
  * BXT<cmd>	bus commands, use bus number X for command.  bus type, T,
  *		is one of 'P' (parallel bus), FIXME add more
+ * C		report 16-bit installed-channel-group bit map as XXXX
  * EXXXX	echo the number XXXX (loop-back test)
  * MXX		run voltage measurement sequence on channel XX, report VTH
  *		DAC as YY
@@ -1691,6 +1759,19 @@ static void do_command(const char *command)
 		default:
 			break;
 		}
+		break;
+	}
+
+	/*
+	 * report installed channel-driver bit map
+	 */
+
+	case 'C': {
+		/* check for correct end of string */
+		if(command[1])
+			goto error;
+		puts_word(installed_channel_drivers);
+		newline();
 		break;
 	}
 
