@@ -319,7 +319,7 @@ class vdacregister(dacregister):
 
 
 class channel_proxy(object):
-	def __init__(self, programmer, channel, cal_data = {"min": 0.1892, "poly": (4.479e-06, 0.09901, -0.6891)}):
+	def __init__(self, programmer, channel, cal_data = {"min": 0.1892, "poly": (-0.6891, 0.09901, 4.479e-06)}):
 		# allpro88 instance with which we are associated
 		self.programmer = programmer
 		# integer channel number
@@ -358,9 +358,9 @@ class channel_proxy(object):
 		return self.programmer.write_command(*args, **kwargs)
 
 	def set_cal(self, cal_data):
-		poly2, poly1, poly0 = cal_data["poly"]
+		poly = numpy.polynomial.Polynomial(cal_data["poly"])
 		self.cal = {
-			"VDAC": (lambda dac: max(cal_data["min"], (poly2 * dac + poly1) * dac + poly0))
+			"VDAC": (lambda dac: max(cal_data["min"], poly(dac)))
 		}
 
 	def __bool__(self):
@@ -726,7 +726,7 @@ class allpro88(object):
 
 	command_queue_size = 64	# commands
 
-	def __init__(self, calibration_file = None):
+	def __init__(self, cal_data = None):
 		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
 		if self.device is None:
@@ -773,9 +773,25 @@ class allpro88(object):
 		self.bus = {}
 
 		# install calibration model (defaults if no calibration
-		# model file is provided)
+		# model is provided).  NOTE:  yes, testing for specific
+		# types is bad practice, but this code performs a very
+		# narrowly-defined and specific task, and the idea of
+		# general-pupose reuse is nonsensical.
 		self.cal = {}
-		self.set_calibration(calibration_file)
+		if cal_data is None or isinstance(cal_data, dict):
+			# assume a dictionary-valued parameter contains the
+			# calibration data.  if no calibration data was
+			# provided, we still call .set_calibration() to do
+			# the default initialization
+			self.set_calibration(cal_data)
+		elif isinstance(cal_data, str):
+			# assume a string-valued parameter is the name of a
+			# file from which to load the calibration data
+			with open(cal_data) as f:
+				self.set_calibration(yaml.unsafe_load(f))
+		else:
+			# calling code error
+			raise ValueError(cal_data)
 
 
 	def __enter__(self):
@@ -864,7 +880,7 @@ class allpro88(object):
 		return False
 
 
-	def set_calibration(self, calibration_file):
+	def set_calibration(self, cal_data):
 		# first, install default calibrations.
 		#
 		# NOTE:  other code might grab and retain a reference to
@@ -874,33 +890,56 @@ class allpro88(object):
 
 		self.cal.clear()
 
-		# programmer DAC curves
+		# default programmer DAC curves (actual calibration for my
+		# original unit)
 		self.cal.update({
-			"VTH": (lambda dac: -1.01764700e-02 + 9.96709040e-02 * dac + 5.55818066e-07 * dac*dac),
-			"VADJ": (lambda dac: 0.371637285 + 0.117641953 * dac + -9.13385655e-07 * dac*dac),
-			"VPUL": (lambda dac: max(0., (7.14173430688944e-07 * dac + 0.09954692191382541) * dac + -0.7873764486422744))
+			"VADJ":  numpy.polynomial.Polynomial((0.30912373649024794, 0.11765130484398306, 2.970232274042522e-08)),
+			"VPUL":  numpy.polynomial.Polynomial((-0.5392560237564137 - 0.18096494173157174, 0.10095824549637102, 2.109251778349706e-08)),
+			"VSR":  numpy.polynomial.Polynomial((0.0053290738646065705, 0.09970530978019132, 5.529891853403212e-08)),
+			"VTH":  numpy.polynomial.Polynomial((-0.01039799263370611, 0.09980593089448744, 7.15096343691551e-08)),
+			"VTST":  numpy.polynomial.Polynomial((0.3012790867808679, 0.10527024428940045, -1.5240068371833107e-05)),
 		})
 
-		# now overwrite with calibration model is one has been
+		# now overwrite with calibration model if one has been
 		# supplied
 
-		if calibration_file is None:
+		if cal_data is None:
 			return
-		cal_model_data = yaml.unsafe_load(calibration_file)
 
-		# programmer DAC curves
+		# programmer DAC curves.  the polynomials model the power
+		# supply outputs.  VPUL, however. is placed onto pins
+		# through reverse protection diodes, and therefore the
+		# actual applied voltage is a little less than the
+		# requested voltage by the equivalent of up to several DAC
+		# counts.  each pin driver has its own diode, with its own
+		# unique forward voltage, but the median forward-bias
+		# voltage is recorded in the diode_vf parameter, and by
+		# subtracting that from the 0th order term of the
+		# polynomial we can correct the model so that it
+		# approximates the actual voltage delivered to the pins.
+		# VPUL is switched onto a pin by a PNP transistor, and the
+		# median of those transistors' emitter-base forward bias
+		# voltages is recorded in the trans_vf parameter.  for
+		# reasons that require reviewing the circuitry, pull-up
+		# voltages less than twice this voltage, or typically
+		# around 1.5 V, cannot be applied to the pins because the
+		# transistors get turned off.  NOTE:  this limitation is
+		# not modeled;  requesting a pull-up voltage less than
+		# 2*trans_vf will silently result in the pull-up voltage
+		# being, in effect, turned off.
 
-		# VPUL DAC
-		def vpul_cal_func(dac, cal_data = cal_model_data["vpul_ramp_cal"]):
-			poly2, poly1, poly0 = cal_data["poly"]
-			return max(cal_data["min"], (poly2 * dac + poly1) * dac + poly0) if dac >= cal_data["threshold"] else cal_data["min"]
-		self.cal["VPUL"] = vpul_cal_func
+		self.cal["VADJ"] = numpy.polynomial.Polynomial(cal_data["vadj"]["poly"])
+		self.cal["VPUL"] = numpy.polynomial.Polynomial(cal_data["vpul"]["poly"])
+		self.cal["VPUL"].coef[0] -= cal_data["vpul"]["diode_vf"]
+		self.cal["VSR"] = numpy.polynomial.Polynomial(cal_data["vsr"]["poly"])
+		self.cal["VTH"] = numpy.polynomial.Polynomial(cal_data["vth"]["poly"])
+		self.cal["VTST"] = numpy.polynomial.Polynomial(cal_data["vtst"]["poly"])
 
 		# per channel DAC curves
 
 		for i, channel in enumerate(self.channels):
 			try:
-				channel_cal_data = cal_model_data["channel%02d" % i]
+				channel_cal_data = cal_data["channel%02d" % i]
 			except KeyError:
 				# no calibration data for this channel.
 				# e.g., this is not a full 88-channel unit.
@@ -910,7 +949,7 @@ class allpro88(object):
 				# all installed channels get calibration
 				# data.
 				continue
-			channel.set_cal(channel_cal_data["vdac_ramp_cal"])
+			channel.set_cal(channel_cal_data["vdac"])
 
 
 	@property
@@ -1093,14 +1132,13 @@ class allpro88(object):
 	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
 
 
-	vsr = dacregister(address = 0x0300)
-	#vth = dacregister(address = 0x0301)
+	vsr = dacregister(address = 0x0300, cal_key = "VSR")
 	vth = dacregister(address = 0x0301, cal_key = "VTH")
 	vadj = dacregister(address = 0x0302, transient = 0.05, cal_key = "VADJ")
 	vadjth = dacregister(address = 0x0303)
 	# must call .load_dacs() for vpul changes
 	vpul = dacregister(address = 0x0305, cal_key = "VPUL")
-	vtst = dacregister(address = 0x0386)
+	vtst = dacregister(address = 0x0386, cal_key = "VTST")
 	itst = dacregister(address = 0x0387)
 
 
