@@ -10,15 +10,21 @@ tty_old_settings = termios.tcgetattr(sys.stdin)
 tty.setcbreak(sys.stdin.fileno())
 
 with allpro88.allpro88() as programmer:
-	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name))
+	print("system ID = 0x%X\nsocket module = %s\nchannels installed:  %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", tuple(channel.channel for channel in programmer.channels_installed)))
 
-	# PCR enable
-	programmer.pcr_enable = True
 	# set all pins to ground
 	for channel in programmer.channels:
 		channel.config = allpro88.PINCON.GND
 
-	print("j = channel -, k = channel +, q = quit")
+	# PCR enable
+	programmer.pcr_enable = True
+	programmer.vadj = allpro88.volt(5.)
+	programmer.vtst = allpro88.volt(3.)
+	programmer.itst = 15	# mA
+
+	# connect an LED's anode to the pin in question and the cathode to
+	# any other pin. no current limit resistor is required
+	print("j = channel down, k = channel up, q = quit")
 	try:
 		n = 0
 		with tqdm(total = 87, desc = "blinking channel") as progress:
@@ -33,10 +39,10 @@ with allpro88.allpro88() as programmer:
 						break
 					progress.n = n
 					progress.refresh()
-				programmer.channels[n].config = allpro88.PINCON.LOGICH
-				time.sleep(0.5)
+				programmer.channels[n].config = allpro88.PINCON.VTST
+				time.sleep(0.125)
 				programmer.channels[n].config = allpro88.PINCON.GND
-				time.sleep(0.5)
+				time.sleep(0.125)
 	except KeyboardInterrupt:
 		pass
 
