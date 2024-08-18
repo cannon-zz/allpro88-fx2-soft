@@ -10,9 +10,12 @@ def blink_idle(programmer, n = 10):
 		time.sleep(0.5)
 
 def blink_zif_pin1(programmer, n = 10):
+	# connect the anode of an LED to pin 1 and the cathode to any other
+	# pin of the DIP48 socket.  no current limiting resistor is
+	# required.
 	programmer.vadj = allpro88.volt(5.)
 	programmer.vtst = allpro88.volt(3.)
-	programmer.itst = 15	# 15 mA
+	programmer.itst = 15	# mA
 	# set all pins to ground
 	for channel in programmer.channels:
 		channel.config = allpro88.PINCON.GND
