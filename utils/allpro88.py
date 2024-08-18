@@ -1005,6 +1005,14 @@ class allpro88(object):
 		del self.bus[bus_number]
 
 
+	def round_v(self, v):
+		"""
+		Quantize the voltage v to the voltage it will be reported
+		as if measured using VTH and the .measure_v() method.
+		"""
+		return self.vth.cal(self.vth.invcal(v, self), self)
+
+
 	def read_responses(self):
 		n = self.device.read(self.ep_addr_in, self.buf)
 		# every response ends in a new line character.  some
