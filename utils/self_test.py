@@ -20,6 +20,168 @@ import time
 from tqdm import tqdm
 import yaml
 from . import allpro88
+import hioki3801
+
+
+#
+# when computing polynomial fits to DAC voltage data, use this weight
+# function.  we want the fit to be more strongly constrained at the end
+# points than in the middle so that the voltages at the ends of the range
+# are correct.  we don't want a situation where the curve is predicting
+# output voltages with the wrong sign at the low end, for example, as
+# that's physically impossible.  the following is 1.0 at counts of 0 and
+# 255, and about 0.5 at a count of 128.
+#
+
+dacfitweights = numpy.fromfunction(numpy.polynomial.Polynomial((1., -2. / 255, +2. / 255**2)), (256,))
+
+
+class power_supply_sweep(object):
+	def __init__(self, programmer, which = ["VADJ", "VTH", "VPUL", "VSR", "VTST"], meter = None):
+		self.programmer = programmer
+		which = set(which)
+		# do VADJ first if it's in the list so that it's ramped
+		# from 0 to max and then left there while other tests are
+		# done.  if it's not in the list, the tests will set it to
+		# max before running
+		for name, sweepfunc in (
+			("VADJ", self.sweep_vadj),
+			("VTH", self.sweep_vth),
+			("VPUL", self.sweep_vpul),
+			("VSR", self.sweep_vsr),
+			("VTST", self.sweep_vtst)
+		):
+			if name in which:
+				ramp_x, ramp_y, model = sweepfunc(meter = meter)
+				which.remove(name)
+		if which:
+			raise ValueError("unrecognized power supplies: %s" % which)
+
+	def test_vadj_ramp(self):
+		"""
+		Ramps VADJ up and down in a triangle wave pattern.
+		"""
+		with tqdm(desc = "VADJ", total = 255, mininterval = 0.) as progress:
+			def set_vadj(vadj):
+				self.programmer.vadj = progress.n = vadj
+				progress.refresh()
+
+			for i in range(3):
+				for vadj in range(256):
+					set_vadj(vadj)
+					time.sleep(10. / 256)
+				for vadj in range(255, -1, -1):
+					set_vadj(vadj)
+					time.sleep(10. / 256)
+
+	def sweep(self, attr, leave_at = 0, meter = None):
+		# need VADJ at max to test other power supplies
+		if attr != "vadj":
+			self.programmer.vadj = 255
+		# run a DAC from 0 to 255 inclusively and measure the
+		# output voltage.  to make this process go faster, only
+		# every 5th value is measured.
+		ramp_x = numpy.arange(0, 256, 5)
+		ramp_y = numpy.zeros_like(ramp_x, dtype = "double")
+		for i, dac in enumerate(ramp_x):
+			setattr(self.programmer, attr, dac)
+			if attr == "vpul":
+				self.programmer.load_dacs()
+			print("@ DAC count %03d:  voltage (in volts) = " % dac, end = "", flush = True)
+			if meter is None:
+				ramp_y[i] = float(input())
+			else:
+				# wait for the meter to stabilize
+				time.sleep(2.)
+				# measure the 5 second arithmetic mean
+				ramp_y[i] = meter.time_average(5.)
+				print("%g" % ramp_y[i])
+		# leave DAC at requested value (typically 0 for safety)
+		setattr(self.programmer, attr, leave_at)
+		if attr == "vpul":
+			self.programmer.load_dacs()
+		# done
+		return ramp_x, ramp_y
+
+	def plot(self, attr, ramp_x, ramp_y, model):
+		fig = figure.Figure()
+		FigureCanvas(fig)
+		axes = fig.add_axes((0.1, 0.3, 0.85, 0.65))
+		axes.set_title("%s DAC Calibration" % attr.upper())
+		#axes.set_xlabel("DAC Value (count)")
+		axes.set_ylabel("Voltage (volts)")
+		axes.scatter(ramp_x, ramp_y, marker = ".", color = "k")
+		model_x = numpy.linspace(0, 255, 256)
+		axes.plot(model_x, model(model_x))
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
+		axes.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(5))
+		axes.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		axes.set_xlim((0, 256))
+		axes.set_ylim((0, 30))
+
+		axes = fig.add_axes((0.1, 0.1, 0.85, 0.15))
+		axes.set_xlabel("DAC Value (count)")
+		axes.set_ylabel("Residual (volts)")
+		axes.plot(ramp_x, ramp_y - model(ramp_x))
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		axes.set_xlim((0, 256))
+		axes.set_ylim((-0.075, +0.075))
+		fig.savefig("%s_ramp.png" % attr)
+
+	def sweep_vadj(self, meter = None):
+		print("\ncalibrating main adjustable power supply, VADJ.\nConnect multimeter leads:\n\t+ --> DIN 1 (primary), pin A5\n\t- --> DIN 1 (primary), pin C1\nPress Enter when ready ...")
+		input()
+		# after sweep, must be left at max for other tests
+		self.vadj_ramp_x, self.vadj_ramp_y = self.sweep("vadj", leave_at = 255, meter = meter)
+		self.vadj_model = numpy.polynomial.Polynomial.fit(self.vadj_ramp_x[1:-3], self.vadj_ramp_y[1:-3], 2, w = dacfitweights[self.vadj_ramp_x[1:-3]]).convert()
+		self.plot("vadj", self.vadj_ramp_x, self.vadj_ramp_y, self.vadj_model)
+		return self.vadj_ramp_x, self.vadj_ramp_y, self.vadj_model
+
+	def sweep_vth(self, meter = None):
+		print("\ncalibrating threshold DAC, VTH.\nConnect multimeter leads:\n\t+ --> DIN 1 (primary), pin B9\n\t- --> DIN 1 (primary), pin C1\nPress Enter when ready ...")
+		input()
+		self.vth_ramp_x, self.vth_ramp_y = self.sweep("vth", meter = meter)
+		self.vth_model = numpy.polynomial.Polynomial.fit(self.vth_ramp_x, self.vth_ramp_y, 2, w = dacfitweights[self.vth_ramp_x]).convert()
+		self.plot("vth", self.vth_ramp_x, self.vth_ramp_y, self.vth_model)
+		return self.vth_ramp_x, self.vth_ramp_y, self.vth_model
+
+	def sweep_vpul(self, meter = None):
+		print("\ncalibrating pull-up power supply, VPUL.\nConnect multimeter leads:\n\t+ --> DIN 1 (primary), pin B4\n\t- --> DIN 1 (primary), pin C1\nPress Enter when ready ...")
+		input()
+		self.vpul_ramp_x, self.vpul_ramp_y = self.sweep("vpul", meter = meter)
+		self.vpul_model = numpy.polynomial.Polynomial.fit(self.vpul_ramp_x[1:], self.vpul_ramp_y[1:], 2, w = dacfitweights[self.vpul_ramp_x[1:]]).convert()
+		self.plot("vpul", self.vpul_ramp_x, self.vpul_ramp_y, self.vpul_model)
+		return self.vpul_ramp_x, self.vpul_ramp_y, self.vpul_model
+
+	def sweep_vsr(self, meter = None):
+		print("\ncalibrating sweep rate DAC, VSR.\nConnect multimeter leads:\n\t+ --> DIN 1 (primary), pin B3\n\t- --> DIN 1 (primary), pin C1\nPress Enter when ready ...")
+		input()
+		self.vsr_ramp_x, self.vsr_ramp_y = self.sweep("vsr", meter = meter)
+		self.vsr_model = numpy.polynomial.Polynomial.fit(self.vsr_ramp_x[1:], self.vsr_ramp_y[1:], 2, w = dacfitweights[self.vsr_ramp_x[1:]]).convert()
+		self.plot("vsr", self.vsr_ramp_x, self.vsr_ramp_y, self.vsr_model)
+		return self.vsr_ramp_x, self.vsr_ramp_y, self.vsr_model
+
+	def sweep_vtst(self, meter = None):
+		print("\ncalibrating constant current supply's maximum voltage DAC, VTST.\nConnect multimeter leads:\n\t+ --> DIN 1 (primary), pin B2\n\t- --> DIN 1 (primary), pin C1\nPress Enter when ready ...")
+		input()
+		# the current-limited power supply's output, when unloaded,
+		# is a function of both the VTST DAC setting and the ITST
+		# DAC setting.  for the calibration ramp we set ITST to 0.
+		# increasing this DAC's setting increases the output
+		# voltage for a given VTST DAC setting, so this
+		# configuration gives us a lower bound on the calibrated
+		# output voltage
+		self.programmer.itst = 0
+		# ramp the voltage limit DAC
+		self.vtst_ramp_x, self.vtst_ramp_y = self.sweep("vtst", meter = meter)
+		self.vtst_model = numpy.polynomial.Polynomial.fit(self.vtst_ramp_x[1:], self.vtst_ramp_y[1:], 2, w = dacfitweights[self.vtst_ramp_x[1:]]).convert()
+		return self.vtst_ramp_x, self.vtst_ramp_y, self.vtst_model
 
 
 class channel_driver_test_suite(object):
@@ -31,6 +193,13 @@ class channel_driver_test_suite(object):
 	def __init__(self, programmer, channel_obj):
 		self.programmer = programmer
 		self.channel = channel_obj
+		# for convenience, a vectorized wrapper of the programmer's
+		# .round_v() method to convert a voltage applied to the pin
+		# to the value that will be reported by the quantized VTH
+		# based measurement of that voltage
+		def round_v(v):
+			return self.programmer.round_v(v)
+		self.round_v = numpy.vectorize(round_v)
 
 
 	def measure_v(self):
@@ -76,32 +245,6 @@ class channel_driver_test_suite(object):
 		# report resistance in Ohms (currents and voltages are
 		# measured in milliamperes and volts, respectively)
 		return scipy.stats.linregress(current, voltage)[0] * 1000.
-
-
-	def test_vadj_ramp(self):
-		"""
-		Ramps VADJ up and down in a triangle wave pattern.  NOTE:
-		confirming the VADJ power supply voltage and its ramp
-		requires access to the interior of the programmer.  This
-		code is not intended to be used for self-test purpose.
-		"""
-		# FIXME:  actually, no it doesn't require access to the
-		# interior.  it turns out VADJ and all other power supplies
-		# are brought out to the 96 pin DIN connectors for the
-		# socket module, but I don't know which pins any of them
-		# are on because I can't read the schematic, too blurry.
-		with tqdm(desc = "VADJ", total = 255, mininterval = 0.) as progress:
-			def set_vadj(vadj):
-				self.programmer.vadj = progress.n = vadj
-				progress.refresh()
-
-			for i in range(3):
-				for vadj in range(256):
-					set_vadj(vadj)
-					time.sleep(10. / 256)
-				for vadj in range(255, -1, -1):
-					set_vadj(vadj)
-					time.sleep(10. / 256)
 
 
 	def test_logich(self, trials = 40, max_lo = 0.2, min_hi = 3.9):
@@ -158,26 +301,58 @@ class channel_driver_test_suite(object):
 		return lowest_hi, highest_lo
 
 
-	def test_vpul_ramp(self):
+	def test_vpul(self):
 		"""
 		"""
-		# the device seems to be unable to produce a pull-up
-		# voltage below about 1.2 V or 1.3 V.  below some DAC
-		# value, the output collapses to about 0.5 V and is
-		# constant.  we first measure where this occurs to identify
-		# the lowest achievable output voltage
-
-		# configure channel for pull-up and turn on the pull-down
-		# driver.  without the pull-down resistor turned on, these
-		# measurements don't work, we need something to drain
-		# charge out of the circuit.  we also make a point of not
-		# using the bypass capacitor on the channel (would help
-		# stabilize the voltage while measuring it) because the
-		# resistance in the circuit leads to too high a time
-		# constant, and then unless inconveniently long delays are
-		# added the voltage measurements become unreliable.  even
-		# without the bypass capacitor, we need to wait a bit for
-		# stray capacitance.
+		# this test checks the circuit for placing the pull-up
+		# voltage onto a pin.  the VPUL power supply is assumed to
+		# have been manually calibrated before this step.
+		#
+		# the pull-up voltage is switched onto a pin using a PNP
+		# transistor that is biased into the off state by the
+		# pull-up voltage itself, and biased into the on state by
+		# an open-collector 7406 inverter whose output pulls the
+		# biasing network to ground greating a voltage differential
+		# across the PNP transistor's emitter-base junction.  the
+		# biasing network consists of a 10 kOhm resistor between
+		# the pull-up rail and the transitor's base, and a 10 kOhm
+		# resistor between the base and the 7406's output.  when
+		# the inverter's output if "false", the pair of resistors
+		# put the base at 1/2 the voltage of the pull-up rail.  at
+		# room temperature the transistor requires about 0.6 V
+		# across the emitter-base junction before it conducts,
+		# therefore until the pull-up voltage exceeds about 1.2 V
+		# the transistor remains off and the pull-up voltage cannot
+		# appear on a pin.  a Schottky diode with a forward bias
+		# voltage of about 150 mV protects the circuit from reverse
+		# voltages, so when the transistor turns on, the voltage
+		# that appears on that pin is about 150 mV below the
+		# pull-up power supply's configured voltage (assuming there
+		# is no load on the pin).
+		#
+		# by assuming the pull-up and threshold power supplies have
+		# been correctly calibrated, we can compare the configured
+		# to observed pull-up voltage on a pin to check the health
+		# of the switching transistor and reverse protection diode.
+		# we can use the y-intercept of a voltage ramp to measure
+		# the forward-bias voltage of the reverse protection diode,
+		# and then after correcting for that we can mesaure the
+		# voltage at which the pull-up output first appears to
+		# check the emitter-base forward-bias voltage of the
+		# switching transistor.
+		#
+		# to do these tests, we configure the channel for pull-up
+		# and turn on the pull-down driver.  without the pull-down
+		# resistor turned on, these measurements don't work, we
+		# need something to establish a voltage difference across
+		# the reverse protection diode or it won't turn on and the
+		# voltage measurements are nonsensical.  we also make a
+		# point of not using the bypass capacitor on the channel
+		# because the resistance in the circuit leads to too high a
+		# time constant, and then unless inconveniently long delays
+		# are added the voltage measurements become unreliable.
+		# even without the bypass capacitor, we need to wait a bit
+		# for stray capacitance.
 		#
 		# for the pull-up supply specifically, the pull-down
 		# resistance is only 2.7 kOhm to ground, because the
@@ -189,9 +364,11 @@ class channel_driver_test_suite(object):
 		# voltage, then because only 1/2 of that total resistance
 		# is between the pull-up voltage source and ground we
 		# assume here that we can safely ramp the pull-up voltage
-		# to 1/2 of its maximum value (to limit the current flowing
-		# through the 1/2 pull-down resistor to what it would be in
-		# the VDAC case).
+		# only to 1/2 of its maximum value so that the current
+		# flowing through the 1/2 pull-down resistor is limited to
+		# what it would be in the VDAC case.  I don't know how much
+		# power it's rated for, but at full voltage it would have
+		# to dissipate about 1/4 W.
 		self.channel.config = allpro88.PINCON.PULLUP | allpro88.PINCON.PULLDN
 		self.channel.bypass = False	# make sure it's off
 		# discharge the circuit
@@ -199,19 +376,18 @@ class channel_driver_test_suite(object):
 		self.programmer.load_dacs()
 		time.sleep(0.2)	# wait for RC delay
 
-		# ramp the DAC over a range of low voltages with the
-		# pull-down resistor enabled to get an initial fit and
-		# identify the lowest reliable operating point.  with the
-		# pull-down resistor on we don't want the voltage to get
-		# too high to avoid damage.  I don't know how much power
-		# it's rated for, but at full voltage it would have to
-		# dissipate about 1/4 W.
-		self.vpul_ramp_x = numpy.arange(128)
+		# ramp the pull-up DAC over a range of voltages to measure
+		# a voltage curve.  for what we are doing here, we want to
+		# record the measured voltage as a function of the applied
+		# pull-up voltage, not as a function of the pull-up power
+		# supply's DAC setting.
+		self.vpul_ramp_x = numpy.zeros(128)
 		self.vpul_ramp_y = numpy.zeros(128)
-		for dac in self.vpul_ramp_x:
+		for dac in range(128):
 			self.programmer.vpul = dac
 			self.programmer.load_dacs()
-			time.sleep(0.002)	# wait for RC delay
+			time.sleep(0.010)	# wait for RC delay
+			self.vpul_ramp_x[dac] = self.programmer.vpul.cal(dac, self.programmer)
 			self.vpul_ramp_y[dac] = self.measure_v()
 
 		# disable channel
@@ -219,60 +395,101 @@ class channel_driver_test_suite(object):
 		self.programmer.load_dacs()
 		self.channel.config = allpro88.PINCON.DISABLE
 
-		# get a fit from what should be the linear regime
-		a2, a1, a0 = map(float, numpy.polyfit(self.vpul_ramp_x[30:], self.vpul_ramp_y[30:], 2))
-		@numpy.vectorize
-		def model(dac):
-			return (a2 * dac + a1) * dac + a0
+		# get a fit from what should be the linear regime.  the
+		# y-intercept is an estimate of the forward-bias voltage of
+		# the reverse protection diode.
+		poly = numpy.polynomial.Polynomial.fit(self.vpul_ramp_x[20:], self.vpul_ramp_y[20:], 1, w = dacfitweights[20:128]).convert()
+		# require slope to be within 2% of 1.0
+		failed = not (0.98 <= poly.coef[1] <= 1.02)
+		print("channel %d VPUL fit: %s%s" % (self.channel.channel, poly, "\t<-- FAILED" if failed else ""))
 
-		# for which DAC values does the fit agree with the observed
-		# value?  "agree" = residual < 50 mV.  find the threshold
-		# where this occurs.
-		output_good = abs(model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32]) < 0.05
-		assert any(output_good), "cannot construct VPUL model:  no measured voltages are consistent with fit:\nx = %s\ny = %s\nresidual = %s" % (self.vpul_ramp_x[:32], self.vpul_ramp_y[:32], model(self.vpul_ramp_x[:32]) - self.vpul_ramp_y[:32])
-		threshold = max(i for i, val in enumerate(output_good) if not val) + 1
-		assert threshold >= 3
-		#for i in range(32):
-		#	print("\t%d\t%.3g\t%.3g\t%.3g\t%s" % (i, model(i), self.vpul_ramp_y[i], model(i) - self.vpul_ramp_y[i], "" if i != threshold else "<--"))
+		self.vpul_diode_vf = -poly.coef[0]
+		# require Vf consistent with Schottky diode
+		failed = not (0.150 <= self.vpul_diode_vf <= 0.35)
+		print("channel %d VPUL reverse-protection Vf:  %.3g V%s" % (self.channel.channel, self.vpul_diode_vf, "\t<-- FAILED" if failed else ""))
 
-		# compute the final model using the measured threshold
-		a2, a1, a0 = map(float, numpy.polyfit(self.vpul_ramp_x[threshold:], self.vpul_ramp_y[threshold:], 2))
-		vpul_min = float(numpy.median(self.vpul_ramp_y[:threshold - 2]))
-		self.vpul_ramp_cal = {
-			"poly": (a2, a1, a0),
-			"threshold": threshold,
-			"min": vpul_min
-		}
-		print("channel %d derived VPUL calibration model:  %.3g dac^2 + %.3g dac + %.3g if dac >= %d else %.3g" % ((self.channel.channel,) + self.vpul_ramp_cal["poly"] + (threshold, vpul_min)))
-		@numpy.vectorize
-		def model(dac):
-			return (a2 * dac + a1) * dac + a0 if dac >= threshold else vpul_min
+		# identify the voltage at which the output transistor turns
+		# on by searching for the VPUL voltage below which the
+		# mesaured voltage disagrees with the model.  measuring
+		# where that occurs gives us an estimate of twice the
+		# transistor's emitter-base forward-bias voltage.
 
-		expected = numpy.fromiter((self.programmer.vpul.cal(x, self.programmer) for x in self.vpul_ramp_x), "double")
-		max_residual = abs(self.vpul_ramp_y[threshold:] - expected[threshold:]).max()
-		rms_residual = ((self.vpul_ramp_y[threshold:] - expected[threshold:])**2.).mean()**0.5
-		failed = max_residual > 0.15
-		print("\tw.r.t. system calibration max residual = %.3g V, RMS residual = %.3g V%s" % (max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+		# for which VPUL voltages does the observed voltage
+		# disagree with the linear fit?  "agree" = residual <= 1
+		# DAC count for VTH.  find the threshold where a transition
+		# occurs.
+		not_good = abs(self.round_v(poly(self.vpul_ramp_x[:40])) - self.vpul_ramp_y[:40]) > 0.12
+		assert not all(not_good), "cannot identify VPUL output transistor bias voltage:  no measured voltages are consistent with VPUL calibration:\nx = %s\ny = %s\nresidual = %s" % (self.vpul_ramp_x[:40], self.vpul_ramp_y[:40], self.vpul_ramp_y[:40] - self.vpul_ramp_x[:40])
+		threshold = max(i for i, i_not_good in enumerate(not_good) if i_not_good) + 1
+		assert 5 <= threshold <= 40
+		minimum = numpy.median(self.vpul_ramp_y[:5])
 
-		expected = model(self.vpul_ramp_x[threshold:])
-		max_residual = abs(self.vpul_ramp_y[threshold:] - expected).max()
-		rms_residual = ((self.vpul_ramp_y[threshold:] - expected)**2.).mean()**0.5
-		print("\tw.r.t. channel model residual = %.3g V, RMS residual = %.3g V" % (max_residual, rms_residual))
+		self.vpul_trans_vf = self.vpul_ramp_x[threshold] / 2.0
+		failed = not (0.6 <= self.vpul_trans_vf <= 0.8)
+		print("channel %d VPUL transistor Veb:  %.3g V%s" % (self.channel.channel, self.vpul_trans_vf, "\t<-- FAILED" if failed else ""))
+		print("channel %d VPUL voltage when transistor off:  %.3g V" % (self.channel.channel, minimum))
 
-		# plot the results
+		# if the pin driver circuitry is working optimally, for
+		# voltages above the switch transistor's turn-on voltage
+		# the observed voltage should be the applied pull-up
+		# voltage minus the reverse protection diode's forward bias
+		# voltage quantized to an integer VTH DAC setting.
+		# measure the difference between the observed voltage and
+		# that simple model.  because the VPUL drive circuit for
+		# each pin includes 2.7 kOhm of output impedance, short
+		# circuits to ground will drag down the observed voltage.
+		# even partial short circuits can easily have a measurable
+		# effect.  confirming agreement between the VPUL power
+		# supply's output voltage and the voltage observed on each
+		# pin can help identify faults in other circuity.
+		def model(vpul):
+			return numpy.where(vpul < 2 * self.vpul_trans_vf, minimum, vpul - self.vpul_diode_vf)
+
+		residual = self.vpul_ramp_y[threshold:] - self.round_v(model(self.vpul_ramp_x[threshold:]))
+		max_residual = abs(residual).max()
+		rms_residual = (residual**2.).mean()**0.5
+		# allow 1 DAC count of disagreement for VTH
+		failed = max_residual > 0.12
+		print("\tw.r.t. basic calibration max residual = %.3g V, RMS residual = %.3g V%s" % (max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
+
+		# plot the results.  take the reverse protection diode's
+		# forward voltage back out of the y values to plot the
+		# actual voltage measurements.  draw a 1-to-1 line offset
+		# by the reverse protection diode's bias voltage and a
+		# vertical line at the switching transistor's forward bias
+		# voltage.
 		fig = figure.Figure()
 		FigureCanvas(fig)
-		axes = fig.gca()
-		axes.set_title("Channel %02d Voltage vs. Pull-Up DAC" % self.channel.channel)
-		axes.set_xlabel("DAC Value (counts)")
+		axes = fig.add_axes((0.1, 0.3, 0.85, 0.65))
+		axes.set_title("Channel %02d Voltage vs.\\@ Pull-Up Voltage" % self.channel.channel)
+		#axes.set_xlabel("Pull-Up Voltage (volts)")
 		axes.set_ylabel("Voltage (volts)")
 		axes.scatter(self.vpul_ramp_x, self.vpul_ramp_y, marker = ".", color = "k")
-		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
-		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
+		x = numpy.linspace(0, 15, 120)
+		axes.plot(x, model(x), color = "b")
+		x = numpy.linspace(2 * self.vpul_trans_vf, 15, 120)
+		axes.plot(x, poly(x), color = "r", alpha = 0.5)
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(5))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+		axes.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(5))
+		axes.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
 		axes.tick_params(which = "both")
 		axes.grid(True, which = "both")
-		axes.set_xlim((0, 256))
-		axes.set_ylim((0, 26))
+		axes.set_xlim((0, 15))
+		axes.set_ylim((0, 15))
+
+		axes = fig.add_axes((0.1, 0.1, 0.85, 0.15))
+		axes.set_xlabel("Pull-Up Voltage (volts)")
+		axes.set_ylabel("Residual (volts)")
+		axes.plot(self.vpul_ramp_x, self.vpul_ramp_y - self.round_v(model(self.vpul_ramp_x)))
+		axes.plot(self.vpul_ramp_x, poly(self.vpul_ramp_x) - self.vpul_ramp_y, color = "r", alpha = 0.5)
+		axes.plot(self.vpul_ramp_x, poly(self.vpul_ramp_x) - self.round_v(poly(self.vpul_ramp_x)), alpha = 0.5)
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(5))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		axes.set_xlim((0, 15))
+		axes.set_ylim((-0.35, +0.15))
 		fig.savefig("channel%02d_vpul_ramp.png" % self.channel.channel)
 
 
@@ -329,9 +546,11 @@ class channel_driver_test_suite(object):
 		"""
 		Each channel has its own 8-bit DAC controlling a high
 		current constant-voltage linear power supply.  This test
-		ramps the DAC from minimum to maximum and confirms the
-		voltage measured on the channel is within allowed
-		tolerance.
+		ramps the DAC from minimum to maximum and measures the
+		voltage at each setting.  This is used to compute a
+		polynomial calibration curve for the VDAC circuit.
+		Finally, the measured data is tested to confirm it agrees
+		with the calibration model within an allowed tolerance.
 		"""
 		# configure for VDAC output.  enable the pull-down driver
 		# (5.4 kOhm to ground) so the output sees a load, otherwise
@@ -352,6 +571,8 @@ class channel_driver_test_suite(object):
 		for dac in self.vdac_ramp_x:
 			self.channel.vdac = dac
 			self.programmer.load_dacs()
+			# let things settle to get a good measurement
+			time.sleep(0.010)
 			self.vdac_ramp_y[dac] = self.measure_v()
 
 		# disable output
@@ -361,38 +582,58 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 		# report deviation from calibration model
-		expected = numpy.fromiter((self.channel.vdac.cal(x, self.channel) for x in self.vdac_ramp_x), "double")
-		max_residual = abs(self.vdac_ramp_y[2:] - expected[2:]).max()
-		rms_residual = ((self.vdac_ramp_y[2:] - expected[2:])**2.).mean()**0.5
-		failed = max_residual > 0.15
+		expected = self.round_v(numpy.fromiter((self.channel.vdac.cal(x, self.channel) for x in self.vdac_ramp_x), "double"))
+		max_residual = abs(self.vdac_ramp_y[1:] - expected[1:]).max()
+		rms_residual = ((self.vdac_ramp_y[1:] - expected[1:])**2.).mean()**0.5
+		# allow 1 VTH DAC count of measurement error
+		failed = max_residual > 0.12	# volts
 		print("channel %d VDAC ramp max residual = %.3g V, RMS residual = %.3g V%s" % (self.channel.channel, max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 
 		# derive updated calibration model and report what its
 		# accuracy would have been
-		self.vdac_ramp_cal = {
-			"poly": tuple(map(float, numpy.polyfit(self.vdac_ramp_x[6:], self.vdac_ramp_y[6:], 2))),
-			"min": float(numpy.median(self.vdac_ramp_y[:4]))
+		poly = numpy.polynomial.Polynomial.fit(self.vdac_ramp_x[12:], self.vdac_ramp_y[12:], 2, w = dacfitweights[12:]).convert()
+		self.cal_data = {
+			"poly": tuple(map(float, poly.coef)),
+			"min": float(numpy.median(self.vdac_ramp_y[:5]))
 		}
-		print("\tupdated calibration model:  max(%.3g, %.3g dac^2 + %.3g dac + %.3g)" % ((self.vdac_ramp_cal["min"],) + self.vdac_ramp_cal["poly"]))
-		@numpy.vectorize
 		def model(dac):
-			return max(self.vdac_ramp_cal["min"], (self.vdac_ramp_cal["poly"][0] * dac + self.vdac_ramp_cal["poly"][1]) * dac + self.vdac_ramp_cal["poly"][2])
-		print("\tupdated model's max residual = %.3g V" % (abs(model(self.vdac_ramp_x[2:]) - self.vdac_ramp_y[2:]).max()))
+			return numpy.maximum(self.cal_data["min"], poly(dac))
+		print("\tupdated calibration model:  max(%.3g, %s)" % (self.cal_data["min"], poly))
+		expected = self.round_v(model(self.vdac_ramp_x))
+		max_residual = abs(self.vdac_ramp_y[1:] - expected[1:]).max()
+		rms_residual = ((self.vdac_ramp_y[1:] - expected[1:])**2.).mean()**0.5
+		# allow 1 VTH DAC count of measurement error
+		failed = max_residual > 0.12	# volts
+		print("\tupdated model's max residual = %.3g V, RMS residual = %.3g V%s" % (max_residual, rms_residual, "" if not failed else "\t<-- FAILED"))
 
 		# plot the results
 		fig = figure.Figure()
 		FigureCanvas(fig)
-		axes = fig.gca()
-		axes.set_title("Channel %02d Voltage vs. DAC" % self.channel.channel)
-		axes.set_xlabel("DAC Value (counts)")
+		axes = fig.add_axes((0.1, 0.3, 0.85, 0.65))
+		axes.set_title("Channel %02d Voltage vs.\\@ DAC" % self.channel.channel)
 		axes.set_ylabel("Voltage (volts)")
 		axes.scatter(self.vdac_ramp_x, self.vdac_ramp_y, marker = ".", color = "k")
+		axes.plot(self.vdac_ramp_x, model(self.vdac_ramp_x))
+		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
+		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
+		axes.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(5))
+		axes.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(1))
+		axes.tick_params(which = "both")
+		axes.grid(True, which = "both")
+		axes.set_xlim((0, 256))
+		axes.set_ylim((0, 26))
+
+		axes = fig.add_axes((0.1, 0.1, 0.85, 0.15))
+		axes.set_xlabel("DAC Value (count)")
+		axes.set_ylabel("Residual (volts)")
+		axes.plot(self.vdac_ramp_x, model(self.vdac_ramp_x) - self.vdac_ramp_y)
+		axes.plot(self.vdac_ramp_x, model(self.vdac_ramp_x) - self.round_v(model(self.vdac_ramp_x)), alpha = 0.5)
 		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
 		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
 		axes.tick_params(which = "both")
 		axes.grid(True, which = "both")
 		axes.set_xlim((0, 256))
-		axes.set_ylim((0, 26))
+		axes.set_ylim((-0.15, +0.15))
 		fig.savefig("channel%02d_vdac_ramp.png" % self.channel.channel)
 
 
@@ -512,6 +753,7 @@ def parse_command_line():
 	parser.add_argument("-c", "--channel", metavar = "number", type = int, choices = range(88), action = "append", help = "Test only this channel (integer in [0, 87] inclusively).  May be specified multiples times.  If not specified, all installed channels are tested in sequence.")
 	parser.add_argument("--calibration-filename", metavar = "filename", default = "calibration.dat", help = "Set the name of the file from which to load (and, optionally, to which to write) the calibration model.")
 	parser.add_argument("-w", "--write-calibration", action = "store_true", help = "Overwrite the calibration file with a new calibration model derived from the measurements made during the self test.")
+	parser.add_argument("-p", "--power-supplies", action = "store_true", help = "Calibrate main power supplies.  This requires probing the primary DIN connector, which requires the socket module to be removed.  Because the socket module cannot be installed or removed while the power is turned on, when this option is enabled pin driver tests that rely on the decoupling capacitors being enabled will not give accurate results, as the pin decoupling capacitors are inside the socket module.  Do not attempt to re-install the socket module with the unit powered!")
 	options = parser.parse_args()
 	return options
 
@@ -519,21 +761,62 @@ def parse_command_line():
 options = parse_command_line()
 
 
-calibration = {
-	"vpul_ramp_cal": []
-}
+try:
+	with open(options.calibration_filename) as calfile:
+		calibration = yaml.unsafe_load(calfile)
+	assert type(calibration) is dict
+except FileNotFoundError as e:
+	print("warning:  %s" % str(e))
+	print("intializing new calibration")
+	calibration = {}
 
-with allpro88.allpro88(calibration_file = open(options.calibration_filename)) as programmer:
-	print("system ID = 0x%X\nsocket module = %s\nchannels installed:  %s\n" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", tuple(channel.channel for channel in programmer.channels_installed)))
+with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as programmer:
+	print("system ID = 0x%X\nsocket module = %s\nchannels installed:  %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", tuple(channel.channel for channel in programmer.channels_installed)))
+
+	# record serial number
+	calibration["serial"] = programmer.serial_number
+	print("USB interface serial number:  %s\n" % calibration["serial"])
 
 	# turn on power supplies
 	programmer.pcr_enable = True
 
-	#channel_driver_test_suite(programmer, None).test_vadj_ramp()
+	# calibrate main power supplies.  these require an external
+	# voltmeter, and user participation unless the meter can be read by
+	# this script.  after these power supplies are calibrated, the unit
+	# can self-calibrate all remaining circuits.
+	if options.power_supplies:
+		with hioki3801.hioki3801() as meter:
+			pwr_sweep = power_supply_sweep(programmer, meter = meter)
+		calibration.update({
+			"vadj": {
+				"poly":	tuple(map(float, pwr_sweep.vadj_model.coef))
+			},
+			"vpul": {
+				"poly":	tuple(map(float, pwr_sweep.vpul_model.coef))
+			},
+			"vsr": {
+				"poly":	tuple(map(float, pwr_sweep.vsr_model.coef))
+			},
+			"vth": {
+				"poly":	tuple(map(float, pwr_sweep.vth_model.coef))
+			},
+			"vtst": {
+				"poly":	tuple(map(float, pwr_sweep.vtst_model.coef))
+			}
+		})
+		# save what we've got so we can skip this step if any part
+		# of what follows fails and we have to try again.
+		with open(options.calibration_filename, "w") as calfile:
+			yaml.dump(calibration, calfile)
+		# install calibration curves so that channel calibrations
+		# are computed correctly
+		programmer.set_calibration(calibration)
 
 	# VADJ = max
 	programmer.vadj = 255
 
+	vpul_diode_vf = []
+	vpul_trans_vf = []
 	for channel in ((channel.channel for channel in programmer.channels_installed) if options.channel is None else options.channel):
 		calibration_name = "channel%02d" % channel
 		calibration[calibration_name] = {}
@@ -548,27 +831,12 @@ with allpro88.allpro88(calibration_file = open(options.calibration_filename)) as
 
 		test_suite.test_logich()
 
-		test_suite.test_vpul_ramp()
-		# there's only one pull-up power supply, but what voltage
-		# actually appears on each channel's output depends on the
-		# characteristics of that channel's output circuitry.  we
-		# cannot probe the pull-up power supply's voltage under
-		# softare control, directly, we can only probe the
-		# (slightly different) voltage that appears on each
-		# channel.  the "calibration" for the pull-up power supply
-		# is an average of the output voltage that appears on the
-		# channels.  we collect a voltage ramp curve from each
-		# channel, save them all, then turn them into a single
-		# calibration function after the loop is finished.  it can
-		# be checked, later, that each channel is within some
-		# tolerance of this function, both to detect malfunctioning
-		# channels and to confirm the one single calibration
-		# function is close enough to be used with any of the
-		# channels individually.
-		calibration["vpul_ramp_cal"].append(test_suite.vpul_ramp_cal)
+		test_suite.test_vpul()
+		vpul_diode_vf.append(test_suite.vpul_diode_vf)
+		vpul_trans_vf.append(test_suite.vpul_trans_vf)
 
 		test_suite.test_vdac_ramp()
-		calibration[calibration_name]["vdac_ramp_cal"] = test_suite.vdac_ramp_cal
+		calibration[calibration_name]["vdac"] = test_suite.cal_data
 
 		test_suite.test_vtst()
 
@@ -578,19 +846,13 @@ with allpro88.allpro88(calibration_file = open(options.calibration_filename)) as
 
 		print("\n")
 
-	# context manager turns off all power supplies, we don't have to do
-	# that here.
+	vpul_diode_vf = float(numpy.median(vpul_diode_vf))
+	vpul_trans_vf = float(numpy.median(vpul_trans_vf))
+	print("VPUL median reverse protection diode Vf:  %.3g V" % vpul_diode_vf)
+	print("VPUL median drive transistor Vf:  %.3g V" % vpul_trans_vf)
+	calibration["vpul"]["diode_vf"] = vpul_diode_vf
+	calibration["vpul"]["trans_vf"] = vpul_trans_vf
 
-# finally, reduce the VPUL calibration data to a single function
-calibration["vpul_ramp_cal"] = {
-	"poly": (
-		float(numpy.median([cal["poly"][0] for cal in calibration["vpul_ramp_cal"]])),
-		float(numpy.median([cal["poly"][1] for cal in calibration["vpul_ramp_cal"]])),
-		float(numpy.median([cal["poly"][2] for cal in calibration["vpul_ramp_cal"]]))
-	),
-	"threshold": float(numpy.median([cal["threshold"] for cal in calibration["vpul_ramp_cal"]])),
-	"min": float(numpy.median([cal["min"] for cal in calibration["vpul_ramp_cal"]])),
-}
 
 if options.write_calibration:
 	print("writing new calibration model to \"%s\"" % options.calibration_filename)
