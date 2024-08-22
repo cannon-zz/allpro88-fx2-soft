@@ -74,75 +74,6 @@ class TIMER_MODE(IntEnum):
 #
 # =============================================================================
 #
-#                          Firmware Command Interface
-#
-# =============================================================================
-#
-
-
-class command(object):
-	"""
-	Device for constructing a command string from a verb and optional
-	address and value.  This also provides a place for the command
-	queue machinery to place a response from the programmer, allowing
-	each response to be associated with the command that produced it.
-	"""
-	def __init__(self, verb, addr = None, val = None, label = None):
-		self.verb = verb
-		self.addr = addr
-		self.val = val
-		self.label = label
-		if verb == "=":
-			# write arbitrary value to arbitrary register
-			# NOTE NOTE NOTE:  physical damage will occur if
-			# the wrong value is written to the wrong address.
-			# by writing an unfortunate value to a pin
-			# configuration register, a pin might be connected
-			# to both a supply voltage and ground
-			# simultaneously, destroying the pin driver
-			# electronics.  for testing purposes, writing 0 to
-			# any address is safe.  this always corresponds to
-			# the "disabled" or "turned off" setting for any
-			# register.  other values should only be written
-			# after carefully consulting the documentation.
-			self.cmd = "=%04X%02X\n" % (addr, val)
-			self.need_response = False
-		elif verb == "?":
-			# read value from register
-			assert val is None
-			self.cmd = "?%04X\n" % addr
-			self.need_response = True
-		elif verb == "C":
-			# retrieve installed channel-driver bit map
-			assert addr is None and val is None
-			self.cmd = "C\n"
-			self.need_response = True
-		elif verb == "E":
-			# echo 4 digit number (USB loop-back test)
-			assert val is None
-			self.cmd = "E%04X\n" % addr
-			self.need_response = True
-		elif verb == "M":
-			# measure voltage using VTH
-			assert val is None
-			self.cmd = "M%02X\n" % addr
-			self.need_response = True
-		elif verb == "V":
-			# measure voltage using VADJTH
-			assert addr is None and val is None
-			self.cmd = "V\n"
-			self.need_response = True
-		else:
-			raise ValueError("invalid command verb \"%s\"" % verb)
-		self.response = None
-
-	def __str__(self):
-		return self.cmd
-
-
-#
-# =============================================================================
-#
 #                           Channel Driver Interface
 #
 # =============================================================================
@@ -254,7 +185,7 @@ class dacregister(object):
 		if not 0 <= dac <= 255:
 			raise ValueError("0 <= dac <= 255:  %d" % dac)
 		# OK
-		obj.write_command("=", self.address(obj), dac)
+		obj.write_addr(self.address(obj), dac)
 		time.sleep(self.transient)
 
 	def invcal(self, v, obj):
@@ -351,11 +282,13 @@ class channel_proxy(object):
 		# set the calibration
 		self.set_cal(cal_data)
 
+	config = property(fset = lambda self, config: self.programmer.write_addr(self.address, config))
+
 	vdac = vdacregister(cal_key = "VDAC")
 
-	def write_command(self, *args, **kwargs):
+	def write_addr(self, *args, **kwargs):
 		# plumbing for the vdac descriptor
-		return self.programmer.write_command(*args, **kwargs)
+		return self.programmer.write_addr(*args, **kwargs)
 
 	def set_cal(self, cal_data):
 		poly = numpy.polynomial.Polynomial(cal_data["poly"])
@@ -378,8 +311,7 @@ class channel_proxy(object):
 		design choice that ensures one or the other results, and
 		that there was a revision in this feature at some point.
 		"""
-		state, = self.programmer.write_command("?", self.address)
-		return bool(state & 1)
+		return bool(self.programmer.read_addr(self.address) & 1)
 
 	def measure_v(self, n = 1):
 		"""
@@ -393,7 +325,8 @@ class channel_proxy(object):
 		assert n > 0
 		volts = []
 		for i in range(n):
-			dac, = self.programmer.write_command("M", self.channel)
+			# command format:  MXX, XX = channel #
+			dac, = self.programmer.write_command("M%02X" % self.channel)
 			volts.append(self.programmer.vth.cal(dac, self.programmer))
 		return numpy.median(volts)
 
@@ -430,12 +363,7 @@ class channel_proxy(object):
 			# enough, the pulse could be implemented in
 			# software, here, on the host side.
 			raise ValueError("pulse duration too long:  %d us" % microseconds)
-		command = "P%02X%04X%02X%02X\n" % (self.channel, microseconds, config, final_config)
-		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
-		# clear response buffer
-		self.programmer.read_responses()
-
-	config = property(fset = lambda self, config: self.programmer.write_command("=", self.address, config))
+		self.programmer.write_command("P%02X%04X%02X%02X" % (self.channel, microseconds, config, final_config))
 
 	@property
 	def bypass(self):
@@ -451,7 +379,7 @@ class channel_proxy(object):
 		# silently ignore requests to turn on or off bypass
 		# capacitors on channels that don't have them.
 		if self.bypass_address is not None:
-			self.programmer.write_command("=", self.bypass_address, 1 if boolean else 0)
+			self.programmer.write_addr(self.bypass_address, 1 if boolean else 0)
 
 	@property
 	def physical(self):
@@ -630,10 +558,7 @@ class bus_parallel(object):
 		# send the bus definition command to the programmer
 		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active, inactive, flt, len(pin_numbers))
 		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
-		command += "\n"
-		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
-		# clear response
-		self.programmer.read_responses()
+		self.programmer.write_command(command)
 		# set initial state
 		for channel in self.channels:
 			if PINCON.VDAC not in (active, inactive, flt):
@@ -651,9 +576,7 @@ class bus_parallel(object):
 		voltage comparators.  The "high"/"low" states are defined
 		by the VTH voltage, not the .inactive and .active states.
 		"""
-		command = "B%01XP?\n" % self.bus_number
-		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
-		word, = self.programmer.read_responses()
+		word, = self.programmer.write_command("B%01XP?" % self.bus_number)
 		return word
 
 	def write(self, word):
@@ -664,20 +587,18 @@ class bus_parallel(object):
 		"""
 		# float the bus if word is None
 		if word is None:
-			command = "B%01XP-\n" % self.bus_number
+			command = "B%01XP-" % self.bus_number
 		# otherwise do a range check
 		elif not (0 <= word <= self.max_word):
 			raise ValueError("0x0 <= word <= 0x%X: 0x%X" % (self.max_word, word))
 		# and set the bus equal to word
 		elif len(self.pin_numbers) <= 8:
-			command = "B%1XP=%02X\n" % (self.bus_number, word)
+			command = "B%1XP=%02X" % (self.bus_number, word)
 		elif len(self.pin_numbers) <= 16:
-			command = "B%1XP=%04X\n" % (self.bus_number, word)
+			command = "B%1XP=%04X" % (self.bus_number, word)
 		else:
-			command = "B%1XP=%08X\n" % (self.bus_number, word)
-		self.programmer.device.write(self.programmer.ep_addr_out, command.encode("ascii"))
-		# clear response
-		self.programmer.read_responses()
+			command = "B%1XP=%08X" % (self.bus_number, word)
+		self.programmer.write_command(command)
 
 	def __len__(self):
 		"""
@@ -724,8 +645,6 @@ class allpro88(object):
 
 	buf_size = 512	# bytes
 
-	command_queue_size = 64	# commands
-
 	def __init__(self, cal_data = None):
 		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
@@ -747,10 +666,6 @@ class allpro88(object):
 		# populate the tuple of installed channel drivers
 		channel_group_bit_map, = self.write_command("C")
 		self.channels_installed = tuple(channel for i, channel in enumerate(self.channels) if (1 << (i // 8)) & channel_group_bit_map)
-
-		# command queues
-		self.out_queue = []
-		self.in_queue = []
 
 		# configure for the installed socket module
 		try:
@@ -915,28 +830,6 @@ class allpro88(object):
 			channel.set_cal(channel_cal_data["vdac"])
 
 
-	@property
-	def serial_number(self):
-		"""
-		The serial number reported by the USB interface's firmware,
-		as a string.  This is not necessarily the historical serial
-		number of the programmer hardware, nor is it necessarily a
-		"number", or in any specific format, although it is
-		expected to be a string that is suitable for use in
-		constructing file names and messages for users.  The
-		purpose is to provide an ID unique to each programmer so
-		calibration files and other hardware-specific data can be
-		associated with the correct device, in the event that more
-		than one unit is conencted to or available to a given host.
-		The value is chosen at firmware compile time, and by
-		default it is a UUID, but the developer could choose to set
-		it manually to the programmer's original serial number for
-		consistency and/or nostalgia, if that number is known (if
-		the sticker hasn't been lost).
-		"""
-		return self.device.serial_number
-
-
 	def get_unused_bus(self, bus_obj = None):
 		"""
 		Returns the integer index of an unused bus definition.
@@ -976,69 +869,130 @@ class allpro88(object):
 		return self.vth.cal(self.vth.invcal(v, self), self)
 
 
-	def read_responses(self):
-		n = self.device.read(self.ep_addr_in, self.buf)
-		# every response ends in a new line character.  some
-		# responses are empty, and more than one such response in a
-		# row become sequential new line characters.  .split()
-		# normally treats them all as a single whitespace boundary,
-		# but if given a specific character to split on then each
-		# new line is its own boundary.  .split() also normally
-		# doesn't create an extra split if the string ends in
-		# whitespace, but when given a specific character to split
-		# on and the string ends in that character then an
-		# additional (zero length) split value is created.  since
-		# every command ends in a new line, we always get one extra
-		# value, which we must drop from the list
-		msg = self.buf[:n].tobytes().decode("ascii").split("\n")[:-1]
-		return tuple(int(x, 16) if x else None for x in msg)
-
-
 	#
-	# one command at a time interface
+	# USB I/O
 	#
 
 
-	def write_command(self, verb, addr = None, val = None):
-		self.device.write(self.ep_addr_out, str(command(verb, addr, val)).encode("ascii"))
-		# every "out" packet generates a response "in" packet, even
-		# if the commands did not produce responses (the packet is
-		# empty).  we need to retrieve it unconditionally or the
+	@property
+	def serial_number(self):
+		"""
+		The serial number reported by the USB interface's firmware,
+		as a string.  This is not necessarily the historical serial
+		number of the programmer hardware, nor is it necessarily a
+		"number", or in any specific format, although it is
+		expected to be a string that is suitable for use in
+		constructing file names and messages for users.  The
+		purpose is to provide an ID unique to each programmer so
+		calibration files and other hardware-specific data can be
+		associated with the correct device, in the event that more
+		than one unit is conencted to or available to a given host.
+		The value is chosen at firmware compile time, and by
+		default it is a UUID, but the developer could choose to set
+		it manually to the programmer's original serial number for
+		consistency and/or nostalgia, if that number is known (if
+		the sticker hasn't been lost).
+		"""
+		return self.device.serial_number
+
+
+	def write_command(self, cmd):
+		"""
+		Write a command to the USB interface, and retrieve, parse
+		and return the response.
+		"""
+		# append a \n to the command, and write the ascii bytes to
+		# the USB device.  all commands end in \n.  we append it
+		# here to simplify calling code.
+
+		self.device.write(self.ep_addr_out, (cmd + "\n").encode("ascii"))
+
+		# the USB interface's firmware allows a USB packet to
+		# contain as many commands as will fit.  it processes them
+		# in ordr and places their responses, in order, in the
+		# response packet.  I had originally imagined a system in
+		# which canned sequences of commands would be assembled and
+		# sent to the programmer to quickly perform a sequence of
+		# operations without the USB back-and-forth overhead.  the
+		# overhead cost of sending the commands one at a time has
+		# proven to be insignificant (the programmer's internal bus
+		# is quite slow compared to a USB bus), and the convenience
+		# of using Python methods to encapsulate I/O operations and
+		# provide a high-level interface (which gets in the way of
+		# bottling sequences of commands) has been too great to
+		# ever make use of the feature.  because the logic needed
+		# to split up a response packet proved a bit tricky to get
+		# right, I have preserved it, below, even though as written
+		# a response packet is now guaranteed to have only a single
+		# response in it.
+
+		# every "out" packet generates a response "in" packet.
+		# even if we know the commands did not generate responses,
+		# we need to retrieve the packet unconditionally or the
 		# "in" queue will fill up in the programmer
-		return self.read_responses()
 
+		n = self.device.read(self.ep_addr_in, self.buf)
 
-	#
-	# command queue based interface
-	#
+		# all commands with responses respond with a single base 16
+		# integer.  every response ends in a new line character.
+		# some responses are empty, and more than one such response
+		# in a row become sequential new line characters.  .split()
+		# normally treats sequential new lines as a single
+		# whitespace boundary, but if given a specific character to
+		# split on (e.g., the new line character) then each new
+		# line is its own boundary.  .split() also normally doesn't
+		# create an extra split if the string ends in whitespace,
+		# but when given a specific character to split on and the
+		# string ends in that character then an additional (zero
+		# length) split value is created.  since every command ends
+		# in a new line, we always get one extra output from
+		# .split(), which we must drop from the list
 
+		resps = self.buf[:n].tobytes().decode("ascii").split("\n")[:-1]
+		return tuple(int(resp, 16) if resp else None for resp in resps)
 
-	def push(self, command):
-		# don't let the queue get too big or it won't encode into a
-		# single packet
-		assert len(self.out_queue) < self.command_queue_size
-		self.out_queue.append(command)
-
-	def commit(self):
-		self.device.write(self.ep_addr_out, "".join(map(str, self.out_queue)).encode("ascii"))
-		self.out_queue[:] = (command for command in self.out_queue if command.need_response)
-		responses = self.read_responses()
-		assert len(responses) == len(self.out_queue)
-		for command, response in zip(self.out_queue, responses):
-			command.response = response
-		self.in_queue.extend(self.out_queue)
-		del self.out_queue[:]
-
-	def pop(self):
-		return self.in_queue.pop(0)
-
-	def pop_all(self):
-		while self.in_queue:
-			yield self.pop()
 
 	#
 	# higher level interface
 	#
+
+
+	def echo(self, val):
+		"""
+		echo 4 digit number (USB loop-back test).
+		"""
+		assert 0 <= val <= 0xffff
+		val, = self.write_command("E%04X" % val)
+		return val
+
+
+	def write_addr(self, addr, val):
+		"""
+		write value to register.
+
+		NOTE NOTE NOTE:  physical damage will occur if the wrong
+		value is written to the wrong address.  by writing an
+		unfortunate value to a pin configuration register, a pin
+		might be connected to both a supply voltage and ground
+		simultaneously, destroying the pin driver electronics.  for
+		testing purposes, writing 0 to any address is safe.  this
+		always corresponds to the "disabled" or "turned off"
+		setting for any register.  other values should only be
+		written after carefully consulting the documentation.
+		"""
+		assert 0 <= addr <= 0x0fff
+		assert 0 <= val <= 0xff
+		self.write_command("=%04X%02X" % (addr, val))
+
+
+	def read_addr(self, addr):
+		"""
+		read value from register
+		"""
+		assert 0 <= addr <= 0x0fff
+		val, = self.write_command("?%04X" % addr)
+		return val
+
 
 	@property
 	def socket_module_id(self):
@@ -1046,8 +1000,8 @@ class allpro88(object):
 		Returns the ID of the socket module installed in the
 		programmer, or 0xff is no module is installed.
 		"""
-		socket_id, = self.write_command("?", 0x0280)
-		return socket_id
+		return self.read_addr(0x0280)
+
 
 	@property
 	def system_id(self):
@@ -1096,11 +1050,10 @@ class allpro88(object):
 		# appropriate features.  someone with an ALLPRO (non-88)
 		# would need to do some research on that.
 
-		system_id, = self.write_command("?", 0x0300)
-		return system_id & 0xf
+		return self.read_addr(0x0300) & 0xf
 
 
-	pcr_enable = property(fset = lambda self, enable: self.write_command("=", 0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
+	pcr_enable = property(fset = lambda self, enable: self.write_addr(0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
 
 
 	vsr = dacregister(address = 0x0300, cal_key = "VSR")
@@ -1114,7 +1067,7 @@ class allpro88(object):
 
 
 	def load_dacs(self, transient = 0.001):
-		self.write_command("=", 0x0308, 0)
+		self.write_addr(0x0308, 0)
 		# wait for transient response
 		time.sleep(transient)
 

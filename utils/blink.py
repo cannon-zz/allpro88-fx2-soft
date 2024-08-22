@@ -4,9 +4,9 @@ from . import allpro88
 
 def blink_idle(programmer, n = 10):
 	for i in tqdm(range(n), desc = "blink IDLE LED"):
-		programmer.write_command("=", 0x030c, allpro88.PCR.NIDLE)
+		programmer.write_addr(0x030c, allpro88.PCR.NIDLE)
 		time.sleep(0.5)
-		programmer.write_command("=", 0x030c, allpro88.PCR.DISABLE)
+		programmer.write_addr(0x030c, allpro88.PCR.DISABLE)
 		time.sleep(0.5)
 
 def blink_zif_pin1(programmer, n = 10):
