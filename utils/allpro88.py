@@ -1037,6 +1037,7 @@ class allpro88(object):
 		"""
 		assert 0 <= addr <= 0x0fff
 		val, = self.write_command("?%04X" % addr)
+		assert 0 <= val <= 0xff
 		return val
 
 
