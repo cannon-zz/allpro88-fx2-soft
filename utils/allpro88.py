@@ -766,8 +766,12 @@ class allpro88(object):
 
 	buf_size = 512	# bytes
 
-	def __init__(self, cal_data = None):
+	def __init__(self, cal_data = None, idVendor = idVendor, idProduct = idProduct):
 		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
+		# replace class attributes with instance attributes
+		self.idVendor = idVendor
+		self.idProduct = idProduct
+		# retrieve the USB device
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
 		if self.device is None:
 			raise ValueError("USB device not found (vid:pid = %04X:%04X)" % (self.idVendor, self.idProduct))
