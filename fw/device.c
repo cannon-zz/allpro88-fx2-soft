@@ -1661,7 +1661,6 @@ static void do_command(const char *command)
 
 	case 'B': {
 		BYTE bus_number = hex_to_val(command[1]);
-		BYTE width = bus[bus_number].parallel.width;
 		if(errno)
 			goto error;
 		switch(command[2]) {
@@ -1669,7 +1668,8 @@ static void do_command(const char *command)
 		 * parallel bus
 		 */
 
-		case 'P':
+		case 'P': {
+			BYTE width = bus[bus_number].parallel.width;
 			switch(command[3]) {
 			/*
 			 * define bus
@@ -1751,6 +1751,7 @@ static void do_command(const char *command)
 				break;
 			}
 			break;
+		}
 
 		/*
 		 * unrecognized bus type
