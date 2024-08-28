@@ -1,4 +1,5 @@
 from enum import IntEnum
+import logging
 import math
 import numpy
 import time
@@ -749,6 +750,9 @@ class bus_parallel_ttl(bus_parallel):
 #
 
 
+logger = logging.getLogger(__name__)
+
+
 class allpro88(object):
 	#
 	# USB information
@@ -789,9 +793,9 @@ class allpro88(object):
 			self.socket_module = socket_modules[self.socket_module_id](self)
 		except KeyError as e:
 			if self.socket_module_id == 0xff:
-				print("warning:  no socket module detected")
+				logger.warning("no socket module detected")
 			else:
-				print("warning:  unrecognized socket module ID 0x%02X" % self.socket_module_id)
+				logger.warning("unrecognized socket module ID 0x%02X" % self.socket_module_id)
 			self.socket_module = None
 
 		# keep track of what bus numbers are in use
