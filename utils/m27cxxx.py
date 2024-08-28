@@ -50,6 +50,7 @@ class m27cx_width8_pulse_ce(object):
 	@classmethod
 	def read_device(cls, imgfile):
 		with allpro88.allpro88() as programmer:
+			allpro88.command_line_banner(programmer)
 			with cls(programmer, "read") as device:
 				device.chip_enable = True
 				for device.address in tqdm(device.address_bus, desc = "Reading"):
@@ -83,6 +84,7 @@ class m27cx_width8_pulse_ce(object):
 		# confirm you have the correct part in the programmer, and
 		# this code also doesn't check that.
 		with allpro88.allpro88() as programmer:
+			allpro88.command_line_banner(programmer)
 			with cls(programmer, "program") as device:
 				# these are the default states, and power
 				# has already been applied to the device at
@@ -164,6 +166,7 @@ class m27cx_width16_pulse_ce(m27cx_width8_pulse_ce):
 	@classmethod
 	def read_device(cls, imgfile):
 		with allpro88.allpro88() as programmer:
+			allpro88.command_line_banner(programmer)
 			with cls(programmer, "read") as device:
 				device.chip_enable = True
 				for device.address in tqdm(device.address_bus, desc = "Reading"):

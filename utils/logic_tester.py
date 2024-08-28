@@ -436,5 +436,6 @@ class SN74273(object):
 
 
 with allpro88.allpro88() as programmer:
+	allpro88.command_line_banner(programmer)
 	with SN7400(programmer) as device:
 		device.test()

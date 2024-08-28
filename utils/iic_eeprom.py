@@ -100,6 +100,7 @@ class microchip_24lc16b(iic_eeprom):
 
 with open("dump.dat", "wb") as dump:
 	with allpro88.allpro88() as programmer:
+		allpro88.command_line_banner(programmer)
 		with atmel_24c02n(programmer) as device:
 			device.address = 0
 			for block in range(device.blocks):

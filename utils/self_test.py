@@ -771,11 +771,10 @@ except FileNotFoundError as e:
 	calibration = {}
 
 with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as programmer:
-	print("system ID = 0x%X\nsocket module = %s\nchannels installed:  %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", tuple(channel.channel for channel in programmer.channels_installed)))
+	allpro88.command_line_banner(programmer)
 
 	# record serial number
 	calibration["serial"] = programmer.serial_number
-	print("USB interface serial number:  %s\n" % calibration["serial"])
 
 	# turn on power supplies
 	programmer.pcr_enable = True

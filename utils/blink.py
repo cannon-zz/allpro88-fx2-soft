@@ -35,7 +35,7 @@ def blink_zif_pin1(programmer, n = 10):
 
 
 with allpro88.allpro88() as programmer:
-	print("system ID = 0x%X\nsocket module = %s" % (programmer.system_id, programmer.socket_module.name))
+	allpro88.command_line_banner(programmer)
 
 	blink_idle(programmer)
 

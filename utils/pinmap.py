@@ -10,7 +10,7 @@ tty_old_settings = termios.tcgetattr(sys.stdin)
 tty.setcbreak(sys.stdin.fileno())
 
 with allpro88.allpro88() as programmer:
-	print("system ID = 0x%X\nsocket module = %s\nchannels installed:  %s" % (programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", tuple(channel.channel for channel in programmer.channels_installed)))
+	allpro88.command_line_banner(programmer)
 
 	# set all pins to ground
 	for channel in programmer.channels:
