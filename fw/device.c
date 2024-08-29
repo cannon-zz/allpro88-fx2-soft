@@ -706,13 +706,15 @@ static void allpro88_hard_reset(void)
  * requires the main power supplies to be enabled and pin drivers
  * configured for ground potential this is done only at power-on when there
  * should not be a part installed in a socket.  it is not repeated as part
- * of the hardware reset sequence, because that is typically repeated each
- * time the host software connects to the device.
+ * of the hardware reset sequence, because that is normally executed each
+ * time the host connects to the programmer, often at a time when a part
+ * has been inserted into a socket.
  *
- * installed_channel_drivers is a bit mask, with each bit indicating the
- * presence of an 8-channel channel driver plug-in board, or "channel
- * group".  the lowest-order bit is for channel group 0 (channels 0 through
- * 7 inclusively);  1 = channel group is installed.
+ * installed_channel_drivers is a bit mask, with bits 0 through 10,
+ * inclusively, indicating the presence of the corresponding 8-channel
+ * channel driver plug-in board, or "channel group".  the lowest-order bit
+ * is for channel group 0 (channels 0 through 7 inclusively);  0 = channel
+ * group is not installed, 1 = channel group is installed.
  */
 
 
@@ -723,7 +725,9 @@ static void scan_installed_channel_drivers(void)
 	BYTE channel;
 	BYTE bit;
 
-	/* turn on main power supply, set VTH to about 1 V */
+	/* turn on main power supply, set VTH to about 1 V.  VADJ powers
+	 * the comparators, so also set it high enough for them to work
+	 * properly */
 	allpro88_set_PCR(PCR_ENABLE | PCR_NIDLE);
 	allpro88_set_VADJ(10);
 	allpro88_set_VTH(10);
@@ -731,14 +735,24 @@ static void scan_installed_channel_drivers(void)
 
 	/* scan the channels.  the channel drivers are implemented as
 	 * plug-in boards, each with 8 channels, so we just check for one
-	 * of the 8 channels for each board to test if that board is
-	 * present.  installed_channel_drivers is a bit mask indicating
-	 * which of the 11 boards are installed.  to test a channel for its
-	 * presence, we set each to pull-down (0 V), and compare the
-	 * voltage to VTH.  missing channels will not respond to the read,
-	 * so the pull-up resistors on the data-bus will set the bus to
-	 * 0xff, making it seem as if the voltage on the pin is above
-	 * threhsold. */
+	 * of the 8 channels on each board to test if that board is
+	 * present.  after setting VTH to about 1 V (see above), to test a
+	 * channel for its presence, we set the channel to pull-down (0 V)
+	 * mode, and compare the voltage on the pin to VTH.  channels that
+	 * are present and functioning will report a 0 in the LSB of the
+	 * data byte indicating that they see a voltage below VTH.  missing
+	 * channels will not respond to the address read operation, so the
+	 * pull-up resistors on the data-bus will set the bus to 0xff,
+	 * making it seem as if the voltage on the pin is above threhsold.
+	 * setting the pin to pull-down mode instead of using the
+	 * ground-driver FET to set its potential to 0 V is hopefully safer
+	 * in case a part is installed in the socket that, for some reason,
+	 * is placing voltages on some pins.  in that case, however, the
+	 * presence of that voltage will confuse the channel-presence test
+	 * and that entire group of 8 channels will be marked as absent.
+	 * it seems better to confuse the power-on self test than to risk
+	 * damaging a part.  the user can fix the problem by removing the
+	 * part and power-cycling the programmer. */
 
 	installed_channel_drivers = 0;
 	for(channel = 0, bit = 1; channel < 88; channel += 8, bit <<= 1) {
@@ -772,15 +786,25 @@ static void scan_installed_channel_drivers(void)
  * NOTE:  VTH is left modified by this operation, it is left set to its
  * approximation of the measured voltage.
  *
- * the VTH slew rate is about 2.5 V/us.  we need to ensure enough time
- * passes between setting VTH and reading the comparator state.  what's
- * here seems to be OK, but I've not carefully tested it, nor am I certain
- * I measured the slew rate correctly (it seems quite slow).  experiments
- * seem to prove that the 60 NOPs are not required at all, but I've left
- * them in just to be safe.  obviously only the first iteration would need
- * them anyway, the second shouldn't need more than 30, the third not more
- * than 15, and so on.  FIXME:  re-check the slew rate, and get rid of the
- * NOPs if it's true they aren't needed.
+ * the VTH slew rate is a bit slower than 2.5 V/us (limited by AD7226
+ * performance).  we need to ensure enough time passes between setting VTH
+ * and reading the comparator state.  what's here seems to be OK, but I've
+ * not carefully tested it.  in a test that sets a pin to a random voltage,
+ * measures it, and repeats as fast as possible, the 60 NOPs seem to
+ * slightly improve the magnitude of the residual over having none at all,
+ * but the test seems to mostly work almost perfectly even without them,
+ * which I don't understand.  I've left them in just to be safe.  obviously
+ * only the first iteration would need them anyway, the second shouldn't
+ * need more than 30, the third not more than 15, and so on.  that might be
+ * why it appears that they aren't needed:  most bits don't require the
+ * NOPs because the change in voltage is too small to need them, and for
+ * those that do need the NOPs mostly it's not necessary for the voltage to
+ * finish slewing to already have the correct answer on the comparator,
+ * only for voltages very close to the voltage of that bit will checking
+ * the comparator too soon be a problem, and maybe that's relatively rare
+ * (nevertheless, failing to wait is still incorrect nevertheless).  FIXME:
+ * think about some kind of jump table trick to have less NOPs on each
+ * iteration.
  */
 
 
@@ -970,7 +994,13 @@ void main_init(void)
 	 * in the next step.  finally, configure address bus and /RESET
 	 * GPIO pins for output set address and control bus pins for output
 	 * (if it isn't already, this now for real pulls /RESET low,
-	 * putting programmer into reset state)
+	 * putting programmer into reset state).  from the initial
+	 * application of power until this point, while the GPIO pins were
+	 * tri-stated, pull up and pull down resistors have been holding
+	 * the /RD and /WR lines high and /RESET line low, so the output
+	 * enable operation should not be changing the state of the control
+	 * lines, we are merely taking over control of their states from
+	 * the resistors.
 	 */
 
 	PORTACFG = 0;
@@ -1040,9 +1070,11 @@ void main_init(void)
 	 * irrelevant, if we guess wrong the first iteration through the
 	 * main loop will set it properly.
 	 *
-	 * FIXME:  should be able to do all of this with interrupts, but it
-	 * took so much screwing around to get just this much to work that
-	 * I don't want to tempt fate
+	 * FIXME:  should be able to do all of this with the wakup
+	 * interrupt, but it took so much screwing around to get just this
+	 * simple polling implementation to work that I don't want to tempt
+	 * fate.  attempting to follow the examples in the reference manual
+	 * led a bricked device.  the documentation is not at all clear.
 	 */
 
 	WAKEUPCS = bmWU | bmDPEN | bmWUEN;
@@ -1492,11 +1524,10 @@ __endasm;
 	 * SDCC actually compiles that loop to a much more efficient form,
 	 * but it has two problems:  (i) it's too fast, but that's easily
 	 * fixed with some NOP's, and (ii) it's not a constant number of
-	 * instructions cycles, it takes different lengths of time
-	 * depending on how the carries work out in the decrement.  this
-	 * code below is a fixed 12 instruction cycles.  1 instruction
-	 * cycle = 4 clock cycles.  at 48 MHz, 12 instruction cycles = 1
-	 * us.
+	 * instruction cycles, it takes different lengths of time depending
+	 * on how the carries work out in the decrement.  this code below
+	 * is a fixed 12 instruction cycles.  1 instruction cycle = 4 clock
+	 * cycles.  at 48 MHz, 12 instruction cycles = 1 us.
 	 *
 	 * the two move operations are 4 extra cycles = 333 ns, which is
 	 * approximately exactly the amount by which the pulse generated by
@@ -1828,15 +1859,6 @@ static void do_command(const char *command)
 	 */
 
 	case 'V':
-		/* FIXME:  this command produces more characters of output
-		 * than characters of input, so it violates the assumption
-		 * that the results of the commands contained in any single
-		 * input buffer can all fit into a single response buffer.
-		 * there's no motivation to queue a bunch of these
-		 * operations up and push them as a single command buffer,
-		 * it's a once-off measurement, so it's unlikely to lead to
-		 * problems, but at the moment there are no safety checks
-		 * in place to guarantee it doesn't lead to problems */
 		/* check for correct end of string */
 		if(command[1])
 			goto error;
@@ -1872,12 +1894,25 @@ inline static void parse_out_buffer(void)
 	AUTOPTRH2 = MSB(EP6FIFOBUF);
 	AUTOPTRL2 = LSB(EP6FIFOBUF);
 
-	/* loop over contents of out buffer.  some commands produce output
-	 * that is put into the in buffer.  the maximum length of any
-	 * command's output is shorter than the shortest output-generating
-	 * command, therefore we assume the output of all commands in a
-	 * single packet will fit into a single packet and don't bother
-	 * including any logic to handle otherwise */
+	/* loop over contents of out buffer, putting command responses in
+	 * in buffer.
+	 *
+	 * FIXME:  no check is made to ensure the responses fit into the
+	 * in buffer response packet.  almost all commands produce shorter
+	 * output than their own length, and given that they fit into a
+	 * command packet their responses are guaranteed to fit into a
+	 * response packet, however there are exceptions.  the "C" and "V"
+	 * commands, for example, and the parallel bus read command if the
+	 * bus size is large produce responses longer than themselves.  in
+	 * most cases there's no reason to queue large numbers of these
+	 * into a single command packet (why queue up a sequence of
+	 * requests to retrieve the installed pin driver map?), also the
+	 * host-side library no longer has the ability to queue multiple
+	 * commands into a single packet at all (although 3rd party code
+	 * could still try).  for these reasons, no effort has been put
+	 * into protecting against this failure mode, but ... if some easy
+	 * way to do it presents itself, that would be nice.
+	 */
 
 	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--)
 		/* search for end of command character */
