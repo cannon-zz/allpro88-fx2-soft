@@ -1540,6 +1540,7 @@ __endasm;
 	 * to 5 us, and then subtract that much above as the minimum pulse
 	 * length
 	 */
+
 __asm
 	mov	r4, _pulse_PARM_2
 	mov	r5, (_pulse_PARM_2 + 1)
