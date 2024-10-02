@@ -301,8 +301,13 @@ class channel_driver_test_suite(object):
 		return lowest_hi, highest_lo
 
 
-	def test_vpul(self):
+	def test_vpul(self, diode_vf):
 		"""
+		diode_vf is the current calibration's average VPUL reverse
+		protection diode forward-bias voltage.  It is required,
+		here, to partially un-calibrate the VPUL pin voltage to
+		obtain the internal VPUL voltage being applied to the
+		pin-driver circuit for some tests.
 		"""
 		# this test checks the circuit for placing the pull-up
 		# voltage onto a pin.  the VPUL power supply is assumed to
@@ -338,7 +343,7 @@ class channel_driver_test_suite(object):
 		# the forward-bias voltage of the reverse protection diode,
 		# and then after correcting for that we can mesaure the
 		# voltage at which the pull-up output first appears to
-		# check the emitter-base forward-bias voltage of the
+		# cross the emitter-base forward-bias voltage of the
 		# switching transistor.
 		#
 		# to do these tests, we configure the channel for pull-up
@@ -378,16 +383,23 @@ class channel_driver_test_suite(object):
 
 		# ramp the pull-up DAC over a range of voltages to measure
 		# a voltage curve.  for what we are doing here, we want to
-		# record the measured voltage as a function of the applied
-		# pull-up voltage, not as a function of the pull-up power
-		# supply's DAC setting.
+		# record the measured voltage as a function of the pull-up
+		# voltage applied to the circuit, meaning not as a function
+		# of the pull-up power supply's DAC setting, and not as a
+		# function of the pull-up voltage model that includes the
+		# diode Vf parameter that we in the process of trying to
+		# measure.  we need to zero that parameter while we do this
+		# test, by removing it from the calibration model.
 		self.vpul_ramp_x = numpy.zeros(128)
 		self.vpul_ramp_y = numpy.zeros(128)
 		for dac in range(128):
 			self.programmer.vpul = dac
 			self.programmer.load_dacs()
 			time.sleep(0.010)	# wait for RC delay
-			self.vpul_ramp_x[dac] = self.programmer.vpul.cal(dac, self.programmer)
+			# the applied VPUL voltage is obtained by adding
+			# the calibration model's diode_vf parameter to the
+			# vpul calibration model.
+			self.vpul_ramp_x[dac] = self.programmer.vpul.cal(dac, self.programmer) + diode_vf
 			self.vpul_ramp_y[dac] = self.measure_v()
 
 		# disable channel
@@ -403,6 +415,9 @@ class channel_driver_test_suite(object):
 		failed = not (0.98 <= poly.coef[1] <= 1.02)
 		print("channel %d VPUL fit: %s%s" % (self.channel.channel, poly, "\t<-- FAILED" if failed else ""))
 
+		# the y-intercept of the observed voltage vs applied
+		# voltage line provides the forward-bias voltage of this
+		# pin's reverse protection diode.
 		self.vpul_diode_vf = -poly.coef[0]
 		# require Vf consistent with Schottky diode
 		failed = not (0.150 <= self.vpul_diode_vf <= 0.35)
@@ -415,7 +430,7 @@ class channel_driver_test_suite(object):
 		# transistor's emitter-base forward-bias voltage.
 
 		# for which VPUL voltages does the observed voltage
-		# disagree with the linear fit?  "agree" = residual <= 1
+		# disagree with the linear fit?  "agree" --> residual <= 1
 		# DAC count for VTH.  find the threshold where a transition
 		# occurs.
 		not_good = abs(self.round_v(poly(self.vpul_ramp_x[:40])) - self.vpul_ramp_y[:40]) > 0.12
@@ -791,7 +806,21 @@ with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as
 				"poly":	tuple(map(float, pwr_sweep.vadj_model.coef))
 			},
 			"vpul": {
-				"poly":	tuple(map(float, pwr_sweep.vpul_model.coef))
+				# this is a model of the power supply's
+				# output
+				"poly":	tuple(map(float, pwr_sweep.vpul_model.coef)),
+				# the following are properties of the
+				# pin-driver circuits that place the power
+				# supply voltage onto a pin.  they are
+				# averages of component properties across
+				# all pin drivers to provide a typical (but
+				# not pin specific) correction for the
+				# calibration model.  they are measured by
+				# the pin driver calibration routines.  for
+				# now we set them to typical values for
+				# these components.
+				"diode_vf": 0.180,	# Schottky Vf
+				"trans_vf": 0.550	# PNP E-B Vf
 			},
 			"vsr": {
 				"poly":	tuple(map(float, pwr_sweep.vsr_model.coef))
@@ -830,7 +859,7 @@ with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as
 
 		test_suite.test_logich()
 
-		test_suite.test_vpul()
+		test_suite.test_vpul(calibration["vpul"]["diode_vf"])
 		vpul_diode_vf.append(test_suite.vpul_diode_vf)
 		vpul_trans_vf.append(test_suite.vpul_trans_vf)
 
