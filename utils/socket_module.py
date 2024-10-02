@@ -79,34 +79,82 @@ class socket_module(object):
 class socket_module_DIP_MODULE(socket_module):
 	name = "DIP MODULE"
 	module_id = 0x02
+	# I suspect this means the 40 pin DIP only socket module with the
+	# single 96 pin DIN connector that shipped with the earlier
+	# programmer, preceding the ALLPRO88.  if so, this should be
+	# exactly compatible with the PLCC socket module, being equivalent
+	# to the upper 40 pins of the 48 pin DIP socket.
 
 
-class socket_module_2708_EAROM(socket_module):
-	name = "2708 / EAROM"
-	# Logical Devices' documentation lists two different adapters for
-	# code 0x03:  something called "2708" and something called "EAROM",
-	# so I've combined their names
+class socket_module_2708(socket_module):
+	name = "2708"
 	module_id = 0x03
+	# Logical Devices' documentation lists two different adapters for
+	# code 0x03:  something called "2708" and something called "EAROM".
+	# I suspect EAROM is a typo, improperly transcripted from EPROM by
+	# somebody not familiar with the technical terms.  I've called this
+	# just 2708.
+	#
+	# 2708 probably refers to the TMS2708 series EPROM parts.  these
+	# require a 25 V to 27 V (26 V nominal) program pulse.  that is at
+	# the very upper end of what the ALLPRO88 can deliver to a pin.  it
+	# can drive a pin to a little over 25 V, which should meet the
+	# minimum requirements to program one of these parts, but it's
+	# maybe not 100% reliable, and if an ALLPRO88 is even just slightly
+	# misadjusted it might not be able to get all the way to 25 V.
+	# this is probably why a custom socket module was provided for this
+	# series of parts, to ensure a higher programming reliability.
+	# this socket module might be a bodge:  they might have intended to
+	# support these parts natively but found it just wasn't
+	# sufficiently reliable to do so, and were forced to solve the
+	# problem with a separate socket module.
 
 
 class socket_module_TMS370(socket_module):
 	name = "TMS370"
 	module_id = 0x04
+	# after giving the TMS370 microcontroller family documentation a
+	# brief read, I don't see why a custom socket module is required,
+	# except possibly for purely physical reasons, to accomodate the 68
+	# pin PLCC and 64 pin PDIP package variants (which the standard
+	# socket module doesn't support).  there are plenty of TMS370
+	# series parts in packages that will fit in the standard socket
+	# module.
 
 
 class socket_module_8789(socket_module):
 	name = "8789"
 	module_id = 0x05
+	# don't know what this is for.
 
 
 class socket_module_68HC11(socket_module):
 	name = "68HC11"
 	module_id = 0x06
+	# the 68HC11 series parts require a current limiting feature on the
+	# programming voltage supply pin.  the datasheet states that a 1
+	# kOhm or 100 Ohm resistor (depending on the part) in series with
+	# the programming supply is sufficient.  I'm skeptical that that is
+	# the reason for a separate socket module, because I think the VTST
+	# supply could be used to supply a suitable current-limited
+	# programming voltage to the part.  apart from the unusual need for
+	# a current limited programming voltage, the only other need for a
+	# custom socket module is the need to support the 56 pin DIP
+	# package and 52 pin QFP package variants, which wouldn't fit into
+	# the standard socket module.
 
 
 class socket_module_PAC1000(socket_module):
 	name = "PAC1000"
 	module_id = 0x07
+	# probably refers to the PAC1000 programmable microcontroller by
+	# Waferscale Integration.  briefly reading the datasheet, I don't
+	# see any electrical reason to require a custom socket module to
+	# support this part.  the part, however, is only available in a 100
+	# pin QFP package and an 88 pin PGA package, neither of which is
+	# supported by the standard socket module.  the 100 pin version has
+	# more pins than a maxed-out ALLPRO88 has channels, but surely not
+	# all pins need to be used to program the part.
 
 
 class socket_module_AP88_PLCC(socket_module):
@@ -120,7 +168,7 @@ class socket_module_AP88_PLCC(socket_module):
 	PLCC sockets, but can use all the others.
 
 	NOTE:  since my programmer is only 48 channels, I have not bothered
-	constructed pin mappings for the 52 pin, 68 pin and 84 pin PLCC
+	constructing pin mappings for the 52 pin, 68 pin and 84 pin PLCC
 	sockets.
 	"""
 	name = "AP88 PLCC"
@@ -372,7 +420,7 @@ class socket_module_68HC705(socket_module):
 
 socket_modules = dict((cls.module_id, cls) for cls in (
 	socket_module_DIP_MODULE,
-	socket_module_2708_EAROM,
+	socket_module_2708,
 	socket_module_TMS370,
 	socket_module_8789,
 	socket_module_68HC11,
