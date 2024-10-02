@@ -581,17 +581,31 @@ class channel_driver_test_suite(object):
 		The TTL low driver is a 50 Ohm resistor to ground.  This
 		test uses a VTST current ramp to test for this resistance.
 		"""
-		# enable VTST and logic low modes together
+		# enable VTST and logic low modes together.  measure
+		# resistance to ground.  don't let current exceed 10 mA
 		self.channel.config = allpro88.PINCON.VTST | allpro88.PINCON.LOGICL
+		R1 = self.vtst_measure_r(10)
 
-		# measure resistance.  don't let current exceed 10 mA
-		R = self.vtst_measure_r(10)
+		# enable pull-up and logic low modes together.  set VPUL to
+		# 25 V (calibrated) and measure voltage on pin.  the
+		# pull-up output impedance is 2700 Ohm, the TTL low driver
+		# is a 50 Ohm resistor to ground, so we should observe
+		# 25 V / (2700 Ohm + 50 Ohm) * 50 Ohm = 0.45 V on the pin.
+		self.channel.config = allpro88.PINCON.PULLUP | allpro88.PINCON.LOGICL
+		self.programmer.vpul = allpro88.volt(22.0)
+		self.programmer.load_dacs()
+		V = self.measure_v()
+		self.programmer.vpul = 0
+		self.programmer.load_dacs()
+
+		failed = False
+		print("channel %d logic low V test:  %g V%s" % (self.channel.channel, V, "" if not failed else "\t<-- FAILED"))
 
 		# disable channel
 		self.channel.config = allpro88.PINCON.DISABLE
 
 		failed = False
-		print("channel %d logic low pull-down resistance:  %.0f Ohm%s" % (self.channel.channel, R, "" if not failed else "\t<-- FAILED"))
+		print("channel %d logic low pull-down resistance:  %.0f Ohm%s" % (self.channel.channel, R1, "" if not failed else "\t<-- FAILED"))
 
 
 	def test_vdac_ramp(self):
