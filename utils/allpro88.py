@@ -42,6 +42,38 @@ class PCR(IntEnum):
 class PINCON(IntEnum):
 	"""
 	Pin driver configuration register bits.
+
+	Except for the case of combining the pull-up supply with other
+	voltage sources, it's almost certainly an error to activate more
+	than one voltage source at the same time, however reverse
+	protection diodes prevent any voltage source from damaging other
+	voltage sources, so any combination of them can be activated
+	simultaneously without doing damage.
+
+	The highest possible output voltage is approximately 25 V, which
+	would dissipate less than 1/8 W in the 5.4 kOhm pull-down resistor.
+	I don't know what it's rated for, but it is probably safe to enable
+	the pull-down resistor in combination with any of the voltage
+	sources at any output voltage.
+
+	Only the pull-up voltage source is safe to enable in combination
+	with the TTL low drive output, or the current-limited test source
+	if set to a sufficiently low current.  Enabling any other voltage
+	source in combination with the TTL low output will destroy
+	hard-to-replace surface-mount components on the channel's hybrid
+	module.
+
+	Enabling the ground drive transistor in combination with any
+	voltage source other than the pull-up source or the current-limited
+	test srouce will destroy components.
+
+	NOTE:  the resistors in the circuitry of the hybrid modules are
+	printed into the module as part of the substrate.  All other
+	components are standard off-the-shelf parts, but the resistors
+	*cannot* be replaced.  If a single one is damanged due to
+	over-current conditions the entire hybrid module will have to be
+	replaced.  The only source of replacement hybrid modules is a
+	parts-donor unit.
 	"""
 	DISABLE = 0x00	# disable ("float") pin
 	GND = 0x01	# turn on FET pulling pin to ground
@@ -380,7 +412,6 @@ class channel_proxy(object):
 		assert n > 0
 		volts = []
 		for i in range(n):
-			# command format:  MXX, XX = channel #
 			dac, = self.programmer.write_command("M%02X" % self.channel)
 			volts.append(self.programmer.vth.cal(dac, self.programmer))
 		return numpy.median(volts)
