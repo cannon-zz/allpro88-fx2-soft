@@ -727,9 +727,9 @@ static void scan_installed_channel_drivers(void)
 
 	/* turn on main power supply, set VTH to about 1 V.  VADJ powers
 	 * the comparators, so also set it high enough for them to work
-	 * properly */
+	 * properly (2 V, or 2 V above VTH, whichever is greater) */
 	allpro88_set_PCR(PCR_ENABLE | PCR_NIDLE);
-	allpro88_set_VADJ(10);
+	allpro88_set_VADJ(30);
 	allpro88_set_VTH(10);
 	delay(10 /* ms */);	/* let power supplies slew */
 
