@@ -37,6 +37,33 @@ dacfitweights = numpy.fromfunction(numpy.polynomial.Polynomial((1., -2. / 255, +
 
 
 class power_supply_sweep(object):
+	"""
+	Notes on power supply behaviour
+
+	The VPUL power supply is constructed from a DAC0832 current DAC, an
+	op amp acting as a current-to-voltage converter, a second op amp
+	acting as a gain amplifier to set the output voltage range, and a
+	NPN power transistor in an emitter-follower configuration to
+	provide high current output capability.  The final op amp's output
+	voltage can be observed on TP6 on Analogue Control 1.  The NPN
+	power transistor does not begin to conduct until the voltage
+	difference across its base-emitter junction exceeds about 0.6 V,
+	and the circuit employs an LM334 current source from the
+	transistor's emitter to the -5 V supply rail, set to about 5 mA, to
+	pull the emitter potential down and ensure the transistor's
+	base-emitter junction is always forward biased and conducting even
+	when the op amp output voltage is at 0 V.  This ensures the VPUL
+	potential remains controlled at all times, it's never freely
+	floating.  All of this also means, however, that VPUL is expected
+	to be about 0.6 V below the op amp output voltage on TP6, and in
+	particular it is expected to be slightly negative for low DAC
+	settings.  Failing to see VPUL go negative at low DAC settings
+	might indicate a failure of the -5 V supply or of the LM334 current
+	source.  The NPN power transistor is rated for at least 1 A maximum
+	collector current, which is enough to deliver VPUL's maximum
+	voltage to all 88 2.7 kOhm pull-up resistors in a fully-equiped
+	unit, when all 88 are being shorted to ground.
+	"""
 	def __init__(self, programmer, which = ["VADJ", "VTH", "VPUL", "VSR", "VTST"], meter = None):
 		self.programmer = programmer
 		which = set(which)
@@ -363,17 +390,21 @@ class channel_driver_test_suite(object):
 		# resistance is only 2.7 kOhm to ground, because the
 		# pull-up driver drives the mid-point of the pull-down
 		# circuit's 5.4 kOhm resistor.  I don't know what power the
-		# resistor is rated for dissipating, but if we assume the
-		# pull down current path has been designed to work safely
-		# in conjunction with a pin DAC at it's maximum output
+		# resistor is rated to dissipate, but if we assume the pull
+		# down current path has been designed to work safely in
+		# conjunction with a pin DAC at it's maximum output
 		# voltage, then because only 1/2 of that total resistance
 		# is between the pull-up voltage source and ground we
 		# assume here that we can safely ramp the pull-up voltage
-		# only to 1/2 of its maximum value so that the current
-		# flowing through the 1/2 pull-down resistor is limited to
-		# what it would be in the VDAC case.  I don't know how much
-		# power it's rated for, but at full voltage it would have
-		# to dissipate about 1/4 W.
+		# to 1/2 of its maximum value so that the current flowing
+		# through the pull-down resistor is limited to what it
+		# would be in the worst-case VDAC configuration, meaning
+		# about 63 mW is dissipated by the resistor.  even with the
+		# VPUL voltage set to its maximum of about 25 V, only about
+		# 1/4 W would be dissipated in the pull-down resistor,
+		# which doesn't sound like a lot for the resistor to
+		# handle, nevertheless we avoid stressing it.
+
 		self.channel.config = allpro88.PINCON.PULLUP | allpro88.PINCON.PULLDN
 		self.channel.bypass = False	# make sure it's off
 		# discharge the circuit
@@ -411,7 +442,11 @@ class channel_driver_test_suite(object):
 		# y-intercept is an estimate of the forward-bias voltage of
 		# the reverse protection diode.
 		poly = numpy.polynomial.Polynomial.fit(self.vpul_ramp_x[20:], self.vpul_ramp_y[20:], 1, w = dacfitweights[20:128]).convert()
-		# require slope to be within 2% of 1.0
+		# require slope to be within 2% of 1.0.  NOTE:  in my
+		# experience, failure of this test is caused by the failure
+		# of the reverse protection diode in the TTL high output
+		# drive circuit.  on three occasions, so far, that has been
+		# the cause.
 		failed = not (0.98 <= poly.coef[1] <= 1.02)
 		print("channel %d VPUL fit: %s%s" % (self.channel.channel, poly, "\t<-- FAILED" if failed else ""))
 
@@ -451,12 +486,14 @@ class channel_driver_test_suite(object):
 		# voltage quantized to an integer VTH DAC setting.
 		# measure the difference between the observed voltage and
 		# that simple model.  because the VPUL drive circuit for
-		# each pin includes 2.7 kOhm of output impedance, short
-		# circuits to ground will drag down the observed voltage.
-		# even partial short circuits can easily have a measurable
-		# effect.  confirming agreement between the VPUL power
-		# supply's output voltage and the voltage observed on each
-		# pin can help identify faults in other circuity.
+		# each pin includes 2.7 kOhm of output impedance, partial
+		# short circuits to ground will drag down the observed
+		# voltage.  given the VTH quantization noise of 0.1 V, the
+		# limit of detection for a stray current path to ground is
+		# about 680 kOhm.  leakage to ground through resistances as
+		# high as 250 kOhm should be easily seen, so this is quite
+		# a sensitive test for faults in the rest of the pin driver
+		# circuitry.
 		def model(vpul):
 			return numpy.where(vpul < 2 * self.vpul_trans_vf, minimum, vpul - self.vpul_diode_vf)
 
