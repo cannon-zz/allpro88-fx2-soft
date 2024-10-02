@@ -47,7 +47,18 @@ class power(object):
 		this instance.  see also the .max() method.  the option of
 		setting this voltage manually is provided for applications
 		where a higher voltage will be needed but is not initially
-		known to this instance.
+		known to this instance.  NOTE:  the main variable power
+		supply also powers the pin voltage read-back comparators.
+		these are LM393 parts.  to operate, they require a supply
+		voltage of at least 2 V, and it is recommended their input
+		voltages remain at least 2 V below the supply voltage (but
+		never negative), therefore vadj should be at least 2 V
+		above the maximum voltage that might appear on any pin,
+		even if that voltage is not being supplied by the
+		programmer.  this is only a recommendation for the parts to
+		meet their performance specifications;  failing to keep the
+		comparator supply voltages above their input voltages will
+		not damage the parts.
 
 		vpul:  the voltage to set the pull-up voltage to.  this
 		voltage is supplied to the pull-up resistors in the channel
@@ -108,7 +119,8 @@ class power(object):
 		"""
 		self.active_voltage_map = self.voltage_maps[voltage_map if voltage_map is not None else self.default_voltage_map]
 		# configure pins.  dacs will be loaded below, with main
-		# dacs
+		# dacs.  note, only the dacs are being set, the power
+		# supplies are still off
 		for pin, voltage in self.active_voltage_map.items():
 			self.socket[pin].bypass = True
 			if voltage:
@@ -437,18 +449,33 @@ class bus_spi(object):
 	lo = allpro88.PINCON.LOGICL
 
 	def __init__(self, socket, sclk, mosi, miso, vdac):
+		"""
+		socket = the socket instance for the socket in which the
+		part is installed.
+
+		sclk, mosi, miso = the socket pin numbers corresponding to
+		these SPI signals.
+
+		vdac = the voltage for the "high" state on the pins (in
+		volts, not dac count).
+		"""
+		# retrieve channel proxy objects for the pins
 		self.sclk = socket[sclk]	# clock
 		self.mosi = socket[mosi]	# master --> slave
 		self.miso = socket[miso]	# master <-- slave
 
+		# set the VDAC voltage on the sclk and mosi pins
 		if vdac <= 0:
 			raise ValueError(vdac)
 		vdac = allpro88.volt(vdac)
 		self.sclk.vdac = vdac
 		self.mosi.vdac = vdac
 
+		# set both pins low = idle state, and make sure miso is
+		# floating.
 		self.sclk.config = self.lo
 		self.mosi.config = self.lo
+		self.miso.config = allpro88.PINCON.DISABLE
 
 	def transfer_byte(self, out_byte):
 		"""
@@ -462,4 +489,6 @@ class bus_spi(object):
 			self.sclk.config = self.lo
 			if self.miso:
 				in_byte |= bit
+		# we don't reset mosi.  FIXME:  do we need to?
+		#self.mosi.config = self.lo
 		return in_byte
