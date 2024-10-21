@@ -8,7 +8,8 @@ class iic_eeprom(object):
 	voltage_maps = {
 		"default": {
 			4: 0.0,	# GND
-			8: 5.0	# Vcc
+			8: 5.0,	# Vcc
+			"VPUL": 5.0
 		}
 	}
 	device_id = 0b1010
@@ -24,7 +25,7 @@ class iic_eeprom(object):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket]
 		# confiugre VPUL and VTH for I2C bus
-		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vpul = 5.0, vth = 2.0)
+		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vth = 2.0)
 		# IIC bus
 		self.i2c = devices.bus_iic(self.socket, 5, 6)
 		# address select pins

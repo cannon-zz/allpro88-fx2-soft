@@ -26,9 +26,10 @@ class oled_module(object):
 		self.power = devices.power(self.programmer, self.socket, {
 			"default": {
 				1: 0.0,
-				2: 5.0
+				2: 5.0,
+				"VPUL": 5.0
 			}
-		}, vpul = 5.0, vth = 2.0)
+		}, vth = 2.0)
 		self.i2c = devices.bus_iic(self.socket, 4, 3)
 
 	def __enter__(self):

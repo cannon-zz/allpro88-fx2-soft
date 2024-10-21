@@ -21,8 +21,11 @@ class m27cx_width8_pulse_ce(object):
 	def __init__(self, programmer, mode):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
+		if mode not in self.voltage_maps:
+			raise ValueError("unknown mode \"%s\"" % mode)
+		self.mode = mode
 		# power pins
-		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj, default_voltage_map = mode)
+		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj)
 		# address and data buses
 		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.address_bus_pins)
 		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.data_bus_pins)
@@ -31,7 +34,7 @@ class m27cx_width8_pulse_ce(object):
 		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.output_enable_pin)
 
 	def __enter__(self):
-		self.power.on()
+		self.power.on(self.mode)
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):

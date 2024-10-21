@@ -19,30 +19,40 @@ class power(object):
 	configurations.  Calling the .on() and .off() methods from the
 	.__enter__() and .__exit__() methods of a context manager will
 	ensure the power to the part is safetly removed in the event of a
-	softwre crash.
+	software crash.
 	"""
-	def __init__(self, programmer, socket, voltage_maps, vadj = "auto", vpul = 0.0, vth = 1.5, default_voltage_map = "default"):
+	def __init__(self, programmer, socket, voltage_maps, vadj = "auto", vth = 1.5):
 		"""
 		programmer:  allpro88 programmer instance
 
 		socket:  the socket instance for the part
 
-		voltage_maps:  a dictionary mapping voltage map names to
-		dictionaries of pin number -to- voltage mappings, with pin
-		numbers for the socket and (float) voltages in volts;  one
-		of the mappings must have the name of default_voltage_map;
-		in the pin number -to- voltage mapping, pins whose voltages
-		are 0 will be connected to ground, all others will have the
-		given voltage (in volts) applied).  all pins given in the
-		voltage map, including ground pins, will have bypass
-		capacitors applied to them to help stabilize the voltages
-		at the part.
+		voltage_maps:  a dictionary mapping string names to
+		dictionaries of integer pin number-to-voltage mappings,
+		with integer pin numbers corresponding to the given socket,
+		and (float) voltages in volts.  when the .on() method is
+		called, the name of a pin-to-voltage map can be supplied to
+		select the pin-to-voltage mapping from among those in
+		voltage_maps;  if no name is provided to .on(), the name
+		"default" is assumed, which then must be the name of one of
+		the pin-to-voltage mappings in voltage_maps.  in each pin
+		number-to-voltage mapping, pins whose voltages are 0 will
+		be connected to ground, all others will have the given
+		voltage (in volts) applied.  all pins given in the voltage
+		map, including ground pins, will have bypass capacitors
+		connected to them, if the socket module has that feature
+		(not all pins in all socket modules provide the bypass
+		capacitor feature).  if one of the pins, instead of being
+		an integer, is the string "VPUL", then that sets the
+		pull-up voltage applied to pull-up resistors in the channel
+		drivers.  if VPUL is not given in the voltage map, the
+		default of 0 V will be used.
 
-		vadj:  the voltage to set the programmers main variable
-		power supply to;  all other power supply voltages are
+		vadj:  the voltage to set the programmer's main variable
+		power supply to.  all other power supply voltages are
 		derived from this via linear regulators so this voltage
 		needs to be a volt or two higher than the highest required
-		voltage.  if set to "auto" (the default) the appropriate
+		voltage.  if set to "auto" (the default) an appropriate
 		value will be derived from all required voltages known to
 		this instance.  see also the .max() method.  the option of
 		setting this voltage manually is provided for applications
@@ -55,14 +65,11 @@ class power(object):
 		never negative), therefore vadj should be at least 2 V
 		above the maximum voltage that might appear on any pin,
 		even if that voltage is not being supplied by the
-		programmer.  this is only a recommendation for the parts to
-		meet their performance specifications;  failing to keep the
-		comparator supply voltages above their input voltages will
-		not damage the parts.
-
-		vpul:  the voltage to set the pull-up voltage to.  this
-		voltage is supplied to the pull-up resistors in the channel
-		drivers.  the default is 0 V.
+		programmer.  this is only a recommendation for the
+		comparators to meet their performance specifications;
+		failing to keep the comparator supply voltages above their
+		input voltages by the minimum recommended amount will not
+		damage the parts.
 
 		vth:  the voltage for the comparators used to test the
 		state of pins.  the default is 1.5 V, which is a compromise
@@ -76,14 +83,20 @@ class power(object):
 		default_voltage_map:  the name of the voltage map to use at
 		start-up.
 		"""
-		if default_voltage_map not in voltage_maps:
-			raise KeyError("voltage_maps must include '%s'" % default_voltage_map)
 		self.programmer = programmer
 		self.socket = socket
+		# confirm the voltage maps have valid pins and the voltages
+		# are sensible
+		valid_pins = set(self.socket) | set(("VPUL",))
+		for name, voltage_map in voltage_maps.items():
+			if not set(voltage_map).issubset(valid_pins):
+				raise ValueError("invalid pins %s in voltage map \"%s\"" % (set(voltage_map), name))
+			for volt in voltage_map.values():
+				if volt < 0:
+					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
+				allpro88.volt(volt)
 		self.voltage_maps = voltage_maps
-		self.default_voltage_map = default_voltage_map
 		self.active_voltage_map = None
-		self.vpul = allpro88.volt(vpul) if vpul else 0
 		self.vth = allpro88.volt(vth) if vth else 0
 		if vadj == "auto":
 			self.vadj = allpro88.volt(self.max() + 2.)
@@ -99,7 +112,7 @@ class power(object):
 		The return type is a float, not an allpro88.volt.
 		"""
 		max_pin_voltage = max(max(voltage_map.values()) for voltage_map in self.voltage_maps.values())
-		return float(max(self.vpul, self.vth, max_pin_voltage))
+		return float(max(self.vth, max_pin_voltage))
 
 	def reset_vth(self):
 		"""
@@ -110,57 +123,83 @@ class power(object):
 		"""
 		self.programmer.vth = self.vth
 
-	def on(self, voltage_map = None):
+	def set_voltage_map(self, voltage_map):
+		# configure pins and the VPUL dac.
+		self.active_voltage_map = self.voltage_maps[voltage_map]
+		for pin, voltage in self.active_voltage_map.items():
+			if pin == "VPUL":
+				self.programmer.vpul = allpro88.volt(voltage) if voltage else 0
+			else:
+				# retrieve channel driver for this pin.
+				# .__init__() has guaranteed this will
+				# succeed
+				pin = self.socket[pin]
+				# configure
+				pin.bypass = True
+				if voltage:
+					pin.config = allpro88.PINCON.VDAC
+					pin.vdac = allpro88.volt(voltage)
+				else:
+					pin.config = allpro88.PINCON.GND
+					pin.vdac = 0
+		# if VPUL was not explicitly set in the voltage map,
+		# default to 0 V.
+		if "VPUL" not in self.active_voltage_map:
+			self.programmer.vpul = 0
+		# clock the VPUL and pin driver dacs
+		self.programmer.load_dacs()
+
+	def on(self, voltage_map = "default"):
 		"""
 		Turn the power supplies on, applying power to the part.
-		Use the voltages in voltage_map.  If voltage_map is None
-		(the default) then the default voltage map is used as
-		configured by the .__init__() method.
+		Use the voltages in voltage_map, or in the voltage map
+		named "default" if a name is not given.
 		"""
-		self.active_voltage_map = self.voltage_maps[voltage_map if voltage_map is not None else self.default_voltage_map]
-		# configure pins.  dacs will be loaded below, with main
-		# dacs.  note, only the dacs are being set, the power
-		# supplies are still off
-		for pin, voltage in self.active_voltage_map.items():
-			self.socket[pin].bypass = True
-			if voltage:
-				self.socket[pin].config = allpro88.PINCON.VDAC
-				self.socket[pin].vdac = allpro88.volt(voltage)
-			else:
-				self.socket[pin].config = allpro88.PINCON.GND
-				self.socket[pin].vdac = 0
+		# safety check before proceeding
+		if voltage_map not in self.voltage_maps:
+			raise ValueError("unknown voltage map \"%s\"" % voltage_map)
+		# turn on power supplies.  this is done before clocking the
+		# VPUL and pin driver dacs because the VADJ power supply
+		# has a slow transient response.  if the dacs are loaded
+		# first, then all the voltages ramp up with VADJ as it
+		# ramps, but that is longer than the maximum allowed
+		# transition time for some parts' power supply pins.
+		self.programmer.pcr_enable = True
 		# set main dacs
 		self.programmer.vadj = self.vadj
-		self.programmer.vpul = self.vpul
 		self.reset_vth()
-		self.programmer.load_dacs()
-		# turn on power supplies
-		self.programmer.pcr_enable = True
-		# give VADJ its chance to ramp up.  the power supplies
-		# weren't enabled, yet, when we programmed its control DAC,
-		# so the power supply that DAC controls is only now
-		# ramping.
-		time.sleep(self.programmer.vadj.transient)
+		# configure pins and the VPUL dac, and clock them to apply
+		# power to the part
+		self.set_voltage_map(voltage_map)
 
 	def off(self):
 		"""
 		Turn power supplies off.
 		"""
-		# cut power
-		self.programmer.pcr_enable = False
-		# set dacs to 0
-		self.programmer.vadj = 0
+		# set VPUL and pin dacs to 0
 		self.programmer.vpul = 0
-		self.programmer.vth = 0
-		# set vdac supplies to 0 and disable pins
-		for pin in self.active_voltage_map:
-			self.socket[pin].vdac = 0
-			self.socket[pin].bypass = False
-			self.socket[pin].config = allpro88.PINCON.DISABLE
-		# load pin dacs and vpul dac
+		if self.active_voltage_map is not None:
+			for pin in self.active_voltage_map:
+				if pin != "VPUL":
+					self.socket[pin].vdac = 0
+		# clock the VPUL and pin driver dacs to remove power from
+		# the part
 		self.programmer.load_dacs()
-		# done
+		# now that power has been removed, it is safe to disable
+		# pins
+		if self.active_voltage_map is not None:
+			for pin in self.active_voltage_map:
+				if pin != "VPUL":
+					pin = self.socket[pin]
+					pin.bypass = False
+					pin.config = allpro88.PINCON.DISABLE
+		# no active voltage map
 		self.active_voltage_map = None
+		# set main dacs to 0
+		self.programmer.vadj = 0
+		self.programmer.vth = 0
+		# cut main power
+		self.programmer.pcr_enable = False
 
 
 #
