@@ -149,15 +149,57 @@ class power(object):
 		# clock the VPUL and pin driver dacs
 		self.programmer.load_dacs()
 
-	def on(self, voltage_map = "default"):
+	def do_sequence(self, sequence):
 		"""
-		Turn the power supplies on, applying power to the part.
-		Use the voltages in voltage_map, or in the voltage map
+		sequence must be an iterable of (voltage map name, delay)
+		pairs.  the voltage maps in sequence are applied in order,
+		with the given delay in seconds between each.  NOTE: delays
+		of about 100 us or less cannot be relied upon.  if a
+		shorter delay is requested than is possible, it will be
+		silently increased to the minimum achievable delay.  if
+		that is not acceptable, if power must be sequenced onto a
+		part with short, precise, time intervals, then custom
+		firmware support will be needed.
+		"""
+		# ensure we can iterate over it more than once and it's not
+		# empty
+		sequence = tuple(sequence)
+		if len(sequence) < 1:
+			raise ValueError("sequence is empty")
+		# confirm the voltage maps are known, the delays are
+		# sensible, and all voltage maps in the sequence configure
+		# the same pins
+		pins = None
+		for voltage_map, delay in sequence:
+			if voltage_map not in self.voltage_maps:
+				raise ValueError("unknown voltage map \"%s\"" % voltage_map)
+			if delay < 0:
+				raise ValueError("invalid delay %g" % delay)
+			if pins is None:
+				pins = set(self.voltage_maps[voltage_map])
+			elif pins != set(self.voltage_maps[voltage_map]):
+				raise ValueError("inconsistent pins in voltage map \"%s\"" % voltage_map)
+		for voltage_map, delay in sequence:
+			self.set_voltage_map(voltage_map)
+			time.sleep(delay)
+
+	def on(self, voltage_map = "default", sequence = None):
+		"""
+		Turn the power supplies on, applying power to the part.  If
+		sequence is None (the default), then use the voltages in
+		the voltage map named voltage_map, or in the voltage map
 		named "default" if a name is not given.
+
+		If sequence is not None, then voltage_map is ignored, and
+		sequence must be an iterable of (voltage map name, delay)
+		pairs.  the voltage maps in sequence are applied in order,
+		with the given delay in seconds between each.  NOTE: delays
+		of about 100 us or less cannot be relied upon;  if shorter
+		delays are requested the actual delay will be a bit more
+		than 100 us.  If power must be sequenced onto a part with
+		such short, precise, delays, custom firmware support will
+		be needed.
 		"""
-		# safety check before proceeding
-		if voltage_map not in self.voltage_maps:
-			raise ValueError("unknown voltage map \"%s\"" % voltage_map)
 		# turn on power supplies.  this is done before clocking the
 		# VPUL and pin driver dacs because the VADJ power supply
 		# has a slow transient response.  if the dacs are loaded
@@ -170,7 +212,23 @@ class power(object):
 		self.reset_vth()
 		# configure pins and the VPUL dac, and clock them to apply
 		# power to the part
-		self.set_voltage_map(voltage_map)
+		try:
+			if sequence is None:
+				self.set_voltage_map(voltage_map)
+			else:
+				self.do_sequence(sequence)
+		except:
+			# if a failure occurs, we want to guarantee the
+			# power has been turned off, so we trap *anything*
+			# and run the following
+
+			# set main dacs to 0
+			self.programmer.vadj = 0
+			self.programmer.vth = 0
+			# cut main power
+			self.programmer.pcr_enable = False
+			# continue error handling
+			raise
 
 	def off(self):
 		"""
