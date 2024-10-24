@@ -3,8 +3,6 @@ from tqdm import tqdm
 from . import allpro88
 
 with allpro88.allpro88() as programmer:
-	allpro88.command_line_banner(programmer)
-
 	for i in tqdm(range(100000), desc = "loopback test"):
 		snd = random.randint(0, 0xffff)
 		rcv = programmer.echo(snd)

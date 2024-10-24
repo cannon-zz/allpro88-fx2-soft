@@ -35,8 +35,5 @@ def blink_zif_pin1(programmer, n = 10):
 
 
 with allpro88.allpro88() as programmer:
-	allpro88.command_line_banner(programmer)
-
 	blink_idle(programmer)
-
 	blink_zif_pin1(programmer)

@@ -839,8 +839,6 @@ except FileNotFoundError as e:
 	calibration = {}
 
 with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as programmer:
-	allpro88.command_line_banner(programmer)
-
 	# record serial number
 	calibration["serial"] = programmer.serial_number
 

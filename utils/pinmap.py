@@ -10,8 +10,6 @@ tty_old_settings = termios.tcgetattr(sys.stdin)
 tty.setcbreak(sys.stdin.fileno())
 
 with allpro88.allpro88() as programmer:
-	allpro88.command_line_banner(programmer)
-
 	# set all pins to ground
 	for channel in programmer.channels:
 		channel.config = allpro88.PINCON.GND

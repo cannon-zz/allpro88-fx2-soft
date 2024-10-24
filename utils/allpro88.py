@@ -916,6 +916,8 @@ class allpro88(object):
 			# calling code error
 			raise ValueError(cal_data)
 
+		logger.info("serial number:  %s\nsystem ID:  0x%X\nsocket module:  %s\nchannels installed (%d):  %s" % (self.serial_number, self.system_id, self.socket_module.name if self.socket_module else "not detected", len(self.channels_installed), tuple(channel.channel for channel in self.channels_installed)))
+
 
 	def __enter__(self):
 		# ensure the programmer is left in a safe condition (all
@@ -1406,11 +1408,3 @@ class allpro88(object):
 		# circuit fails to prevent an overload it could be seen to
 		# be above that.
 		return vdac / 5.0
-
-
-def command_line_banner(programmer):
-	"""
-	Text banner displayed by command-line tools.
-	"""
-	# FIXME:  use logger?  and do this in allpro88.__init__()?
-	print("serial number:  %s\nsystem ID:  0x%X\nsocket module:  %s\nchannels installed (%d):  %s" % (programmer.serial_number, programmer.system_id, programmer.socket_module.name if programmer.socket_module else "not detected", len(programmer.channels_installed), tuple(channel.channel for channel in programmer.channels_installed)))
