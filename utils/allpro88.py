@@ -18,6 +18,10 @@ from socket_module import socket_modules
 #
 
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level = logging.INFO)
+
+
 #
 # =============================================================================
 #
@@ -791,9 +795,6 @@ class bus_parallel_ttl(bus_parallel):
 #
 # =============================================================================
 #
-
-
-logger = logging.getLogger(__name__)
 
 
 class allpro88(object):
