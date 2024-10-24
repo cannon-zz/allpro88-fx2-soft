@@ -1,0 +1,474 @@
+#
+# I needed to program a PIC16F676 to make a PS/2 to Apple 2 keyboard
+# interface adapter to resurrect an Apple 2 clone motherboard I got my
+# hands on.  so I wrote this.  I *don't* think it's a good idea to try to
+# add support for more parts, because it's looking like a very deep rabbit
+# hole.  this was my first exposure to PIC devices.  there are free and
+# open source PIC programmer projects floating around that support a wide
+# range of parts and work with DIY bit-banging hardware.  for example
+#
+#	https://wiki.kewl.org/projects:pickle
+#
+# I think the correct path forward is to write something that a project
+# like that could speak to, probably with some patches pushed upstream
+#
+
+
+import logging
+import sys
+import time
+from tqdm import tqdm
+from intelhex import IntelHex
+import allpro88
+import devices
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level = logging.INFO)
+
+
+#
+# data words are 8 bits, program words are 14 bits.  14 bit program words
+# are stored as pairs of 8 bit bytes in the .hex file, low byte first.  for
+# program data, the addresses in the .hex file are twice the physical
+# address (they are counts of bytes).  for example, the 14 bit config word
+# at 0x2007 in the PIC memory map is found as two bytes at address 16398 in
+# the contents of the .hex file.
+#
+
+def ih_get_word(ih, addr):
+	return ih[addr * 2] | ih[addr * 2 + 1] << 8
+
+def ih_set_word(ih, addr, word):
+	ih[addr * 2] = word & 0xff
+	ih[addr * 2 + 1] = word >> 8
+
+
+
+class pic(object):
+	"""
+	PIC12F629/675/PIC16F630/676
+
+	Implementation of the PIC microcontroller in-circuit serial
+	programming bus and protocol.  This is for the parts that use a
+	synchronous 2 pin serial interface, not an RS232 compatible
+	interface for communication.  This is intended to be sub-classed to
+	define specific parts.
+	"""
+
+	voltage_sequences = {
+		"program/verify": [	# enter program/verify mode
+			("program/verify_step0", 5e-6),	# hold 5 us
+			("program/verify_step1", 0)
+		]
+	}
+
+	#
+	# subclass must override this
+	#
+
+	socket_name = ""
+
+	#
+	# pin numbers with respect to the socket.  subclass must override
+	# these
+	#
+
+	VPP_pin = None	# +12 V in programming mode
+	VDD_pin = None	# +5 V
+	VSS_pin = None	# GND
+	clk_pin = None	# serial programming clock
+	dat_pin = None	# serial programming data I/O
+
+	#
+	# program timings in case they need to be overridden
+	#
+
+	T_PROG2 = 2e-3	# seconds.  the "externally timed" program delay
+	T_ERA = 8e-3	# seconds.  the "bulk erase" delay
+
+	def __init__(self, programmer, socket):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets[self.socket_name]
+
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, voltage_maps = {
+			# in the "off" voltage map the part is still
+			# connected to the programmer, the programmer is
+			# still powered, but the part's supply lines are
+			# grounded.  this is different from the .off()
+			# state of the power management system in which the
+			# part is disconnected from the programmer and the
+			# programmer's power supplies are shut down.
+			# switching back and forth between program/verify
+			# and the off voltage maps can be done quickly,
+			# whereas turning the power supplies on and off
+			# cannot be.
+			"off": {
+				self.VDD_pin: 0.0,	# GND
+				self.VPP_pin: 0.0,	# GND
+				self.VSS_pin: 0.0	# GND
+			},
+			"run": {
+				self.VDD_pin: 5.0,	# volts
+				self.VSS_pin: 0.0	# GND
+			},
+			"program/verify_step0": {	# 12 V only
+				self.VDD_pin: 0.0,	# GND
+				self.VPP_pin: 12.0,	# volts
+				self.VSS_pin: 0.0	# GND
+			},
+			"program/verify_step1": {	# 5 V and 12 V
+				self.VDD_pin: 5.0,	# volts
+				self.VPP_pin: 12.0,	# volts
+				self.VSS_pin: 0.0	# GND
+			}
+		})
+
+		# clock, data.  default state = TTL low
+		self.icspclk_flag = allpro88.flag_ttl(self.socket, self.icspclk_pin)
+		self.icspdat_flag = allpro88.flag_ttl(self.socket, self.icspdat_pin)
+
+	# proxy descriptors
+	icspclk = devices.read_write_proxy("icspclk_flag")
+	icspdat = devices.read_write_proxy("icspdat_flag")
+
+	def __enter__(self):
+		self.power.on(voltage_map = "off")
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	#
+	# command I/O
+	#
+
+	def write_command(self, command):
+		"""
+		Transmit a 6 bit command.
+		"""
+		if not 0 <= command <= 0x3f:
+			# cannot be more than 6 bits
+			raise ValueError("invalid command 0x%x" % command)
+		# LSB first.  bits are clocked on falling edge
+		for bit in (0x01, 0x02, 0x04, 0x08, 0x10, 0x20):
+			self.icspclk = True
+			self.icspdat = command & bit
+			self.icspclk = False
+		# a minimum 1 us delay is required before the next
+		# operation.  this code cannot run that fast, so we don't
+		# bother putting an explicit pause here.  we just leave it
+		# commented out for the record.
+		#time.sleep(1e-6)
+
+	def write_word(self, data):
+		"""
+		Transmit a data word.
+		"""
+		# start bit
+		self.icspclk = True
+		self.icspdat = False
+		self.icspclk = False
+		# 14 bits, LSB first.  bits are clocked on falling edge
+		for bit in (0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000):
+			self.icspclk = True
+			self.icspdat = data & bit
+			self.icspclk = False
+		# stop bit
+		self.icspclk = True
+		self.icspdat = False
+		self.icspclk = False
+
+	def read_word(self):
+		"""
+		Receive a data word.
+		"""
+		# float data
+		self.icspdat = None
+		# start bit
+		self.icspclk = True
+		self.icspclk = False
+		# 14 bits, LSB first.  bits are clocked on falling edge
+		data = 0
+		for bit in (0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000):
+			self.icspclk = True
+			if self.icspdat:
+				data |= bit
+			self.icspclk = False
+		# stop bit
+		self.icspclk = True
+		self.icspclk = False
+		# leave data low
+		self.icspdat = False
+		return data
+
+	#
+	# commands
+	#
+
+	def command(self, command, data = None):
+		if command == "configuration":
+			# set address counter to 0x2000 (configuration
+			# space) and load 1 word for program memory
+			assert 0 <= data <= 0x3fff
+			self.write_command(0x00)
+			self.write_word(data)
+		elif command == "load program":
+			# load 1 word for program memory at current address
+			assert 0 <= data <= 0x3fff
+			self.write_command(0x02)
+			self.write_word(data)
+		elif command == "load data":
+			# load 1 byte for data memory at current address
+			assert 0 <= data <= 0xff
+			self.write_command(0x03)
+			self.write_word(data)
+		elif command == "read program":
+			# read 1 word from program memory at current
+			# address
+			self.write_command(0x04)
+			return self.read_word()
+		elif command == "read data":
+			# read 1 byte from data memory at current address
+			self.write_command(0x05)
+			return self.read_word()
+		elif command == "increment address":
+			# increments the address counter.  if the counter
+			# is 0x1fff, incrementing it wraps it back to
+			# 0x0000.  if the counter is 0x3fff, incrementing
+			# it wraps it back to 0x2000.  if the counter is <
+			# 0x2000, to move it above 0x1fff issue the
+			# "configuration" command.  if the counter is >=
+			# 0x2000, to move it below 0x2000 power cycle the
+			# part and re-enter program/verify mode.
+			self.write_command(0x06)
+		elif command == "begin program (int)":
+			# writes the most recently loaded program word or
+			# data byte to the current address.  must wait at
+			# least 6 ms before sending next command.  the
+			# target address is erased first.
+			self.write_command(0x08)
+			time.sleep(6e-3)
+		elif command == "begin program (ext)":
+			# write the most recently loaded program word or
+			# data byte to the current address.  must be
+			# followed by an "end program" command after a
+			# T_PROG2 delay.  that is is included here.  the
+			# target address is not erased first.
+			self.write_command(0x18)
+			time.sleep(self.T_PROG2)
+			self.write_command(0x0a)	# end program
+		elif command == "erase program":
+			# erase program memory.  requires T_ERA pause
+			# before next operation
+			self.write_command(0x09)
+			time.sleep(self.T_ERA)
+		elif command == "erase data":
+			# erase data memory.  requires T_ERA pause before
+			# next operation
+			self.write_command(0x0b)
+			time.sleep(self.T_ERA)
+		else:
+			raise ValueError("invalid command 0x%x" % command)
+
+	#
+	# read/write
+	#
+
+	def read_OSCCAL(self):
+		"""
+		Retrieve the OSCCAL configuration word.  On entry, address
+		counter must be at 0x0000.  On exit, address counter is
+		0x03ff.
+		"""
+		# increment address counter to 0x03ff
+		for i in range(0x3ff):
+			self.command("increment address")
+		# read word
+		osccal = self.command("read program")
+		# verify value is 0b11 01xx xxxx xxxx
+		if (osccal & 0x3c00) != 0x3400:
+			logging.warning("OSCCAL value invalid: 0x%04x" % osccal)
+		# done
+		return osccal
+
+	def read_device_id(self):
+		# enter program/verify mode.  sets address counter to 0
+		self.power.do_sequence(self.voltage_sequences["program/verify"])
+		# move address counter to 0x2000.  command must load a word
+		# for writing, but we do not write the value to memory
+		self.command("configuration", 0)
+		# increment address counter to 0x2006
+		for i in range(0x6):
+			self.command("increment address")
+		# read word
+		device_id = self.command("read program")
+		# parse
+		revision = device_id & 0x001f
+		device = device_id >> 5
+		device = {
+			0b001111100: "PIC12F629",
+			0b001111110: "PIC12F675",
+			0b010000110: "PIC16F630",
+			0b010000111: "PIC16F676"
+		}[device]
+		# power off
+		self.power.set_voltage_map("off")
+		# done
+		return device, revision
+
+	def read_configuration(self):
+		"""
+		Moves address counter to configuration address space.
+		Returns the configuration word, and leaves address counter
+		at 0x2007.  Part must be power-cycled to return address
+		counter to code address space.
+		"""
+		# move address counter to 0x2000.  command must load a word
+		# for writing, but we do not write the value to memory
+		self.command("configuration", 0)
+		# increment address counter to 0x2007
+		for i in range(0x7):
+			self.command("increment address")
+		# read word
+		return self.command("read program")
+
+	@staticmethod
+	def get_BG_bits(config):
+		"""
+		Given the value of a configration word, return the value in
+		the band-gap calibration bits, the highest two bits of the
+		word.
+		"""
+		return (config & 0x3000) >> 12
+
+	@staticmethod
+	def set_BG_bits(config, BG_bits):
+		"""
+		Sets the two band-gap calibration bits in a configuration
+		word value.  This computes the combined value, it does not
+		program the configuration word to memory.
+		"""
+		assert 0x0 <= BG_bits <= 0x3
+		return (config & 0x0fff) | (BG_bits << 12)
+
+	def write_intel_hex(self, filename, dry_run = True, osccal = None, bg_cal = None):
+		"""
+		"""
+		# load the .hex file
+		ih = IntelHex(open(filename))
+
+		# enter program/verify mode.  sets address counter to 0
+		self.power.do_sequence(self.voltage_sequences["program/verify"])
+
+		# retrieve osccal word
+		if osccal is None:
+			osccal = self.read_OSCCAL()
+		logger.info("OSCCAL (@0x03ff)= 0x%04x" % osccal)
+		# paste the OSCCAL word into the .hex image at 0x3ff
+		ih_set_word(ih, 0x3ff, osccal)
+		assert ih_get_word(ih, 0x3ff) == osccal
+		# retrive the band-gap cal bits
+		if bg_cal is None:
+			bg_cal = self.get_BG_bits(self.read_configuration())
+		logger.info("band-gap cal = 0x%x" % bg_cal)
+		# retrieve the config word from the .hex image at 0x2007,
+		# and replace its band-gap bits with their value for this
+		# part
+		config = self.set_BG_bits(ih_get_word(ih, 0x2007), bg_cal)
+		# bits 9, 10, 11 are not implemented and will read back as
+		# 0, so to avoid an aparent programming failure we need to
+		# set them to 0 in the .hex image
+		config &= 0x31ff
+		logger.info("new configuration word @ 0x2007 = 0x%04x" % config)
+		# paste the new value into the .hex image at 0x2007
+		ih_set_word(ih, 0x2007, config)
+
+		# erase program memory.  because retrieving the
+		# configuration word has moved the address counter above
+		# 0x2000 the erase command will also erase the
+		# configuration space.
+		if not dry_run:
+			self.command("erase program")
+		# power down device, wait 100 ms, then re-enter
+		# program/verify mode.  address counter is at 0
+		self.power.set_voltage_map("off")
+		time.sleep(0.1)
+		self.power.do_sequence(self.voltage_sequences["program/verify"])
+		# keep track of where the counter is at
+		addr = 0
+
+		# loop over blocks of words to write below 0x2000
+		for start, stop in sorted(ih.segments()):
+			start //= 2
+			stop //= 2
+			if start >= 0x2000:
+				continue
+			assert stop <= 0x2000
+			logger.info("segment [0x%04x, 0x%04x]" % (start, stop - 1))
+			while addr < start:
+				self.command("increment address")
+				addr += 1
+			while addr < stop:
+				word = ih_get_word(ih, addr)
+				assert 0 <= word <= 0x3fff, "@0x%04x 0x%04x" % (addr, word)
+				self.command("load program", word)
+				if not dry_run:
+					self.command("begin program (ext)")
+					chk = self.command("read program")
+					if chk != word:
+						raise ValueError("programming failure at address 0x%04x:  wrote 0x%04x, read back 0x%04x" % (addr, word, chk))
+				self.command("increment address")
+				addr += 1
+
+		# loop over blocks of words to write above 0x2000.  this
+		# includes configuration words, but also the part allows
+		# data memory to be written to by writing 8 bit bytes to a
+		# 128 word window of program memory starting at 0x2100.
+		# altogether, program memory, config words, and data memory
+		# call all be supplied in a single .hex file
+
+		# move address counter to 0x2000.  command must load a word
+		# for writing, but we do not write the value to memory
+		self.command("configuration", 0)
+		addr = 0x2000
+		for start, stop in sorted(ih.segments()):
+			start //= 2
+			stop //= 2
+			if start < 0x2000:
+				continue
+			logger.info("segment [0x%04x, 0x%04x]" % (start, stop - 1))
+			while addr < start:
+				self.command("increment address")
+				addr += 1
+			while addr < stop:
+				word = ih_get_word(ih, addr)
+				self.command("load program", word)
+				if not dry_run:
+					self.command("begin program (ext)")
+					chk = self.command("read program")
+					if chk != word:
+						raise ValueError("programming failure at address 0x%04x:  wrote 0x%04x, read back 0x%04x" % (addr, word, chk))
+				self.command("increment address")
+				addr += 1
+
+		# power off
+		self.power.set_voltage_map("off")
+
+
+class PIC16F676(pic):
+	socket_name = "DIP14"
+	VPP_pin = 4	# +12 V in programming mode
+	VDD_pin = 1	# +5 V
+	VSS_pin = 14	# GND
+	clk_pin = 12	# serial programming clock
+	dat_pin = 13	# serial programming data I/O
+
+
+with allpro88.allpro88() as programmer:
+	with PIC16F676(programmer) as part:
+		logger.info("device %s revision %d" % part.read_device_id())
+		part.write_intel_hex("ps2_to_apple2_SVN14_16F676.hex", dry_run = False, osccal = 0x3464, bg_cal = 0x1)
