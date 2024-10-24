@@ -807,10 +807,9 @@ class allpro88(object):
 	ep_addr_out = 0x02
 	ep_addr_in = 0x86
 
-	buf_size = 512	# bytes
-
 	def __init__(self, cal_data = None, idVendor = idVendor, idProduct = idProduct):
-		self.buf = usb.core.array.array("B", (0,) * self.buf_size)
+		# 512 byte buffer
+		self.buf = usb.core.array.array("B", (0,) * 512)
 		# replace class attributes with instance attributes
 		self.idVendor = idVendor
 		self.idProduct = idProduct
