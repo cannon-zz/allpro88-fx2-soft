@@ -198,11 +198,12 @@ class dacregister(object):
 	range checking to ensure the value written is allowed, and will
 	optionally apply a volts-to-DAC count calibration function.
 	"""
-	def __init__(self, address = None, transient = 0., cal_key = None):
-		# fixed register address, if known.  if not known, or None,
-		# the .address() method must be overridden.
+	def __init__(self, address = None, transient = 0.):
+		# DAC register address.  if the object to which this
+		# descriptor is attached has a .dac_address attribute, then
+		# its value will be used instead of this.
 
-		self._address = address
+		self.dac_address = address
 
 		# transient response time in seconds.  for convenience,
 		# this code can enforce a pause after changing a DAC, to
@@ -225,52 +226,28 @@ class dacregister(object):
 
 		self.transient = transient
 
-		# calibration function look-up key.  you might think it
-		# would make more sense to simply set the calibration
-		# function here directly instead of this nonsense of a key
-		# that we use to look up in a dictionary elsewhere.  the
-		# problem is that a descriptor (used to implement an
-		# attribute of a class) is only a single instance:  there
-		# is one instance of the descriptor class for the class
-		# definition to which it is attached, there is not a new
-		# instance of the descriptor for each instance of the
-		# class.  that means that data stored in the descriptor
-		# instance is shared across all instances of the class
-		# whose attribute it is being used to implement.  we cannot
-		# store any data here that we might want to configure
-		# differently for different programmers.  therefore we
-		# cannot put the calibration curve itself here, only a
-		# shared key used to look up the programmer-specific
-		# calibration function in a table stored elsewhere.
+	def __set_name__(self, owner, name):
+		self.name = name
 
-		self.cal_key = cal_key
-
-	def address(self, obj):
+	def calfunc(self, obj):
 		"""
-		This DAC register's address.  obj is the instance of the
-		class to which this descriptor is attached:  for pin driver
-		VDAC registers obj is the associated channel_proxy
-		instance, for all others it's the allpro88 programmer
-		instance.
+		Retrieve the calibration curve for this DAC.  The object
+		obj must have a dictionary named .cal containing an entry
+		whose key equals the name of this descriptor.  For example
+		an object with a dacdescriptor attribute named .vadj must
+		also have a .cal attribute contraining a dictionary with a
+		"vadj" entry providing the calibration function.
 		"""
-		# subclasses must override this if they need something
-		# other than a single, fixed, address.
-		assert self._address is not None
-		return self._address
+		return obj.cal[self.name]
 
 	def cal(self, dac, obj):
 		"""
-		Convert DAC count to voltage.  If this descriptor was
-		initialized with cal_key set to None (the default) then a
-		default generic calibration function is used.  Otherwise,
-		obj.cal[self.cal_key] is retrieved, and the result of
-		passing the DAC value to that function is used as the
-		return value.
+		Convert DAC count to voltage.  .calfunc() is called on obj
+		to retrieve the calibration function, which is passed an
+		integer DAC count, and which must return the corresponding
+		voltage in volts.
 		"""
-		if self.cal_key is None:
-			# default calibration
-			return dac * 25.5 / 256.
-		return obj.cal[self.cal_key](dac)
+		return self.calfunc(obj)(dac)
 
 	def __set__(self, obj, val):
 		"""
@@ -295,8 +272,13 @@ class dacregister(object):
 		# verify range
 		if not 0 <= dac <= 255:
 			raise ValueError("0 <= dac <= 255:  %d" % dac)
-		# OK
-		obj.write_addr(self.address(obj), dac)
+		# determine address of DAC register.  if the object to
+		# which we are attached provides a .dac_address attribute,
+		# then we use its value, otherwise we use the address given
+		# to .__init__().
+		address = obj.dac_address if hasattr(obj, "dac_address") else self.dac_address
+		# write the value and pause for transient
+		obj.write_addr(address, dac)
 		time.sleep(self.transient)
 
 	def invcal(self, v, obj):
@@ -309,6 +291,8 @@ class dacregister(object):
 		limits of the DAC are mapped to the lowest available
 		voltage.
 		"""
+		# retrieve the forward (DAC -> volts) calibration function
+		calfunc = self.calfunc(obj)
 		# most DAC-to-voltage calibration mappings are linear or
 		# quadratic polynomials, with a cut-off at the low end
 		# below which the voltage is a constant.  rather than
@@ -324,7 +308,7 @@ class dacregister(object):
 			raise ValueError("voltage too high:  requested %g V > DAC limit of %g V" % (v, self.cal(255, obj)))
 		while hi - lo > 0.5:
 			mid = (hi + lo) / 2
-			cal = self.cal(mid, obj)
+			cal = calfunc(mid)
 			if cal == v:
 				dac = mid
 				break
@@ -348,19 +332,9 @@ class dacregister(object):
 		# some threshold.  if we've chosen a DAC setting in such an
 		# interval, choose the lowest such DAC setting (typically
 		# 0, but check).
-		while dac > 0 and self.cal(dac - 1, obj) == self.cal(dac, obj):
+		while dac > 0 and calfunc(dac - 1) == calfunc(dac):
 			dac -= 1
 		return dac
-
-
-class vdacregister(dacregister):
-	"""
-	Version of dacregister for controlling channel VDAC DACs.  The
-	register address is computed from the base address of the object to
-	which it is attached.
-	"""
-	def address(self, obj):
-		return obj.address + 3
 
 
 class channel_proxy(object):
@@ -371,7 +345,7 @@ class channel_proxy(object):
 	briefly pulsing the pin and enabling and disabling the pin's bypass
 	capacitor.
 	"""
-	def __init__(self, programmer, channel, cal_data = {"min": 0.1892, "poly": (-0.6891, 0.09901, 4.479e-06)}):
+	def __init__(self, programmer, channel):
 		# allpro88 instance with which we are associated
 		self.programmer = programmer
 		# integer channel number
@@ -383,6 +357,9 @@ class channel_proxy(object):
 			self.address = self.channel << 4
 		else:
 			self.address = (self.channel + 0x18) << 4
+		# this channel's DAC address.  this attribute is used by
+		# the .vdac descriptor
+		self.dac_address = self.address + 3
 		# bypass capacitor control register
 		# FIXME:  the bypass capacitor feature including its
 		# associated control logic and address decode circuitry
@@ -400,30 +377,43 @@ class channel_proxy(object):
 		else:
 			# only first 48 channels have bypass capacitors
 			self.bypass_address = None
-		# set the calibration
-		self.set_cal(cal_data)
+		# set default calibration
+		self.set_cal()
 
 	config = property(fset = lambda self, config: self.programmer.write_addr(self.address, config), doc = """
 	Write only access to pin configuration register.  See PINCON for
 	values.
 	""")
 
-	vdac = vdacregister(cal_key = "VDAC")
+	vdac = dacregister()
 
 	def write_addr(self, *args, **kwargs):
 		"""
 		Synonym of self.programmer.write_addr().  This is plumbing
-		for internal use by the vdacregister code.
+		for internal use by the dacregister code.
 		"""
 		return self.programmer.write_addr(*args, **kwargs)
 
-	def set_cal(self, cal_data):
+	def set_cal(self, cal_data = {"min": 0.19, "poly": (-0.7, 0.1)}):
 		"""
-		Set the calibration model for this channel's VDAC DAC.
+		Set the calibration model for this channel's VDAC DAC.  If
+		cal_data is not set, a default calibration model is used.
+
+		The calibration model is a dictionary providing a minimum
+		output voltage and a polynomial mapping DAC count to output
+		voltage (above the minimum).  The programmer's power
+		supplies and DACs are calibrated at the factory to provide
+		a nominal ratio of 0.1 V per DAC count.  The pin driver
+		VDAC output circuitry includes an emitter-follower silicon
+		power transistor and a Shottky reverse protection diode,
+		which together reduce the output voltage by about 0.7 V.
+		The default calibration is, therefore, 0.1 V/count - 0.7 V
+		above a minimum of 0.19 V.
 		"""
 		poly = numpy.polynomial.Polynomial(cal_data["poly"])
+		# this dictionary attribute is used by the .vdac descriptor
 		self.cal = {
-			"VDAC": (lambda dac: max(cal_data["min"], poly(dac)))
+			"vdac": (lambda dac: max(cal_data["min"], poly(dac)))
 		}
 
 	def __bool__(self):
@@ -896,7 +886,6 @@ class allpro88(object):
 		# types is bad practice, but this code performs a very
 		# narrowly-defined and specific task, and the idea of
 		# general-pupose reuse is nonsensical.
-		self.cal = {}
 		if cal_data == "auto":
 			# if "auto", search for a file matching this unit's
 			# serial number in the directories given in
@@ -1013,36 +1002,44 @@ class allpro88(object):
 		return None
 
 
-	def set_calibration(self, cal_data):
-		# first, install default calibrations.
+	def set_calibration(self, cal_data = None):
+		# default calibration if no data provided
+
+		if cal_data is None:
+			# default programmer DAC curves (actual calibration
+			# for my original unit).  we don't bother
+			# populating 88 null entries for the per channel
+			# calibration curves, we handle their absence
+			# separately.
+			cal_data = {
+				#"serial":  self.serial_number,
+				"vadj":  {"poly":  (0.30912373649024794, 0.11765130484398306, 2.970232274042522e-08)},
+				"vadjth":  {"poly":  (0., 25.5 / 256.)},
+				"vpul":  {"poly":  (-0.5392560237564137, 0.10095824549637102, 2.109251778349706e-08), "diode_vf": 0.18096494173157174},
+				"vsr":  {"poly":  (0.0053290738646065705, 0.09970530978019132, 5.529891853403212e-08)},
+				"vth":  {"poly":  (-0.01039799263370611, 0.09980593089448744, 7.15096343691551e-08)},
+				"vtst":  {"poly":  (0.3012790867808679, 0.10527024428940045, -1.5240068371833107e-05)},
+				"itst":  {"poly":  (0., 25.5 / 256.)}
+			}
+		elif cal_data["serial"] != self.serial_number:
+			# confirm the calibration data is for this unit.
+			# don't make this fatal if it isn't, just issue a
+			# warning
+			logger.warning("calibration data is for serial # \"%s\", but this unit has serial # \"%s\":  using anyway." % (cal_data["serial"], self.serial_number))
+
+		# clear current calibration
 		#
 		# NOTE:  other code might grab and retain a reference to
 		# .cal, therefore do not delete it and create a new object
 		# but, instead, clear its contents and re-populate it with
 		# the new model.
 
-		self.cal.clear()
-
-		# default programmer DAC curves (actual calibration for my
-		# original unit)
-		self.cal.update({
-			"VADJ":  numpy.polynomial.Polynomial((0.30912373649024794, 0.11765130484398306, 2.970232274042522e-08)),
-			"VPUL":  numpy.polynomial.Polynomial((-0.5392560237564137 - 0.18096494173157174, 0.10095824549637102, 2.109251778349706e-08)),
-			"VSR":  numpy.polynomial.Polynomial((0.0053290738646065705, 0.09970530978019132, 5.529891853403212e-08)),
-			"VTH":  numpy.polynomial.Polynomial((-0.01039799263370611, 0.09980593089448744, 7.15096343691551e-08)),
-			"VTST":  numpy.polynomial.Polynomial((0.3012790867808679, 0.10527024428940045, -1.5240068371833107e-05)),
-		})
-
-		# now overwrite with calibration model if one has been
-		# supplied
-
-		if cal_data is None:
-			return
-
-		# confirm the calibration data is for this unit.  don't
-		# make this fatal if it isn't, just issue a warning
-		if cal_data["serial"] != self.serial_number:
-			logger.warning("calibration data is for serial # \"%s\", but this unit has serial # \"%s\":  using anyway." % (cal_data["serial"], self.serial_number))
+		try:
+			self.cal.clear()
+		except AttributeError:
+			# when called from .__init__() attribute is not yet
+			# present
+			self.cal = {}
 
 		# programmer DAC curves.  the polynomials model the power
 		# supply outputs.  VPUL, however. is placed onto pins
@@ -1066,18 +1063,22 @@ class allpro88(object):
 		# 2*trans_vf will silently result in the pull-up voltage
 		# being, in effect, turned off.
 
-		self.cal["VADJ"] = numpy.polynomial.Polynomial(cal_data["vadj"]["poly"])
-		self.cal["VPUL"] = numpy.polynomial.Polynomial(cal_data["vpul"]["poly"])
-		self.cal["VPUL"].coef[0] -= cal_data["vpul"]["diode_vf"]
-		self.cal["VSR"] = numpy.polynomial.Polynomial(cal_data["vsr"]["poly"])
-		self.cal["VTH"] = numpy.polynomial.Polynomial(cal_data["vth"]["poly"])
-		self.cal["VTST"] = numpy.polynomial.Polynomial(cal_data["vtst"]["poly"])
+		for name in ("vadj", "vadjth", "vpul", "vsr", "vth", "vtst", "itst"):
+			try:
+				dac_cal_data = cal_data[name]
+			except KeyError:
+				# no calibration data for this dac.  use
+				# default calibration
+				dac_cal_data = {"poly": (0., 25.5 / 256.)}
+			self.cal[name] = numpy.polynomial.Polynomial(dac_cal_data["poly"])
+			if name == "vpul":
+				self.cal[name].coef[0] -= dac_cal_data["diode_vf"]
 
 		# per channel DAC curves
 
 		for i, channel in enumerate(self.channels):
 			try:
-				channel_cal_data = cal_data["channel%02d" % i]
+				dac_cal_data = cal_data["channel%02d" % i]
 			except KeyError:
 				# no calibration data for this channel.
 				# e.g., this is not a full 88-channel unit.
@@ -1088,7 +1089,7 @@ class allpro88(object):
 				# indicates an out-of-date calibration file
 				# following an upgrade.
 				continue
-			channel.set_cal(channel_cal_data["vdac"])
+			channel.set_cal(dac_cal_data["vdac"])
 
 
 	def get_unused_bus(self, bus_obj = None):
@@ -1340,13 +1341,13 @@ class allpro88(object):
 	# DAC register interfaces for the variable power supplies shared by
 	# all pin drivers.
 
-	vsr = dacregister(address = 0x0300, cal_key = "VSR")
-	vth = dacregister(address = 0x0301, cal_key = "VTH")
-	vadj = dacregister(address = 0x0302, transient = 0.05, cal_key = "VADJ")
+	vsr = dacregister(address = 0x0300)
+	vth = dacregister(address = 0x0301)
+	vadj = dacregister(address = 0x0302, transient = 0.05)
 	vadjth = dacregister(address = 0x0303)
 	# must call .load_dacs() for vpul changes
-	vpul = dacregister(address = 0x0305, cal_key = "VPUL")
-	vtst = dacregister(address = 0x0386, cal_key = "VTST")
+	vpul = dacregister(address = 0x0305)
+	vtst = dacregister(address = 0x0386)
 	itst = dacregister(address = 0x0387)
 
 
