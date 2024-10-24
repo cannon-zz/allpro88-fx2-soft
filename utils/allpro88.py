@@ -55,9 +55,9 @@ class PINCON(IntEnum):
 
 	Except for the case of combining the pull-up supply with other
 	voltage sources, it's almost certainly an error to activate more
-	than one voltage source at the same time, however reverse
-	protection diodes prevent any voltage source from damaging other
-	voltage sources, so any combination of them can be activated
+	than one voltage source at the same time.  Nevertheless, reverse
+	protection diodes prevent all voltage sources from being damaged by
+	other voltage sources, so any combination of them can be activated
 	simultaneously without doing damage.
 
 	The highest possible output voltage is approximately 25 V, which
@@ -66,10 +66,11 @@ class PINCON(IntEnum):
 	the pull-down resistor in combination with any of the voltage
 	sources at any output voltage.
 
-	Only the pull-up voltage source is safe to enable in combination
-	with the TTL low drive output, or the current-limited test source
-	if set to a sufficiently low current.  Enabling any other voltage
-	source in combination with the TTL low output will destroy
+	When activating the TTL low drive output, only the pull-up voltage
+	source is safe to enable in combination with it, or also the
+	current-limited test source if set to a sufficiently low current.
+	All other voltage sources have low output impedance, and enabling
+	any of them in combination with the TTL low output risks destroying
 	hard-to-replace surface-mount components on the channel's hybrid
 	module.
 
@@ -77,13 +78,15 @@ class PINCON(IntEnum):
 	voltage source other than the pull-up source or the current-limited
 	test srouce will destroy components.
 
-	NOTE:  the resistors in the circuitry of the hybrid modules are
-	printed into the module as part of the substrate.  All other
-	components are standard off-the-shelf parts, but the resistors
-	*cannot* be replaced.  If a single one is damanged due to
-	over-current conditions the entire hybrid module will have to be
-	replaced.  The only source of replacement hybrid modules is a
-	parts-donor unit.
+	NOTE:  all components on the hybrid modules except the resistors
+	are standard readily-available parts and are straight-forward,
+	although not easy, to replace.  The resistors in the circuitry of
+	the hybrid modules, on the other hand, are *printed into the module
+	as part of the circuit board itself* and *cannot* be replaced.  If
+	any of those resistors is damaged due to over-current conditions
+	the entire hybrid module will have to be replaced.  The only source
+	I know of for replacement hybrid modules would be another, donor,
+	unit.
 	"""
 	DISABLE = 0x00	# disable ("float") pin
 	GND = 0x01	# turn on FET pulling pin to ground
@@ -107,37 +110,40 @@ class CLKGEN_MODE(IntEnum):
 	# register.  the schematic includes labels on some connections.
 	# two of the PAL's outputs are labelled "PHASE0", "PHASE1", and
 	# lead off board via a connector to be the two phases driving the
-	# pin drivers.  the 6 other outputs are labelled 125KHz, 250KHz,
-	# 500KHz, 1MHz, 2MHz, and 4MHz, which are together labelled "PHASE
-	# TAPS".  they don't appear to be connected to anything except the
-	# 4MHz output which loops back to another PAL one of whose outputs
-	# provides the clock for the x273 register.  my guess is something
-	# is being done to ensure the clock generator PAL's configuration
-	# bits are latched at a special point in its internal state
-	# sequence.  the lowest three data bus bits input to the timer PAL
-	# are labelled "PHSEL0", "PHSEL1" and "PHSEL2".  there are no
-	# labels on the rest.  what it *looks* like to me is the PAL is
-	# implementing a ripple counter, dividing down an input clock by
-	# factors of 2, with one of the six divided down outputs or
-	# "nothing" switched onto an output by the three configuration
-	# bits, and the other phase output being generated as the inverse
-	# of the first.  that would suggest that 0x00 through 0x07 should
-	# be valid configurations (6 frequencies, off, and a manually
-	# toggle option, for a total of 8 configurations).  kevtris' notes
-	# say 0x07 is not valid, and none of his configurations correspond
-	# to the 125kHz output shown on the schematic.  he says not to
-	# select 0x07 or it will damage the circuit, but I would have
-	# guessed it enables the 125kHz output.  it's possible his PAL chip
-	# is malfunctioning, but I've confirmed that my systems behave the
-	# same way.  there is no 125 kHz clock configuration.  how could
-	# any selection damage something?  the concern here is not in the
-	# clock generator circuit but in the pin driver circuits.  a pin
-	# driver uses one phase to switch the TTL high output on and off
-	# and the other phase to switch the TTL low output on and off, so
-	# the two phases must never both be on at the same time or both TTL
-	# high and low outputs will be enabled simultaneously and short out
-	# whichever pin driver is set to clock output mode.  I believe that
-	# if no pin drivers are set to clock mode there is no risk in
+	# pin drivers.  the 6 other outputs are labelled "125KHz",
+	# "250KHz", "500KHz", "1MHz", "2MHz", and "4MHz", which are
+	# together labelled "PHASE TAPS".  the "KHz" labels are surely
+	# typographic errors, and mean "kHz".  they don't appear to be
+	# connected to anything except the 4 MHz output which loops back to
+	# another PAL one of whose outputs provides the clock for the x273
+	# register.  my guess is something is being done to ensure the
+	# clock generator PAL's configuration bits are latched at a special
+	# point in its internal state sequence.  the lowest three data bus
+	# bits input to the timer PAL are labelled "PHSEL0", "PHSEL1" and
+	# "PHSEL2".  there are no labels on the rest.  what it *looks* like
+	# to me is the PAL is implementing a ripple counter, dividing down
+	# an input clock by factors of 2, with one of the six divided down
+	# outputs or "nothing" selected for an output phase by the three
+	# configuration bits, and the other phase output being generated as
+	# the inverse of the first.  that would suggest that 0x00 through
+	# 0x07 should be valid configurations:  6 frequencies, off, and a
+	# manually toggle option, for a total of 8 configurations.
+	# kevtris' notes say 0x07 is not valid, and none of his
+	# configurations correspond to the 125 kHz output shown on the
+	# schematic.  he says not to select 0x07 or it will damage the
+	# circuit, but I would have guessed it enables the 125 kHz mode.
+	# it's possible his PAL chip is malfunctioning, but I've confirmed
+	# that both of my systems behave the same way.  there is no 125 kHz
+	# clock configuration.  how could any selection damage something?
+	# in mode 0x07 both phase outputs get stuck high.  the concern here
+	# is not that the clock generator circuit might be damaged but that
+	# the pin driver circuits will be.  a pin driver uses one phase to
+	# switch the TTL high output on and off and the other phase to
+	# switch the TTL low output on and off, so the two phases must
+	# never both be on at the same time or both TTL high and low
+	# outputs will be enabled simultaneously and short out whichever
+	# pin driver is set to clock output mode.  I believe that if no pin
+	# drivers are set to a clock output mode then there is no risk in
 	# experimenting with the clock generator configuration bits.
 	#
 	# the schematic makes no mention of the "polarity" bit 0x80.
@@ -177,6 +183,11 @@ class volt(float):
 	"""
 	Sub-class of float used to indicate to a DAC proxy that the value
 	should be interpreted as a voltage, not a DAC count.
+
+	Example:
+
+	>>> programmer.vadj = 128	# set VADJ DAC register to 128
+	>>> programmer.vadj = volt(20)	# set VADJ to 20 V using cal model
 	"""
 	pass
 
@@ -343,8 +354,11 @@ class dacregister(object):
 
 
 class vdacregister(dacregister):
-	# version of dacregister that gets the address dynamically from the
-	# object to which it is attached.
+	"""
+	Version of dacregister for controlling channel VDAC DACs.  The
+	register address is computed from the base address of the object to
+	which it is attached.
+	"""
 	def address(self, obj):
 		return obj.address + 3
 
@@ -389,15 +403,24 @@ class channel_proxy(object):
 		# set the calibration
 		self.set_cal(cal_data)
 
-	config = property(fset = lambda self, config: self.programmer.write_addr(self.address, config))
+	config = property(fset = lambda self, config: self.programmer.write_addr(self.address, config), doc = """
+	Write only access to pin configuration register.  See PINCON for
+	values.
+	""")
 
 	vdac = vdacregister(cal_key = "VDAC")
 
 	def write_addr(self, *args, **kwargs):
-		# plumbing for the vdac descriptor
+		"""
+		Synonym of self.programmer.write_addr().  This is plumbing
+		for internal use by the vdacregister code.
+		"""
 		return self.programmer.write_addr(*args, **kwargs)
 
 	def set_cal(self, cal_data):
+		"""
+		Set the calibration model for this channel's VDAC DAC.
+		"""
 		poly = numpy.polynomial.Polynomial(cal_data["poly"])
 		self.cal = {
 			"VDAC": (lambda dac: max(cal_data["min"], poly(dac)))
@@ -405,8 +428,8 @@ class channel_proxy(object):
 
 	def __bool__(self):
 		"""
-		Boolean state = state of comparator.  Set VTH to threshold
-		voltage.
+		State of this channel's comparator:  1 = voltage on pin is
+		above VTH;  0 = voltage on pin is below VTH.
 
 		NOTE:  with VTH and pin driver power supplies off, in
 		some units the comparator reports logic 0 while in others
@@ -479,6 +502,10 @@ class channel_proxy(object):
 		or disable the bypass capacitor of a channel that does not
 		have one.  The request is silently ignored.  This
 		simplifies "reset everything" loops.
+
+		If calling code wishes to know if a channel has a bypass
+		capacitor, test the value of .bypass_address:  None = this
+		channel does not have a bypass capacitor.
 		"""
 		raise NotImplementedError
 
@@ -564,8 +591,8 @@ class flag(object):
 		flt = the PINCON register configuration for the floating
 		state.
 
-		If none of the three states corresponds to a VDAC
-		controlled voltage, the VDAC driver will be set to 0.
+		If none of the three states is a VDAC output, the VDAC DAC
+		will be set to 0.
 		"""
 		self.socket = socket
 		self.pin_number =  pin_number
@@ -712,8 +739,8 @@ class bus_parallel(object):
 	is applied to the socket.  Pins configured for ground potential
 	take effect immediately.
 
-	NOTE:  see also devices.bus_proxy_parallel to create a descriptor
-	to make calling the .read() and .write() methods of an instance of
+	NOTE:  see also devices.read_write_proxy to create a descriptor to
+	make calling the .read() and .write() methods of an instance of
 	this class more convenient.
 	"""
 	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt, default = None):
@@ -1054,11 +1081,12 @@ class allpro88(object):
 			except KeyError:
 				# no calibration data for this channel.
 				# e.g., this is not a full 88-channel unit.
-				# FIXME:  after figuring out how to
-				# determine which channels are installed,
-				# should add a check here to ensure that
-				# all installed channels get calibration
-				# data.
+				# FIXME:  maybe print a warning if the
+				# number of channels in the calibration
+				# data doesn't match the number of channels
+				# installed in the unit.  probably
+				# indicates an out-of-date calibration file
+				# following an upgrade.
 				continue
 			channel.set_cal(channel_cal_data["vdac"])
 
@@ -1286,12 +1314,21 @@ class allpro88(object):
 
 		return self.read_addr(0x0300) & 0xf
 
-
-	pcr_enable = property(fset = lambda self, enable: self.write_addr(0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE))
-
+	pcr_enable = property(fset = lambda self, enable: self.write_addr(0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE), doc =
+	"""
+	Boolean write-only descriptor controlling main power supply.
+	Setting to True extinguishes the green "Idle" LED on the socket
+	module, turns on the main power supplies, and illuminates the red
+	"Busy" LED on the socket module.  Setting to False does the
+	opposite.
+	""")
 
 	@property
 	def clkgen_mode(self):
+		"""
+		Write-only descriptor to set the clock generator
+		configuration register.  See CLKGEN_MODE for values.
+		"""
 		raise NotImplementedError("write-only address")
 
 	@clkgen_mode.setter
@@ -1300,6 +1337,8 @@ class allpro88(object):
 			raise ValueError("mode 0x07 forbidden")
 		self.write_addr(0x038B, val)
 
+	# DAC register interfaces for the variable power supplies shared by
+	# all pin drivers.
 
 	vsr = dacregister(address = 0x0300, cal_key = "VSR")
 	vth = dacregister(address = 0x0301, cal_key = "VTH")
@@ -1312,6 +1351,21 @@ class allpro88(object):
 
 
 	def load_dacs(self, transient = 0.001):
+		"""
+		The VPUL power supply DAC and the per-pin VDAC DAC chips
+		are double-buffered:  a first write operation latches a
+		value into an internal register, but the DAC's output is
+		not changed until a second clock pulse transfers the
+		latched value into the DAC's output register.  By sharing
+		the second clock signal across all DAC chips, their outputs
+		are updated simultaneously.
+
+		This method triggers the output latch clock signal.
+		Calling this method causes the VPUL DAC and all per-pin
+		VDAC DACs to set their outputs to their most recently
+		latched input value.  NOTE:  until this method is called,
+		there will be no change in the outputs of those DACs.
+		"""
 		self.write_addr(0x0308, 0)
 		# wait for transient response
 		time.sleep(transient)

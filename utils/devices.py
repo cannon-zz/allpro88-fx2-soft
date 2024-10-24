@@ -319,6 +319,10 @@ class read_write_proxy(object):
 #
 
 
+#
+# These are additional bus types for which there is no specific firmware
+# support.  They are implemented purely in software.
+#
 
 
 #
@@ -336,6 +340,12 @@ class bus_iic(object):
 	finally .stop().  The bit manipulations performed by each method
 	follow correctly from the state the bus has been left in by the
 	preceding method;  different orders will not work.
+
+	NOTE:  the controller in the USB interface has its own, native, IIC
+	interface with which it communicates with its EEPROM and which is
+	available on a pin header for future expansion.  This is *not* an
+	interface to that bus.  This is a software emulation of an IIC bus
+	implemented by bit-banging socket pins.
 	"""
 	lo = allpro88.PINCON.PULLUP | allpro88.PINCON.LOGICL
 	hi = allpro88.PINCON.PULLUP
@@ -381,20 +391,24 @@ class bus_iic(object):
 	#
 
 	def wait_sda(self, timeout = 0.5):
-		# no-op if not in strict mode
+		"""
+		Wait for SDA line to be high.  No-op if strict_arbitration
+		is False.
+		"""
 		if not self.strict_arbitration:
 			return
-		# wait until sda is hi
 		timeout += time.time()
 		while not bool(self.sda):
 			if time.time() > timeout:
 				raise IOError("bus sda is being held low")
 
 	def wait_scl(self, timeout = 0.5):
-		# no-op if not in strict mode
+		"""
+		Wait for SCL line to be high.  No-op if strict_arbitration
+		is False.
+		"""
 		if not self.strict_arbitration:
 			return
-		# wait until scl is hi
 		timeout += time.time()
 		while not bool(self.scl):
 			if time.time() > timeout:
@@ -405,6 +419,12 @@ class bus_iic(object):
 	#
 
 	def start(self):
+		"""
+		Transmit start sequence.  If a start sequence has already
+		been transmitted without an intervening stop sequence
+		having been transmitted then a "restart" sequence is
+		transmitted instead.
+		"""
 		if self.started:
 			# restart sequence
 			self.scl.config = self.lo
@@ -417,6 +437,9 @@ class bus_iic(object):
 		self.started = True
 
 	def stop(self):
+		"""
+		Transmit stop sequence.
+		"""
 		assert self.started
 		# do stop sequence.  but have just read or written a byte
 		# so first pull clock low, pull data low, raise clock, then
@@ -430,6 +453,11 @@ class bus_iic(object):
 		self.started = False
 
 	def write_bit(self, boolean):
+		"""
+		Write one bit.  This is unlikely to be needed by calling
+		code.  See .write_byte() and .read_byte() for the normal
+		I/O interface functions.
+		"""
 		assert self.started
 		# pull clock low, put bit onto data, raise clock
 		self.scl.config = self.lo
@@ -445,6 +473,11 @@ class bus_iic(object):
 		# .read_bit() or .stop() will do the correct thing.
 
 	def read_bit(self):
+		"""
+		Read one bit.  This is unlikely to be needed by calling
+		code.  See .write_byte() and .read_byte() for the normal
+		I/O interface functions.
+		"""
 		assert self.started
 		# pull clock low to complete last operation, float data
 		# line to allow target to drive it, raise clock, read data
@@ -460,6 +493,10 @@ class bus_iic(object):
 		return bool(self.sda)
 
 	def write_byte(self, byte):
+		"""
+		Write an 8 bit byte, read the ACK bit, and return the ACK
+		bit value.
+		"""
 		assert 0 <= byte <= 255
 		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
 			self.write_bit(byte & bit)
@@ -467,6 +504,10 @@ class bus_iic(object):
 		return not self.read_bit()
 
 	def read_byte(self, ack = True):
+		"""
+		Read an 8 bit byte, and respond with the given ACK bit
+		value.
+		"""
 		data = 0
 		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
 			if self.read_bit():
