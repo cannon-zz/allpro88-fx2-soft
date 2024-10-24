@@ -37,12 +37,12 @@ class D_flip_flop(object):
 		self.Q_flag = allpro88.flag_ttl(self.socket, self.Q_pin, default = None)
 		self.Qbar_flag = allpro88.flag_ttl(self.socket, self.Qbar_pin, default = None)
 
-	D = devices.flag_proxy("D_flag")
-	clk = devices.flag_proxy("clk_flag")
-	S = devices.flag_proxy("S_flag")
-	R = devices.flag_proxy("R_flag")
-	Q = devices.flag_proxy("Q_flag")
-	Qbar = devices.flag_proxy("Qbar_flag")
+	D = devices.read_write_proxy("D_flag")
+	clk = devices.read_write_proxy("clk_flag")
+	S = devices.read_write_proxy("S_flag")
+	R = devices.read_write_proxy("R_flag")
+	Q = devices.read_write_proxy("Q_flag")
+	Qbar = devices.read_write_proxy("Qbar_flag")
 
 	def check_Q(self, val, Qbar_val = None):
 		val = bool(val)
@@ -98,8 +98,8 @@ class NAND_2(object):
 		self.in_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.in_pins)
 		self.out_flag = allpro88.flag_ttl(self.socket, self.out_pin, default = None)
 
-	inp = devices.bus_proxy_parallel("in_bus")
-	out = devices.flag_proxy("out_flag")
+	inp = devices.read_write_proxy("in_bus")
+	out = devices.read_write_proxy("out_flag")
 
 	def test(self):
 		# check input test vectors
@@ -231,10 +231,10 @@ class SN74244(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	output_enable_1 = devices.flag_proxy("output_enable_1_flag")
-	output_enable_2 = devices.flag_proxy("output_enable_2_flag")
-	A = devices.bus_proxy_parallel("A_bus")
-	Y = devices.bus_proxy_parallel("Y_bus")
+	output_enable_1 = devices.read_write_proxy("output_enable_1_flag")
+	output_enable_2 = devices.read_write_proxy("output_enable_2_flag")
+	A = devices.read_write_proxy("A_bus")
+	Y = devices.read_write_proxy("Y_bus")
 
 	def test(self):
 		highest_lo = 0.
@@ -312,11 +312,11 @@ class SN74245(object):
 		return False
 
 	# True = A->B;  False = B->A
-	direction = devices.flag_proxy("direction_flag")
+	direction = devices.read_write_proxy("direction_flag")
 	# True = drive output;  False = float output
-	output_enable = devices.flag_proxy("output_enable_flag")
-	A = devices.bus_proxy_parallel("A_bus")
-	B = devices.bus_proxy_parallel("B_bus")
+	output_enable = devices.read_write_proxy("output_enable_flag")
+	A = devices.read_write_proxy("A_bus")
+	B = devices.read_write_proxy("B_bus")
 
 	def test(self):
 		for i in tqdm(range(4096), desc = "testing transceiver"):
@@ -385,10 +385,10 @@ class SN74273(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
-	clear = devices.flag_proxy("clear_flag")
-	clock = devices.flag_proxy("clock_flag")
-	D = devices.bus_proxy_parallel("D_bus")
-	Q = devices.bus_proxy_parallel("Q_bus")
+	clear = devices.read_write_proxy("clear_flag")
+	clock = devices.read_write_proxy("clock_flag")
+	D = devices.read_write_proxy("D_bus")
+	Q = devices.read_write_proxy("Q_bus")
 
 	def test(self):
 		# reset

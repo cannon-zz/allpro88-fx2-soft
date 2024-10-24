@@ -502,6 +502,18 @@ class channel_proxy(object):
 #
 
 
+#
+# The code here is used in .__init__() methods of classes defining parts to
+# create attributes that provide high-level interfaces to pins on the part.
+#
+# These classes all provide .read() and .write() methods to set and
+# retrieve the value of the pins they control.  To reduce the amount of
+# typing, and help make code readable, the devices module provides the
+# read_write_proxy class to create descriptors that hide the .read() and
+# .write() calls.
+#
+
+
 class flag(object):
 	"""
 	A tri-state logic interface on one of a socket's pins, with default

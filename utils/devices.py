@@ -311,37 +311,14 @@ class read_write_proxy(object):
 
 
 #
-# Boolean state pins
+# =============================================================================
+#
+#                                    Buses
+#
+# =============================================================================
 #
 
 
-class flag_proxy(read_write_proxy):
-	pass
-
-
-#
-# Parallel bus
-#
-
-
-class bus_proxy_parallel(read_write_proxy):
-	"""
-	Example:
-
-	class some_device(object):
-		def __init__(self, programmer, socket):
-			# initialize a .address_bus instance attribute
-			self.address_bus = allpro88.bus_parallel_ttl(programmer, socket, (1, 2, 3, 4))
-		# define a proxy named .address to perform .read() and
-		# .write() operations on .address_bus
-		address = bus_proxy_parallel("address_bus")
-
-	device = some_device(...)
-	# iterate the address bus over all allowed values
-	for device.address in device.address_bus:
-		...
-	"""
-	pass
 
 
 #

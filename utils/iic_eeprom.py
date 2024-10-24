@@ -43,8 +43,8 @@ class iic_eeprom(object):
 		return False
 
 	# proxy descriptors
-	address = devices.bus_proxy_parallel("address_bus")
-	write_control = devices.flag_proxy("write_control_flag")
+	address = devices.read_write_proxy("address_bus")
+	write_control = devices.read_write_proxy("write_control_flag")
 
 	def select_code(self, block, r_not_w):
 		raise NotImplementedError("subclass must provide this method")
@@ -58,7 +58,7 @@ class st24w04(iic_eeprom):
 		super(st24w04, self).__init__(*args, **kwargs)
 		self.write_protect_enable_flag = allpro88.flag_ttl(self.socket, 1)
 
-	write_protect_enable = devices.flag_proxy("write_protect_enable_flag")
+	write_protect_enable = devices.read_write_proxy("write_protect_enable_flag")
 
 	def select_code(self, block, r_not_w):
 		assert 0 <= block < self.blocks

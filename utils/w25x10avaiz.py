@@ -28,9 +28,9 @@ class w25x10avaiz(object):
 		return False
 
 	# proxy descriptors
-	chip_select = devices.flag_proxy("chip_select_flag")
-	write_protect = devices.flag_proxy("write_protect_flag")
-	hold = devices.flag_proxy("hold_flag")
+	chip_select = devices.read_write_proxy("chip_select_flag")
+	write_protect = devices.read_write_proxy("write_protect_flag")
+	hold = devices.read_write_proxy("hold_flag")
 
 
 with open("dump.dat", "wb") as dump:

@@ -43,10 +43,10 @@ class m27cx_width8_pulse_ce(object):
 		return False
 
 	# proxy descriptors
-	address = devices.bus_proxy_parallel("address_bus")
-	data = devices.bus_proxy_parallel("data_bus")
-	chip_enable = devices.flag_proxy("chip_enable_flag")
-	output_enable = devices.flag_proxy("output_enable_flag")
+	address = devices.read_write_proxy("address_bus")
+	data = devices.read_write_proxy("data_bus")
+	chip_enable = devices.read_write_proxy("chip_enable_flag")
+	output_enable = devices.read_write_proxy("output_enable_flag")
 
 	# read/write
 
@@ -153,7 +153,7 @@ class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 		self.program_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.program_enable_pin)
 
 	# proxy descriptors.  see also parent class
-	program_enable = devices.flag_proxy("program_enable_flag")
+	program_enable = devices.read_write_proxy("program_enable_flag")
 
 	@classmethod
 	def write_device(cls, imgfile):
@@ -374,7 +374,7 @@ class msm538002e(m27cx_width16_pulse_ce):
 	# no proxy provided because this pin's state must be held fixed to
 	# logic False for the address and data bus configurations to be
 	# valid
-	#byte_mode = devices.flag_proxy("byte_mode_flag")
+	#byte_mode = devices.read_write_proxy("byte_mode_flag")
 
 	@classmethod
 	def write_device(cls, imgfile):
