@@ -722,8 +722,7 @@ __xdata static WORD installed_channel_drivers;
 
 static void scan_installed_channel_drivers(void)
 {
-	BYTE channel;
-	BYTE bit;
+	signed char channel;
 
 	/* turn on main power supply, set VTH to about 1 V.  VADJ powers
 	 * the comparators, so also set it high enough for them to work
@@ -755,7 +754,7 @@ static void scan_installed_channel_drivers(void)
 	 * part and power-cycling the programmer. */
 
 	installed_channel_drivers = 0;
-	for(channel = 0, bit = 1; channel < 88; channel += 8, bit <<= 1) {
+	for(channel = 80; channel >= 0; channel -= 8) {
 		const WORD addr = allpro88_channel_addr(channel);
 		allpro88_write(addr, PINCON_PULLDN);
 		/* let bus relax.  for channels that aren't installed,
@@ -766,8 +765,9 @@ static void scan_installed_channel_drivers(void)
 		 * read, we still still see the value of PINCON_PULLDN on
 		 * the data bus.  adding a small delay fixes */
 		delay(1 /* ms */);
+		installed_channel_drivers <<= 1;
 		if(!(allpro88_read(addr) & 1))
-			installed_channel_drivers |= bit;
+			installed_channel_drivers |= 1;
 		allpro88_write(addr, PINCON_DISABLE);
 	}
 
