@@ -50,7 +50,7 @@ class oled_module(object):
 		return self.device_id << 2 | self.address << 1 | r_not_w
 
 
-with allpro88.allpro88(cal_data = "calibration.dat") as programmer:
+with allpro88.allpro88() as programmer:
 	allpro88.command_line_banner(programmer)
 	with oled_module(programmer) as device:
 		display = ssd1306(i2c(bus = device.i2c, port = None, address = device.device_id << 1 | device.address))

@@ -34,7 +34,7 @@ class w25x10avaiz(object):
 
 
 with open("dump.dat", "wb") as dump:
-	with allpro88.allpro88(cal_data = "calibration.dat") as programmer:
+	with allpro88.allpro88() as programmer:
 		allpro88.command_line_banner(programmer)
 		with w25x10avaiz(programmer) as device:
 			# device ignores chip select until it has seen it

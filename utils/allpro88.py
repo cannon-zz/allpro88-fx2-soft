@@ -2,6 +2,7 @@ from enum import IntEnum
 import logging
 import math
 import numpy
+import os
 import time
 import usb.core
 import yaml
@@ -9,17 +10,22 @@ from socket_module import socket_modules
 
 
 #
-# NOTE NOTE NOTE:  in all of what follows, "channel number" means a pin
-# driver channel number according to my numbering convention, NOT any of
-# the channel numbering conventions shown in the ALLPRO88 technical
-# documentation (I've identified at least two).  by my convention channels
-# are numbered sequentially from 0 in the order of their control register
-# addresses.
+# =============================================================================
+#
+#                          Environment Configuration
+#
+# =============================================================================
 #
 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
+
+
+# FIXME:  when this is turned into a proper package, move this to the
+# package's __init__.py file.
+
+ALLPRO88_CAL_PATH = os.getenv("ALLPRO88_CAL_PATH", default = ".").split(":")
 
 
 #
@@ -154,6 +160,16 @@ class CLKGEN_MODE(IntEnum):
 #                           Channel Driver Interface
 #
 # =============================================================================
+#
+
+
+#
+# NOTE NOTE NOTE:  in all of what follows, "channel number" means a pin
+# driver channel number according to my numbering convention, NOT any of
+# the channel numbering conventions shown in the ALLPRO88 technical
+# documentation (I've identified at least two).  by my convention channels
+# are numbered sequentially from 0 in the order of their control register
+# addresses.
 #
 
 
@@ -808,7 +824,7 @@ class allpro88(object):
 	ep_addr_out = 0x02
 	ep_addr_in = 0x86
 
-	def __init__(self, cal_data = None, idVendor = idVendor, idProduct = idProduct):
+	def __init__(self, cal_data = "auto", idVendor = idVendor, idProduct = idProduct):
 		# 512 byte buffer
 		self.buf = usb.core.array.array("B", (0,) * 512)
 		# replace class attributes with instance attributes
@@ -854,6 +870,21 @@ class allpro88(object):
 		# narrowly-defined and specific task, and the idea of
 		# general-pupose reuse is nonsensical.
 		self.cal = {}
+		if cal_data == "auto":
+			# if "auto", search for a file matching this unit's
+			# serial number in the directories given in
+			# ALLPRO88_CAL_PATH.  if a calibration file
+			# literally named "auto" is desired, use "./auto"
+			# to load it.  .calibration_filename() returns the
+			# name of the file it has found or None.  we set
+			# cal_data to the return value and continue
+			# processing as if that input had come from the
+			# calling code
+			cal_data = self.calibration_filename()
+			if cal_data is None:
+				logger.warning("cannot find calibration model in ALLPRO88_CAL_PATH;  using default model")
+			else:
+				logger.info("loaded calibration model \"%s\"" % cal_data)
 		if cal_data is None or isinstance(cal_data, dict):
 			# assume a dictionary-valued parameter contains the
 			# calibration data.  if no calibration data was
@@ -932,6 +963,29 @@ class allpro88(object):
 		return False
 
 
+	def calibration_filename(self, serial_number = None):
+		"""
+		Search ALLPRO88_CAL_PATH for a calibration model matching
+		the given serial number and return the file's full path
+		name, or None if no matching file is found.  Directory
+		names in ALLPRO88_CAL_PATH are searched in order, and if
+		more than one of the directories contains a matching file
+		the first one found is reported.  If a serial number is not
+		provided, the default is to search for this unit's own
+		serial number.  Only the file names are checked, access
+		permission is not checked, nor are the contents confirmed
+		to contain a valid calibration model matching the given
+		serial number.
+		"""
+		if serial_number is None:
+			serial_number = self.serial_number
+		for path in ALLPRO88_CAL_PATH:
+			filename = os.path.join(path, "allpro88_cal_%s.yml" % serial_number)
+			if os.access(filename, os.F_OK):
+				return filename
+		return None
+
+
 	def set_calibration(self, cal_data):
 		# first, install default calibrations.
 		#
@@ -957,6 +1011,11 @@ class allpro88(object):
 
 		if cal_data is None:
 			return
+
+		# confirm the calibration data is for this unit.  don't
+		# make this fatal if it isn't, just issue a warning
+		if cal_data["serial"] != self.serial_number:
+			logger.warning("calibration data is for serial # \"%s\", but this unit has serial # \"%s\":  using anyway." % (cal_data["serial"], self.serial_number))
 
 		# programmer DAC curves.  the polynomials model the power
 		# supply outputs.  VPUL, however. is placed onto pins
