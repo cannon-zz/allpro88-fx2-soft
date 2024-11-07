@@ -894,13 +894,17 @@ class allpro88(object):
 
 		# configure for the installed socket module
 		try:
-			self.socket_module = socket_modules[self.socket_module_id](self)
+			# retrieve the class
+			self.socket_module = socket_modules[self.socket_module_id]
 		except KeyError as e:
 			if self.socket_module_id == 0xff:
 				logger.warning("no socket module detected")
 			else:
 				logger.warning("unrecognized socket module ID 0x%02X" % self.socket_module_id)
 			self.socket_module = None
+		else:
+			# initialize
+			self.socket_module = self.socket_module(self)
 
 		# keep track of what bus numbers are in use
 		self.bus = {}
