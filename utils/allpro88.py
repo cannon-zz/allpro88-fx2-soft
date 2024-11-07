@@ -680,9 +680,9 @@ class flag_vdac(flag):
 		kwargs are passed to parent class, e.g., what state to use
 		for floating.
 		"""
-		super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
 		if vdac <= 0:
 			raise ValueError(vdac)
+		super(flag_vdac, self).__init__(socket, pin_number, active = PINCON.VDAC, inactive = PINCON.LOGICL, **kwargs)
 		self.channel.vdac = volt(vdac)
 
 
@@ -697,9 +697,9 @@ class flag_vdac_active_low(flag):
 		kwargs are passed to parent class, e.g., what state to use
 		for floating.
 		"""
-		super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
 		if vdac <= 0:
 			raise ValueError(vdac)
+		super(flag_vdac_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.VDAC, **kwargs)
 		self.channel.vdac = volt(vdac)
 
 	def read(self):
