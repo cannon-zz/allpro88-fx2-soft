@@ -654,12 +654,13 @@ static void allpro88_hard_reset(void)
 
 	/*
 	 * the /RESET line clears all configuration registers (octal latch
-	 * chips) back to 0.  that disables all channel outputs, and turns
-	 * off all power supplies.  we pull it low (active), ensure the /RD
-	 * and /WR control lines (and /ACT) are high (inactive), wait a
-	 * while.  the data bus is floating during all of this.  finally,
-	 * the address bus set to 0, and /RESET set high (inactive) taking
-	 * the harware out of reset.
+	 * chips) back to 0.  that disables all channel outputs, the clock
+	 * generator, disconnects socket module pin bypass capacitors, and
+	 * turns off all power supplies.  we pull it low (active), ensure
+	 * the /RD and /WR control lines (and /ACT) are high (inactive),
+	 * wait a while.  the data bus is floating during all of this.
+	 * finally, the address bus set to 0, and /RESET set high
+	 * (inactive) taking the harware out of reset.
 	 */
 
 	/* set /RESET low */
@@ -802,9 +803,8 @@ static void scan_installed_channel_drivers(void)
  * finish slewing to already have the correct answer on the comparator,
  * only for voltages very close to the voltage of that bit will checking
  * the comparator too soon be a problem, and maybe that's relatively rare
- * (nevertheless, failing to wait is still incorrect nevertheless).  FIXME:
- * think about some kind of jump table trick to have less NOPs on each
- * iteration.
+ * (nevertheless, failing to wait is still incorrect).  FIXME: think about
+ * some kind of jump table trick to have less NOPs on each iteration.
  */
 
 
