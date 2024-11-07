@@ -565,6 +565,21 @@ inline static void allpro88_set_VTST(BYTE vdac, BYTE idac)
 
 
 /*
+ * set the two spare DACs.  these are two of the four DACs in the analogue
+ * 2 board's AD7226 quad DAC chip.  they are not connected to anything
+ * except resistors to ground.  the other two DACs in this chip control the
+ * current and voltage of the VTST power suppy.
+ */
+
+
+inline static void allpro88_set_SPARE(BYTE dac0, BYTE dac1)
+{
+	allpro88_write(0x0384, dac0);	/* pin 2 */
+	allpro88_write(0x0385, dac1);	/* pin 1 */
+}
+
+
+/*
  * start address for the control registers for a channel
  */
 
@@ -687,6 +702,9 @@ static void allpro88_hard_reset(void)
 	allpro88_set_VSR(0);
 	allpro88_set_VTH(0);
 	allpro88_set_VTST(0, 0);
+	/* zero the two spare DACs.  their outputs are connected to
+	 * resistors to ground, so zero them to save a bit of power */
+	allpro88_set_SPARE(0, 0);
 
 	/* zero the DACs that require a separate update step, then do it */
 	for(channel = 0; channel < 88; channel++)
