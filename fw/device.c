@@ -1630,6 +1630,8 @@ inline static BOOL in_buffer_not_full(void)
  *		DAC as YY
  * PXXYYYYAABB	pulse channel XX to state AA for YYYY microseconds,
  *		returning to state BB
+ * R		execute hardware reset (of ALLPRO88, this does not reset
+ *		the USB interface board)
  * V  		run VADJ voltage measurement sequence report VADJTH DAC as
  *		YY
  *
@@ -1872,6 +1874,18 @@ static void do_command(const char *command)
 		pulse(channel, microseconds, config, final_config);
 		break;
 	}
+
+	/*
+	 * hardware reset
+	 */
+
+	case 'R':
+		/* check for correct end of string */
+		if(command[1])
+			goto error;
+		/* execute hardware reset */
+		allpro88_hard_reset();
+		break;
 
 	/*
 	 * VADJ voltage measurement

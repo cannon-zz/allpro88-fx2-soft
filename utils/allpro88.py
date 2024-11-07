@@ -921,30 +921,9 @@ class allpro88(object):
 
 	def __enter__(self):
 		# ensure the programmer is left in a safe condition (all
-		# variable power supplies off, all channel drivers
-		# disabled).
-
-		# turn off power supplies
-		self.pcr_enable = False
-
-		# ensure all channel drivers are disabled (off), the DAC
-		# voltages are 0'ed and the bypass capacitors disabled
-		for channel in self.channels:
-			channel.config = PINCON.DISABLE
-			channel.bypass = False
-			channel.vdac = 0
-		# set all variable power supplies to 0 V
-		self.vpul = 0
-		self.load_dacs()	# also updates pin driver DACs
-		self.vsr = 0
-		self.vth = 0
-		self.vtst = 0
-		self.itst = 0
-		self.vadjth = 0
-		self.vadj = 0
-
-		# turn off TTL clock generator
-		self.clkgen_mode = CLKGEN_MODE.DISABLE
+		# variable power supplies off, all DACs reset to 0, all
+		# channel drivers disabled).
+		self.reset()
 
 		# done
 		return self
@@ -952,30 +931,9 @@ class allpro88(object):
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
 		# ensure the programmer is left in a safe condition (all
-		# variable power supplies off, all channel drivers
-		# disabled).
-
-		# turn off power supplies
-		self.pcr_enable = False
-
-		# ensure all channel drivers are disabled (off), the DAC
-		# voltages are 0'ed and the bypass capacitors disabled
-		for channel in self.channels:
-			channel.config = PINCON.DISABLE
-			channel.bypass = False
-			channel.vdac = 0
-		# set all variable power supplies to 0 V
-		self.vpul = 0
-		self.load_dacs()	# also updates pin driver DACs
-		self.vsr = 0
-		self.vth = 0
-		self.vtst = 0
-		self.itst = 0
-		self.vadjth = 0
-		self.vadj = 0
-
-		# turn off TTL clock generator
-		self.clkgen_mode = CLKGEN_MODE.DISABLE
+		# variable power supplies off, all DACs reset to 0, all
+		# channel drivers disabled).
+		self.reset()
 
 		# done.  if an exception has occured, continue processing
 		return False
@@ -1408,3 +1366,14 @@ class allpro88(object):
 		# circuit fails to prevent an overload it could be seen to
 		# be above that.
 		return vdac / 5.0
+
+
+	def reset(self):
+		"""
+		Reset the ALLPRO88 programmer hardware.  This has no effect
+		on the USB interface module.  For example, bus definitions
+		and so on remain valid, although without reconfiguring the
+		ALLPRO88 hardware, it's unlikely existing bus definitions
+		will behave as expected.
+		"""
+		self.write_command("R")
