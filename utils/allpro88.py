@@ -734,6 +734,15 @@ class bus_parallel(object):
 	this class more convenient.
 	"""
 	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt, default = None):
+		"""
+		programmer is the allpro88 programmer instance, and socket
+		the socket in which the part is inserted.  pin_numbers is a
+		sequence containing the pin numbers corresponding to the
+		bus' bits, least-significant bit first.  active, inactive
+		and flt are the PINCON configuration bits to use for the
+		active, inactive and floating states.  default sets the
+		initial state of the bus (default = floating).
+		"""
 		if not (1 <= len(pin_numbers) <= 32):
 			raise ValueError("bus width out of range: 1 <= %d <= 32" % len(pin_numbers))
 		self.programmer = programmer
