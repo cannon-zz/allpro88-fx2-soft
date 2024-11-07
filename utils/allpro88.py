@@ -1324,6 +1324,11 @@ class allpro88(object):
 	vpul = dacregister(address = 0x0305)
 	vtst = dacregister(address = 0x0386)
 	itst = dacregister(address = 0x0387)
+	# two of the DACs on analogue control 2's PM7226 quad DAC chip are
+	# not connected.  they can be controlled at the following
+	# addresses
+	spare_dac0 = dacregister(address = 0x0384)
+	spare_dac1 = dacregister(address = 0x0385)
 
 
 	def load_dacs(self, transient = 0.001):
