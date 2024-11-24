@@ -69,7 +69,11 @@ class power(object):
 		comparators to meet their performance specifications;
 		failing to keep the comparator supply voltages above their
 		input voltages by the minimum recommended amount will not
-		damage the parts.
+		damage the parts.  Note, also, that the comparator outputs
+		are pulled up to VADJ and applied to the input of an HCT
+		series 8-to-1 multiplexer for the read-back circuit, and
+		therefore reliable read out of the comparators is only
+		guaranteed if VADJ is at least 4 V.
 
 		vth:  the voltage for the comparators used to test the
 		state of pins.  the default is 1.5 V, which is a compromise
@@ -99,7 +103,11 @@ class power(object):
 		self.active_voltage_map = None
 		self.vth = allpro88.volt(vth) if vth else 0
 		if vadj == "auto":
-			self.vadj = allpro88.volt(self.max() + 2.)
+			# whichever is larger:  4 V or the highest
+			# requested supply voltage + 2 V.  this ensures
+			# proper operation of the comparators and their
+			# read-out.
+			self.vadj = allpro88.volt(max(4., self.max() + 2.))
 		else:
 			self.vadj = allpro88.volt(vadj)
 

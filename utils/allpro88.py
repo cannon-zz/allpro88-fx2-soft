@@ -447,6 +447,18 @@ class channel_proxy(object):
 		fluctuations in comparator behaviour, but is a circuit
 		design choice that ensures one or the other results, and
 		that there was a revision in this feature at some point.
+
+		NOTE:  VADJ is used as the pull-up voltage for the
+		comparator outputs, and therefore must be set to at least 4
+		V for the associated digital chip to interpret a "high"
+		voltage on an input as a logic 1 state.  This is almost
+		certainly a design error, but the logic family used for the
+		8-to-1 multiplexer chip for the comparator read-back is
+		from a logic family that can tolerate high voltages on its
+		inputs, and there is sufficient current limiting resistance
+		in the circuit to protect it that VADJ can be configured
+		for any voltage without damaging the comparator read-back
+		circuits.
 		"""
 		return bool(self.programmer.read_addr(self.address) & 1)
 
@@ -455,8 +467,12 @@ class channel_proxy(object):
 		Use a bisection search with VTH to measure the voltage on
 		this channel's pin.  Repeat the measurement n times
 		(default = 1) and report the median of the measurements.
+
 		NOTE:  VTH is left set to (an approximation of) the
 		measured voltage.
+
+		NOTE:  see the note in .__bool__() about the minimum VADJ
+		voltage required for reliable comparator operation.
 		"""
 		n = int(n)
 		assert n > 0
