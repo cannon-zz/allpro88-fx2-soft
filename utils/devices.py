@@ -180,7 +180,7 @@ class power(object):
 		pins = None
 		for voltage_map, delay in sequence:
 			if voltage_map not in self.voltage_maps:
-				raise ValueError("unknown voltage map \"%s\"" % voltage_map)
+				raise KeyError(voltage_map)
 			if delay < 0:
 				raise ValueError("invalid delay %g" % delay)
 			if pins is None:
