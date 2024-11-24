@@ -474,11 +474,23 @@ class channel_proxy(object):
 		"""
 		n = int(n)
 		assert n > 0
-		volts = []
+		measurements = []
 		for i in range(n):
+			# to improve performance, the voltage measurement
+			# bisection search is run by the firmware in the
+			# USB interface board.  that function reports the
+			# DAC count that approximates the pin voltage.
 			dac, = self.programmer.write_command("M%02X" % self.channel)
-			volts.append(self.programmer.vth.cal(dac, self.programmer))
-		return numpy.median(volts)
+			# save.  NOTE:  to improve performance, we assume
+			# the calibration model is monotonic in DAC count,
+			# so that taking the median of the measured DAC
+			# counts and calibrating to a voltage is identical
+			# to calibrating each DAC count to a voltage and
+			# taking the median of those.
+			measurements.append(dac)
+		# choose median of measurements, convert DAC count to
+		# voltage, and report value
+		return self.programmer.vth.cal(numpy.median(measurements), self.programmer)
 
 	def pulse(self, microseconds, config, final_config):
 		"""
