@@ -216,9 +216,10 @@ class dacregister(object):
 	optionally apply a volts-to-DAC count calibration function.
 	"""
 	def __init__(self, address = None, transient = 0.):
-		# DAC register address.  if the object to which this
-		# descriptor is attached has a .dac_address attribute, then
-		# its value will be used instead of this.
+		# DAC register address.  if this is None then the object to
+		# which this descriptor is attached must have a
+		# .dac_address attribute, and its value will be used
+		# instead.
 
 		self.dac_address = address
 
@@ -289,11 +290,8 @@ class dacregister(object):
 		# verify range
 		if not 0 <= dac <= 255:
 			raise ValueError("0 <= dac <= 255:  %d" % dac)
-		# determine address of DAC register.  if the object to
-		# which we are attached provides a .dac_address attribute,
-		# then we use its value, otherwise we use the address given
-		# to .__init__().
-		address = obj.dac_address if hasattr(obj, "dac_address") else self.dac_address
+		# address of DAC register
+		address = self.dac_address if self.dac_address is not None else obj.dac_address
 		# write the value and pause for transient
 		obj.write_addr(address, dac)
 		time.sleep(self.transient)
