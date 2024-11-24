@@ -425,7 +425,7 @@ class channel_driver_test_suite(object):
 		# test, by removing it from the calibration model.
 		self.vpul_ramp_x = numpy.zeros(128)
 		self.vpul_ramp_y = numpy.zeros(128)
-		for dac in range(128):
+		for dac in tqdm(range(128), "VPUL"):
 			self.programmer.vpul = dac
 			self.programmer.load_dacs()
 			time.sleep(0.010)	# wait for RC delay
@@ -636,7 +636,7 @@ class channel_driver_test_suite(object):
 		# output voltage
 		self.vdac_ramp_x = numpy.arange(256)
 		self.vdac_ramp_y = numpy.zeros(256)
-		for dac in self.vdac_ramp_x:
+		for dac in tqdm(self.vdac_ramp_x, desc = "VDAC"):
 			self.channel.vdac = dac
 			self.programmer.load_dacs()
 			# let things settle to get a good measurement
