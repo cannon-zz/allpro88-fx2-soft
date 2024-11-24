@@ -836,7 +836,37 @@ try:
 except FileNotFoundError as e:
 	print("warning:  %s" % str(e))
 	print("intializing new calibration")
-	calibration = {}
+	# initialize with sensible default power supply calibration curves
+	calibration = {
+		"serial": None,
+		"vadj": {
+			"poly":	(0.5, 0.118)
+		},
+		"vpul": {
+			"poly":	(0., 25.5 / 256),
+			# the following are properties of the
+			# pin-driver circuits that place the power
+			# supply voltage onto a pin.  they are
+			# averages of component properties across
+			# all pin drivers to provide a typical (but
+			# not pin specific) correction for the
+			# calibration model.  they are measured by
+			# the pin driver calibration routines.  for
+			# now we set them to typical values for
+			# these components.
+			"diode_vf": 0.180,	# Schottky Vf
+			"trans_vf": 0.550	# PNP E-B Vf
+		},
+		"vsr": {
+			"poly":	(0., 25.5 / 256)
+		},
+		"vth": {
+			"poly":	(0., 25.5 / 256)
+		},
+		"vtst": {
+			"poly":	(0., 25.5 / 256)
+		}
+	}
 
 with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as programmer:
 	# record serial number
