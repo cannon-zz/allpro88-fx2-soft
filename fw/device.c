@@ -76,7 +76,8 @@ static BOOL errno = FALSE;
 
 /*
  * convert upper-case base 16 strings of various fixed lengths to numerical
- * values
+ * values.  sets errno to TRUE if the input is not a valid upper case base
+ * 16 number, and in that case the return value is undefined.
  */
 
 
