@@ -112,8 +112,8 @@ class PINCON(IntEnum):
 	LOGICH = 0x08	# turn on +5 V ("TTL high") driver
 	PULLUP = 0x10	# turn on pull-up driver (2.7 kOhm to VPUL source)
 	LOGICL = 0x20	# turn on 0 V ("TTL low") driver (50 Ohm to ground)
-	POSCLK = 0x40	# clock phase 1 drives TTL high, phase 0 drives TTL low
-	NEGCLK = 0x60	# clock phase 0 drives TTL high, phase 1 drives TTL low
+	POSCLK = 0x40	# clock phase 0 drives TTL high, phase 1 drives TTL low
+	NEGCLK = 0x60	# clock phase 1 drives TTL high, phase 0 drives TTL low
 	PULLDN = 0x80	# turn on pull-down driver (5.4 kOhm to ground)
 
 
