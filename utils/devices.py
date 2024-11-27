@@ -132,8 +132,19 @@ class power(object):
 		self.programmer.vth = self.vth
 
 	def set_voltage_map(self, voltage_map):
-		# configure pins and the VPUL dac.
-		self.active_voltage_map = self.voltage_maps[voltage_map]
+		# confirm that we are not leaving any already configured
+		# pins dangling.  whatever pins we are currently
+		# controlling, we must continue to control
+		new_voltage_map = self.voltage_maps[voltage_map]
+		if self.active_voltage_map is not None:
+			current_pins = set(self.active_voltage_map)
+			new_pins = set(new_voltage_map)
+			if new_pins < current_pins:
+				raise ValueError("cannot reduce set of configured pins:  %s --> %s" % (str(current_pins), str(new_pins)))
+
+		# switch to new voltage map.  configure pins and the VPUL
+		# dac.
+		self.active_voltage_map = new_voltage_map
 		for pin, voltage in self.active_voltage_map.items():
 			if pin == "VPUL":
 				self.programmer.vpul = allpro88.volt(voltage) if voltage else 0
