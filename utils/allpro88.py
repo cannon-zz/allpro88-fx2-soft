@@ -987,7 +987,7 @@ class allpro88(object):
 			# calling code error
 			raise ValueError(cal_data)
 
-		logger.info("serial number:  %s\nsystem ID:  0x%X\nsocket module:  %s\nchannels installed (%d):  %s" % (self.serial_number, self.system_id, self.socket_module.name if self.socket_module else "not detected", len(self.channels_installed), tuple(channel.channel for channel in self.channels_installed)))
+		logger.info("serial number:  %s\nsystem ID:  0x%X\nsocket module:  %s\nchannels installed (%d):  %s\nlast calibrated:  %s" % (self.serial_number, self.system_id, self.socket_module.name if self.socket_module else "not detected", len(self.channels_installed), tuple(channel.channel for channel in self.channels_installed), self.cal["time"]))
 
 
 	def __enter__(self):
@@ -1071,6 +1071,9 @@ class allpro88(object):
 			# when called from .__init__() attribute is not yet
 			# present
 			self.cal = {}
+
+		# calibration date and time
+		self.cal["time"] = cal_data.get("time", "NEVER")
 
 		# programmer DAC curves.  the polynomials model the power
 		# supply outputs.  VPUL, however. is placed onto pins

@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import matplotlib
 from matplotlib import figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -869,8 +870,9 @@ except FileNotFoundError as e:
 	}
 
 with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as programmer:
-	# record serial number
+	# record serial number and timestamp
 	calibration["serial"] = programmer.serial_number
+	calibration["time"] = datetime.datetime.now(datetime.UTC).isoformat()
 
 	# turn on power supplies
 	programmer.pcr_enable = True
