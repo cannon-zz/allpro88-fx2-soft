@@ -248,8 +248,28 @@ class m27c32(m27cx_width8_pulse_ce):
 		return verify
 
 
-class hn462716(m27cx_width8_pulse_ce):
+class nmc27c16q(m27cx_width8_pulse_ce):
 	socket_name = "DIP24"
+	voltage_maps = {
+		"read": {
+			12: 0.0,	# GND
+			21: 5.0,	# Vpp
+			24: 5.0		# Vcc
+		},
+		"program": {
+			12: 0.0,	# GND
+			21: 12.75,	# Vpp
+			24: 5.0		# Vcc
+		}
+	}
+	address_bus_pins = (8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19)
+	data_bus_pins = (9, 10, 11, 13, 14, 15, 16, 17)
+	chip_enable_pin = 18
+	output_enable_pin = 20
+	Tpw = 100 # us
+
+
+class hn462716(nmc27c16q):
 	voltage_maps = {
 		"read": {
 			12: 0.0,	# GND
@@ -262,11 +282,7 @@ class hn462716(m27cx_width8_pulse_ce):
 			24: 5.0		# Vcc
 		}
 	}
-	address_bus_pins = (8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19)
-	data_bus_pins = (9, 10, 11, 13, 14, 15, 16, 17)
-	chip_enable_pin = 18
-	output_enable_pin = 20
-	Tpw = 50000	# 50 ms
+	Tpw = 50000	# 50 ms <--- FIXME: confirm
 
 
 class hn462732(m27c32):
@@ -554,4 +570,4 @@ class ds1230y(x28c64):
 ###
 
 
-am29f040.read_device(open("dump.dat", "wb"))
+nmc27c16q.read_device(open("dump.dat", "wb"))
