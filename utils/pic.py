@@ -87,7 +87,7 @@ class pic(object):
 	T_PROG2 = 2e-3	# seconds.  the "externally timed" program delay
 	T_ERA = 8e-3	# seconds.  the "bulk erase" delay
 
-	def __init__(self, programmer, socket):
+	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
 
@@ -109,6 +109,15 @@ class pic(object):
 				self.VPP_pin: 0.0,	# GND
 				self.VSS_pin: 0.0	# GND
 			},
+			# NOTE:  all other states include an explicit
+			# configuration for the VPP pin, but it becomes a
+			# GPIO in the normal running state.  the power
+			# class will not allow a transition from the other
+			# states to the "run" state because doing so would
+			# leave the VPP pin's configuration in whatever
+			# state it had originally been in, which could do
+			# damage.  only a transition directly into the
+			# "run" state from power.off() is allowed.
 			"run": {
 				self.VDD_pin: 5.0,	# volts
 				self.VSS_pin: 0.0	# GND
@@ -256,7 +265,7 @@ class pic(object):
 			# write the most recently loaded program word or
 			# data byte to the current address.  must be
 			# followed by an "end program" command after a
-			# T_PROG2 delay.  that is is included here.  the
+			# T_PROG2 delay.  that is included here.  the
 			# target address is not erased first.
 			self.write_command(0x18)
 			time.sleep(self.T_PROG2)
@@ -429,7 +438,7 @@ class pic(object):
 		# data memory to be written to by writing 8 bit bytes to a
 		# 128 word window of program memory starting at 0x2100.
 		# altogether, program memory, config words, and data memory
-		# call all be supplied in a single .hex file
+		# can all be supplied in a single .hex file
 
 		# move address counter to 0x2000.  command must load a word
 		# for writing, but we do not write the value to memory
