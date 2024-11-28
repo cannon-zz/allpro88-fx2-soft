@@ -1871,7 +1871,10 @@ error:
 
 inline static void parse_out_buffer(void)
 {
+	/* start address of command string.  first command is at start of
+	 * end-point 2's ("out") buffer */
 	char *command = EP2FIFOBUF;
+	/* length of buffer's contents */
 	WORD n;
 
 	/* initialize autopointer 1 to the start address of end-point 2's
@@ -1904,13 +1907,15 @@ inline static void parse_out_buffer(void)
 	 */
 
 	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--)
-		/* search for end of command character */
+		/* search for end-of-command character.  reading XAUTODAT1
+		 * increments the corresponding auto pointer.  */
 		if(XAUTODAT1 == '\n') {
-			/* null terminate the command and interpret */
+			/* null terminate and interpret.  command points to
+			 * start address */
 			char __xdata *next_cmd = (char __xdata *) MAKEWORD(AUTOPTRH1, AUTOPTRL1);
 			*(next_cmd - 1) = 0;
 			do_command(command);
-			/* reset state for next command */
+			/* save start address of next command */
 			command = next_cmd;
 		}
 
