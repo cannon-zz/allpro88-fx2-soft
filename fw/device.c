@@ -115,19 +115,6 @@ static DWORD str_to_dword(const char *str)
 
 
 /*
- * write a null-terminated string without the terminator character.
- * assumes AUTOPTR2 is set to the destination.
- */
-
-
-static void puts(const char *str)
-{
-	while(*str)
-		XAUTODAT2 = *str++;
-}
-
-
-/*
  * write integers to base 16 strings of various fixed lengths.  assumes
  * AUTOPTR2 is set to the destination.
  */
@@ -598,21 +585,6 @@ static WORD allpro88_channel_addr(BYTE channel)
 
 
 /*
- * set the PINCON register for a channel
- */
-
-
-#if 0	/* not used */
-inline static void allpro88_set_PINCON(BYTE channel, enum ALLPRO88_PINCON_BITS val)
-{
-	/* config register is at offset 0 from the start of the register
-	 * group for each channel */
-	allpro88_write(allpro88_channel_addr(channel), val);
-}
-#endif
-
-
-/*
  * set the DAC register for a channel.  the voltage will be
  *
  * VDAC = -0.5 + (0.1 * dac)
@@ -640,23 +612,6 @@ inline static void allpro88_xfer_PINDACs(void)
 {
 	allpro88_write(0x308, 0);
 }
-
-
-/*
- * enable/disable the bypass capacitor for a channel.  only channels < 0x30
- * have bypass capacitors.
- */
-
-
-#if 0	/* not used */
-inline static void allpro88_set_PINBYPASS(BYTE channel, BOOL enable)
-{
-	if(channel < 0x28)
-		allpro88_write(0x0280 + channel, enable);
-	else if(channel < 0x30)
-		allpro88_write(0x02c0 - 0x28 + channel, enable);
-}
-#endif
 
 
 /*
