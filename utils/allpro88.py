@@ -1113,20 +1113,22 @@ class allpro88(object):
 
 		# per channel DAC curves
 
+		channels_missing_cal = []
 		for i, channel in enumerate(self.channels):
 			try:
 				dac_cal_data = cal_data["channel%02d" % i]
 			except KeyError:
 				# no calibration data for this channel.
-				# e.g., this is not a full 88-channel unit.
-				# FIXME:  maybe print a warning if the
-				# number of channels in the calibration
-				# data doesn't match the number of channels
-				# installed in the unit.  probably
-				# indicates an out-of-date calibration file
-				# following an upgrade.
+				# this unit might not have this channel
+				# installed anyway, but if it does and the
+				# calibration data is missing make a note
+				# of that.
+				if channel in self.channels_installed:
+					channels_missing_cal.append(i)
 				continue
 			channel.set_cal(dac_cal_data["vdac"])
+		if channels_missing_cal:
+			logger.warning("no calibration data for channel(s) %s.  using default calibration" % ", ".join(channels_missing_cal))
 
 
 	def get_unused_bus(self, bus_obj = None):
