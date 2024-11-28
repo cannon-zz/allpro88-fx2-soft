@@ -1208,6 +1208,13 @@ class allpro88(object):
 
 		self.device.write(self.ep_addr_out, (cmd + "\n").encode("ascii"))
 
+		# every "out" packet generates a response "in" packet.
+		# even if we know the commands did not generate responses,
+		# we need to retrieve the packet unconditionally or the
+		# "in" queue will fill up in the programmer
+
+		n = self.device.read(self.ep_addr_in, self.buf)
+
 		# the USB interface's firmware allows a USB packet to
 		# contain as many commands as will fit.  it processes them
 		# in order and places their responses, in order, in the
@@ -1221,36 +1228,15 @@ class allpro88(object):
 		# of using Python methods to encapsulate I/O operations and
 		# provide a high-level interface (which gets in the way of
 		# bottling sequences of commands) has been too great to
-		# ever make use of the feature.  because the logic needed
-		# to split up a response packet proved a bit tricky to get
-		# right, I have preserved it, below, even though as written
-		# a response packet is now guaranteed to have only a single
-		# response in it.
+		# ever make use of the feature.  nevertheless, I have
+		# preserved the command response splitting feature here,
+		# just in case
 
-		# every "out" packet generates a response "in" packet.
-		# even if we know the commands did not generate responses,
-		# we need to retrieve the packet unconditionally or the
-		# "in" queue will fill up in the programmer
+		# not all commands generate a response.  every command with
+		# a response responds with a single base 16 integer
+		# followed by a newline character.
 
-		n = self.device.read(self.ep_addr_in, self.buf)
-
-		# all commands with responses respond with a single base 16
-		# integer.  every response ends in a new line character.
-		# some responses are empty, and more than one such response
-		# in a row become sequential new line characters.  .split()
-		# normally treats sequential new lines as a single
-		# whitespace boundary, but if given a specific character to
-		# split on (e.g., the new line character) then each new
-		# line is its own boundary.  .split() also normally doesn't
-		# create an extra split if the string ends in whitespace,
-		# but when given a specific character to split on and the
-		# string ends in that character then an additional (zero
-		# length) split value is created.  since every command ends
-		# in a new line, we always get one extra output from
-		# .split(), which we must drop from the list
-
-		resps = self.buf[:n].tobytes().decode("ascii").split("\n")[:-1]
-		return tuple(int(resp, 16) if resp else None for resp in resps)
+		return tuple(int(resp, 16) for resp in self.buf[:n].tobytes().decode("ascii").split())
 
 
 	#
