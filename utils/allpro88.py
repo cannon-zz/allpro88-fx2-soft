@@ -95,15 +95,17 @@ class PINCON(IntEnum):
 	voltage source other than the pull-up source or the current-limited
 	test srouce will destroy components.
 
-	NOTE:  all components on the hybrid modules except the resistors
-	are standard readily-available parts and are straight-forward,
-	although not easy, to replace.  The resistors in the circuitry of
-	the hybrid modules, on the other hand, are *printed into the module
-	as part of the circuit board itself* and *cannot* be replaced.  If
-	any of those resistors is damaged due to over-current conditions
-	the entire hybrid module will have to be replaced.  The only source
-	I know of for replacement hybrid modules would be another, donor,
-	unit.
+	NOTE:  with the exception of the LM346M amplifier chip, the
+	surface-mount components on the hybrid modules are standard
+	readily-available parts and are straight-forward, although not
+	easy, to replace (the 346 was once a widely available part, it is
+	now discontinued and getting harder to find with time).  The
+	resistors in the circuitry of the hybrid modules, on the other
+	hand, are *printed into the module as part of the circuit board
+	itself* and *cannot* be replaced.  If any of those resistors is
+	damaged due to over-current conditions the entire hybrid module
+	will have to be replaced.  The only source I know of for
+	replacement hybrid modules are other, scrapped donor, units.
 	"""
 	DISABLE = 0x00	# disable ("float") pin
 	GND = 0x01	# turn on FET pulling pin to ground
@@ -131,7 +133,7 @@ class CLKGEN_MODE(IntEnum):
 	# "250KHz", "500KHz", "1MHz", "2MHz", and "4MHz", which are
 	# together labelled "PHASE TAPS".  the "KHz" labels are surely
 	# typographic errors, and mean "kHz".  they don't appear to be
-	# connected to anything except the 4 MHz output which loops back to
+	# connected to anything, except the 4 MHz output which loops back to
 	# another PAL one of whose outputs provides the clock for the x273
 	# register.  my guess is something is being done to ensure the
 	# clock generator PAL's configuration bits are latched at a special
@@ -625,7 +627,9 @@ class flag(object):
 		state.
 
 		If none of the three states is a VDAC output, the VDAC DAC
-		will be set to 0.
+		will be set to 0, otherwise it will not be modified, and
+		the calling code is expected to set it to the desired
+		value.
 		"""
 		self.socket = socket
 		self.pin_number =  pin_number
@@ -919,9 +923,7 @@ class allpro88(object):
 		if self.device is None:
 			raise ValueError("USB device not found (vid:pid = %04X:%04X)" % (self.idVendor, self.idProduct))
 
-		# firmware resets itself and the programmer.  the
-		# .__enter__() method repeats much of what this does, but
-		# it doesn't hurt to be cautious.
+		# firmware resets itself and the programmer.
 		self.device.set_configuration()
 
 		# initialize channel proxy list.  NOTE:  this step must be
@@ -987,13 +989,14 @@ class allpro88(object):
 			# calling code error
 			raise ValueError(cal_data)
 
+		# print status banner for logging purposes
 		logger.info("serial number:  %s\nsystem ID:  0x%X\nsocket module:  %s\nchannels installed (%d):  %s\nlast calibrated:  %s" % (self.serial_number, self.system_id, self.socket_module.name if self.socket_module else "not detected", len(self.channels_installed), tuple(channel.channel for channel in self.channels_installed), self.cal["time"]))
 
 
 	def __enter__(self):
-		# ensure the programmer is left in a safe condition (all
-		# variable power supplies off, all DACs reset to 0, all
-		# channel drivers disabled).
+		# ensure the programmer is in a safe state:  all variable
+		# power supplies off, all DACs reset to 0, all channel
+		# drivers disabled.
 		self.reset()
 
 		# done
@@ -1001,9 +1004,9 @@ class allpro88(object):
 
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
-		# ensure the programmer is left in a safe condition (all
+		# ensure the programmer is left in a safe state:  all
 		# variable power supplies off, all DACs reset to 0, all
-		# channel drivers disabled).
+		# channel drivers disabled.
 		self.reset()
 
 		# done.  if an exception has occured, continue processing
@@ -1205,7 +1208,7 @@ class allpro88(object):
 
 		# the USB interface's firmware allows a USB packet to
 		# contain as many commands as will fit.  it processes them
-		# in ordr and places their responses, in order, in the
+		# in order and places their responses, in order, in the
 		# response packet.  I had originally imagined a system in
 		# which canned sequences of commands would be assembled and
 		# sent to the programmer to quickly perform a sequence of
