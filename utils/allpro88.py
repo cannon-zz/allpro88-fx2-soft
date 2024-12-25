@@ -776,11 +776,23 @@ class bus_parallel(object):
 	is applied to the socket.  Pins configured for ground potential
 	take effect immediately.
 
+	ignore_overflow disables or enables (the default) range checking on
+	values written to the bus.  Normally ValueError is raised if a
+	value that requires more bits to represent than the bus possess is
+	written to the bus, but sometimes it's convenient to ignore
+	overflows.  One example is when parts have several enable
+	lines, it can be convenient to combine them into a "bus" to simplify
+	setting them to the correct configuration:  write a specific value
+	to the bus to enable the part, but if disabling it means writing
+	the bitwise inverse of that value it's inconvenient to look up the
+	bus size and do a bitwise and to clip the bits to the bus width,
+	it's easier to just disable the bus width test.
+
 	NOTE:  see also devices.read_write_proxy to create a descriptor to
 	make calling the .read() and .write() methods of an instance of
 	this class more convenient.
 	"""
-	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt, default = None):
+	def __init__(self, programmer, socket, pin_numbers, active, inactive, flt, default = None, ignore_overflow = False):
 		"""
 		programmer is the allpro88 programmer instance, and socket
 		the socket in which the part is inserted.  pin_numbers is a
@@ -798,6 +810,7 @@ class bus_parallel(object):
 		self.pin_numbers = tuple(pin_numbers)
 		self.max_word = (1 << len(pin_numbers)) - 1
 		self.default = default
+		self.ignore_overflow = ignore_overflow
 		# send the bus definition command to the programmer
 		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active, inactive, flt, len(pin_numbers))
 		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
@@ -836,15 +849,15 @@ class bus_parallel(object):
 		if word is None:
 			command = "B%01XP-" % self.bus_number
 		# otherwise do a range check
-		elif not (0 <= word <= self.max_word):
+		elif not (self.ignore_overflow or (0 <= word <= self.max_word)):
 			raise ValueError("0x0 <= word <= 0x%X: 0x%X" % (self.max_word, word))
 		# and set the bus equal to word
 		elif len(self.pin_numbers) <= 8:
-			command = "B%1XP=%02X" % (self.bus_number, word)
+			command = "B%1XP=%02X" % (self.bus_number, word & self.max_word)
 		elif len(self.pin_numbers) <= 16:
-			command = "B%1XP=%04X" % (self.bus_number, word)
+			command = "B%1XP=%04X" % (self.bus_number, word & self.max_word)
 		else:
-			command = "B%1XP=%08X" % (self.bus_number, word)
+			command = "B%1XP=%08X" % (self.bus_number, word & self.max_word)
 		self.programmer.write_command(command)
 
 	def __len__(self):
