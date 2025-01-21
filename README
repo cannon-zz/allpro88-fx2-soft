@@ -1,6 +1,6 @@
 This repository contains the firmware for a Cypress FX2 based USB controller board for Logical Devices' ALLPRO88 software-driven device programmers, as well as a collection of host-side software for working with the programmer via that controller.
 
-See https://github.com/cannon-zz/allpro88-fx2-controller for information about the hardware side of this project.
+See https://github.com/cannon-zz/allpro88-fx2-hard for information about the hardware side of this project.
 
 The Cypress FX2 firmware in this project was developed from a firmware template forked from
 
