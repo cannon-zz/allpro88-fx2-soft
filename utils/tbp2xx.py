@@ -20,7 +20,7 @@ class tbp2xx(object):
 	# "bus" to to enable the chip (disable is assumed to be any other
 	# value, nominally the bitwise inverse)
 	chip_enable_pins = ()
-	enable = 0	# state to set chip enable pins to to enable chip
+	enabled = 0	# state to set chip enable pins to to enable chip
 	Tpw = 20	# program pulse width in microseconds
 	Vadj = "auto"
 
