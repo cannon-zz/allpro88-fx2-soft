@@ -166,10 +166,6 @@ class socket_module_AP88_PLCC(socket_module):
 	determined by the number of channels installed in your programmer.
 	For example, a 48 channel programmer cannot use the three largest
 	PLCC sockets, but can use all the others.
-
-	NOTE:  since my programmer is only 48 channels, I have not bothered
-	constructing pin mappings for the 52 pin, 68 pin and 84 pin PLCC
-	sockets.
 	"""
 	name = "AP88 PLCC"
 	module_id = 0x11
@@ -365,6 +361,61 @@ class socket_module_AP88_PLCC(socket_module):
 			46:	45,
 			47:	46,
 			48:	47
+		},
+
+		"PLCC52": {
+			1:	50,
+			2:	51,
+			3:	40,
+			4:	41,
+			5:	42,
+			6:	43,
+			7:	32,
+			8:	33,
+			9:	34,
+			10:	35,
+			11:	24,
+			12:	25,
+			13:	26,
+			14:	27,
+			15:	16,
+			16:	17,
+			17:	18,
+			18:	19,
+			19:	8,
+			20:	9,
+			21:	10,
+			22:	11,
+			23:	0,
+			24:	1,
+			25:	2,
+			26:	3,
+			27:	4,
+			28:	5,
+			29:	6,
+			30:	7,
+			31:	12,
+			32:	13,
+			33:	14,
+			34:	15,
+			35:	20,
+			36:	21,
+			37:	22,
+			38:	23,
+			39:	28,
+			40:	29,
+			41:	30,
+			42:	31,
+			43:	36,
+			44:	37,
+			45:	38,
+			46:	39,
+			47:	44,
+			48:	45,
+			49:	46,
+			50:	47,
+			51:	52,
+			52:	53
 		}
 	}
 
