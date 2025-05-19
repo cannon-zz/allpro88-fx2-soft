@@ -424,10 +424,10 @@ class socket_module_AP88_PLCC(socket_module):
 
 		# provide socket definitions for DIP packages smaller than
 		# 48 pins.  these packages get inserted into the 48 pin
-		# socket according to the diagram on the socket module.
-		# the drawing only shows 8, 16, 20, 24, 28, 32 and 40 pin
-		# packages, but for completeness we generate definitions
-		# for all even counts of pins starting with 2.
+		# socket according to the diagram on the socket module's
+		# case.  the drawing only shows 8, 16, 20, 24, 28, 32 and
+		# 40 pin packages, but for completeness we generate
+		# definitions for all even counts of pins starting with 2.
 
 		for n in range(2, 48, 2):
 			self.sockets["DIP%d" % n] = dict((i, self.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
