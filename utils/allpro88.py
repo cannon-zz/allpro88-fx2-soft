@@ -387,6 +387,17 @@ class channel_proxy(object):
 		# port feature, and it would probably be better being
 		# handled by the socket_module class somehow so that the
 		# correct code is attached to the electronics.
+		# FIXME:  this is exactly correct.  addresses 0x0280
+		# through 0x02ff inclusively comprise an address window
+		# assigned to the socket module.  the address decoding on
+		# the PLCC socket module, for example, uses only the 7
+		# lowest bits of the address bus, the module as a whole is
+		# selected using a global active-low enable line computed
+		# by the decoding logic on the motherboard, and the
+		# schematic I found for the older ALLPRO40's socket module
+		# shows it has a completely different allocation of
+		# functions to on-module addresses.  this code has to be
+		# moved to the socket module.
 		if channel <= 0x27:
 			self.bypass_address = 0x280 + channel
 		elif channel <= 0x2f:
