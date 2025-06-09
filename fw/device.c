@@ -639,8 +639,8 @@ static void allpro88_hard_reset(void)
 	/* abort any pending waveforms, set /ACT, /RD, /WR high */
 	GPIFABORT = 0xFF;
 	GPIFIDLECTL = 0x07;
-	/* wait a while (1 ms) */
-	delay(1);
+	/* wait a while */
+	delay(1 /* ms */);
 	/* zero the address bus (raises /RESET) */
 	ALLPRO88_ADDR_SET(0);
 
@@ -718,18 +718,18 @@ static void scan_installed_channel_drivers(void)
 	 * mode, and compare the voltage on the pin to VTH.  channels that
 	 * are present and functioning will report a 0 in the LSB of the
 	 * data byte indicating that they see a voltage below VTH.  missing
-	 * channels will not respond to the address read operation, so the
-	 * pull-up resistors on the data-bus will set the bus to 0xff,
-	 * making it seem as if the voltage on the pin is above threhsold.
-	 * setting the pin to pull-down mode instead of using the
-	 * ground-driver FET to set its potential to 0 V is hopefully safer
-	 * in case a part is installed in the socket that, for some reason,
-	 * is placing voltages on some pins.  in that case, however, the
-	 * presence of that voltage will confuse the channel-presence test
-	 * and that entire group of 8 channels will be marked as absent.
-	 * it seems better to confuse the power-on self test than to risk
-	 * damaging a part.  the user can fix the problem by removing the
-	 * part and power-cycling the programmer. */
+	 * channels will not respond to the read operation, so the pull-up
+	 * resistors on the data-bus will set the bus to 0xff, making it
+	 * seem as if the voltage on the pin is above threhsold.  setting
+	 * the pin to pull-down mode instead of using the ground-driver FET
+	 * to set its potential to 0 V is hopefully safer in case a part is
+	 * installed in the socket that, for some reason, is placing
+	 * voltages on some pins.  in that case, however, the presence of
+	 * that voltage will confuse the channel-presence test and that
+	 * entire group of 8 channels will be marked as absent.  it seems
+	 * better to confuse the power-on self test than to risk damaging a
+	 * part.  the user can fix the problem by removing the part and
+	 * power-cycling the programmer. */
 
 	installed_channel_drivers = 0;
 	for(channel = 80; channel >= 0; channel -= 8) {
