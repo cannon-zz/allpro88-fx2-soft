@@ -90,8 +90,8 @@ class power(object):
 		# are sensible
 		valid_pins = set(self.socket) | set(("VPUL",))
 		for name, voltage_map in voltage_maps.items():
-			if not set(voltage_map).issubset(valid_pins):
-				raise ValueError("invalid pins %s in voltage map \"%s\"" % (set(voltage_map), name))
+			if not set(voltage_map) <= valid_pins:
+				raise ValueError("invalid pins %s in voltage map \"%s\"" % (set(voltage_map) - valid_pins, name))
 			for volt in voltage_map.values():
 				if volt < 0:
 					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
@@ -137,7 +137,7 @@ class power(object):
 		if self.active_voltage_map is not None:
 			current_pins = set(self.active_voltage_map)
 			new_pins = set(new_voltage_map)
-			if new_pins < current_pins:
+			if not new_pins >= current_pins:
 				raise ValueError("cannot reduce set of configured pins:  %s --> %s" % (str(current_pins), str(new_pins)))
 
 		# switch to new voltage map.  configure pins and the VPUL
