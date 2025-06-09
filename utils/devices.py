@@ -80,12 +80,9 @@ class power(object):
 		voltage usually acceptable for 3.3 V through 5 V logic
 		parts.  NOTE:  use of the voltage measurement function on
 		any pin will leave this power supply's voltage set to the
-		an approximation of the measured pin voltage, and it will
-		need to be reset to return to using the comparators as
-		digital inputs.  see .reset_vth().
-
-		default_voltage_map:  the name of the voltage map to use at
-		start-up.
+		measured pin voltage, and it will need to be reset to
+		return to using the comparators as digital inputs.  see
+		.reset_vth().
 		"""
 		self.programmer = programmer
 		self.socket = socket
@@ -98,6 +95,7 @@ class power(object):
 			for volt in voltage_map.values():
 				if volt < 0:
 					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
+				# test that this type conversion works
 				allpro88.volt(volt)
 		self.voltage_maps = voltage_maps
 		self.active_voltage_map = None
@@ -172,22 +170,24 @@ class power(object):
 		"""
 		sequence must be an iterable of (voltage map name, delay)
 		pairs.  the voltage maps in sequence are applied in order,
-		with the given delay in seconds between each.  NOTE: delays
-		of about 100 us or less cannot be relied upon.  if a
-		shorter delay is requested than is possible, it will be
-		silently increased to the minimum achievable delay.  if
-		that is not acceptable, if power must be sequenced onto a
-		part with short, precise, time intervals, then custom
-		firmware support will be needed.
+		with each held for the given delay in seconds before the
+		next is applied.  NOTE: delays of about 100 us or less
+		cannot be relied upon.  if a shorter delay is requested
+		than is possible, it will be silently increased to the
+		minimum achievable delay.  if that is not acceptable, if
+		power must be sequenced onto a part with short, precise,
+		time intervals, then custom firmware support will be
+		needed.
 		"""
 		# ensure we can iterate over it more than once and it's not
 		# empty
 		sequence = tuple(sequence)
 		if len(sequence) < 1:
 			raise ValueError("sequence is empty")
-		# confirm the voltage maps are known, the delays are
-		# sensible, and all voltage maps in the sequence configure
-		# the same pins
+		# before we start, confirm the voltage maps are known, the
+		# delays are sensible, and all voltage maps in the sequence
+		# configure the same pins.  we don't want to crash during
+		# the sequence
 		pins = None
 		for voltage_map, delay in sequence:
 			if voltage_map not in self.voltage_maps:
@@ -198,6 +198,7 @@ class power(object):
 				pins = set(self.voltage_maps[voltage_map])
 			elif pins != set(self.voltage_maps[voltage_map]):
 				raise ValueError("inconsistent pins in voltage map \"%s\"" % voltage_map)
+		# run the sequence
 		for voltage_map, delay in sequence:
 			self.set_voltage_map(voltage_map)
 			time.sleep(delay)
@@ -211,13 +212,7 @@ class power(object):
 
 		If sequence is not None, then voltage_map is ignored, and
 		sequence must be an iterable of (voltage map name, delay)
-		pairs.  the voltage maps in sequence are applied in order,
-		with the given delay in seconds between each.  NOTE: delays
-		of about 100 us or less cannot be relied upon;  if shorter
-		delays are requested the actual delay will be a bit more
-		than 100 us.  If power must be sequenced onto a part with
-		such short, precise, delays, custom firmware support will
-		be needed.
+		pairs.  See .do_sequence() for more information.
 		"""
 		# turn on power supplies.  this is done before clocking the
 		# VPUL and pin driver dacs because the VADJ power supply
@@ -260,7 +255,7 @@ class power(object):
 				if pin != "VPUL":
 					self.socket[pin].vdac = 0
 		# clock the VPUL and pin driver dacs to remove power from
-		# the part
+		# the part, changing all voltages simultaneously.
 		self.programmer.load_dacs()
 		# now that power has been removed, it is safe to disable
 		# pins
