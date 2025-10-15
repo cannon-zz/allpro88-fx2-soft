@@ -917,8 +917,9 @@ with allpro88.allpro88(cal_data = calibration if calibration != {} else None) as
 		})
 		# save what we've got so we can skip this step if any part
 		# of what follows fails and we have to try again.
-		with open(options.calibration_filename, "w") as calfile:
-			yaml.dump(calibration, calfile)
+		if options.write_calibration:
+			with open(options.calibration_filename, "w") as calfile:
+				yaml.dump(calibration, calfile)
 		# install calibration curves so that channel calibrations
 		# are computed correctly
 		programmer.set_calibration(calibration)
