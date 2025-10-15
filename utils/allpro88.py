@@ -614,7 +614,7 @@ class flag(object):
 		self.default = default
 		# set initial state
 		if PINCON.VDAC not in (active, inactive, flt):
-			self.socket[self.pin_number].vdac = 0
+			self.channel.vdac = 0
 		self.channel.bypass = False
 		self.write(self.default)
 
