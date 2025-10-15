@@ -7,6 +7,18 @@
 # addresses.
 #
 
+#
+# Within the programmer, addresses 0x0280 through 0x02ff inclusively are a
+# 128 word I/O window assigned to the socket module.  An active-low
+# !SOCKETEN signal is available on the socket module connectors indicating
+# that the value on the address bus is in this range.  The least
+# significant 7 bits of the address bus then indicate which of the 128
+# addresses is selected.  The PLCC socket module uses writes to these
+# addresses to enable and disable bypass capacitors connected to the 48
+# pins of the DIP socket.  I don't know what other socket modules do with
+# these addresses.
+#
+
 
 class socket_module(object):
 	#
@@ -57,6 +69,19 @@ class socket_module(object):
 	`	Used by subclasses to initialize themselves.
 		"""
 		return dict((pin, self.programmer.channels[channel]) for pin, channel in pin_to_channel_mapping.items())
+
+
+	def set_bypass(self, channel, enabled):
+		"""
+		Enable or disable the bypass capacitor for the given
+		channel number.  Not all socket modules provide
+		programmable bypass capacitors, and those that do don't
+		necessarily provide them for all channels.  Subclasses
+		override this method to implement the behaviour.  If the
+		requested channel does not support the feature, the
+		operation is silently a no-op.
+		"""
+		pass
 
 
 	def pin_lookup(self, socket_name, channel):
@@ -594,6 +619,22 @@ class socket_module_AP88_PLCC(socket_module):
 
 		for n in range(2, 48, 2):
 			self.sockets["DIP%d" % n] = dict((i, self.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
+
+
+	def set_bypass(self, channel, enabled):
+		# bypass capacitor is turned on and off with bit 0.
+		# silently ignore requests to turn on or off bypass
+		# capacitors on channels that don't have them but raise
+		# ValueError if the channel number is out of range.
+		if not 0 <= channel < 88:
+			raise ValueError(channel)
+		if channel <= 0x27:
+			address = 0x280 + channel
+		elif channel <= 0x2f:
+			address = 0x2c0 + (channel - 0x28)
+		else:
+			return
+		self.programmer.write_addr(address, 1 if enabled else 0)
 
 
 class socket_module_68705(socket_module):

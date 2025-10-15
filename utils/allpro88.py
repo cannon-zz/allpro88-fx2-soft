@@ -377,34 +377,6 @@ class channel_proxy(object):
 		# this channel's DAC address.  this attribute is used by
 		# the .vdac descriptor
 		self.dac_address = self.address + 3
-		# bypass capacitor control register
-		# FIXME:  the bypass capacitor feature including its
-		# associated control logic and address decode circuitry
-		# lives on the socket module.  it's not part of the
-		# programmer.  if a different socket module gets installed
-		# who knows what these addresses would control.  this
-		# address range is probably meant to be a generic expansion
-		# port feature, and it would probably be better being
-		# handled by the socket_module class somehow so that the
-		# correct code is attached to the electronics.
-		# FIXME:  this is exactly correct.  addresses 0x0280
-		# through 0x02ff inclusively comprise an address window
-		# assigned to the socket module.  the address decoding on
-		# the PLCC socket module, for example, uses only the 7
-		# lowest bits of the address bus, the module as a whole is
-		# selected using a global active-low enable line computed
-		# by the decoding logic on the motherboard, and the
-		# schematic I found for the older ALLPRO40's socket module
-		# shows it has a completely different allocation of
-		# functions to on-module addresses.  this code has to be
-		# moved to the socket module.
-		if channel <= 0x27:
-			self.bypass_address = 0x280 + channel
-		elif channel <= 0x2f:
-			self.bypass_address = 0x2c0 + (channel - 0x28)
-		else:
-			# only first 48 channels have bypass capacitors
-			self.bypass_address = None
 		# set default calibration
 		self.set_cal()
 
@@ -548,20 +520,12 @@ class channel_proxy(object):
 		or disable the bypass capacitor of a channel that does not
 		have one.  The request is silently ignored.  This
 		simplifies "reset everything" loops.
-
-		If calling code wishes to know if a channel has a bypass
-		capacitor, test the value of .bypass_address:  None = this
-		channel does not have a bypass capacitor.
 		"""
 		raise NotImplementedError
 
 	@bypass.setter
 	def bypass(self, boolean):
-		# bypass capacitor is turned on and off with bit 0.
-		# silently ignore requests to turn on or off bypass
-		# capacitors on channels that don't have them.
-		if self.bypass_address is not None:
-			self.programmer.write_addr(self.bypass_address, 1 if boolean else 0)
+		self.programmer.socket_module.set_bypass(self.channel, boolean)
 
 	@property
 	def physical(self):
