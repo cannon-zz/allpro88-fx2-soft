@@ -681,7 +681,7 @@ class channel_driver_test_suite(object):
 		axes = fig.add_axes((0.1, 0.3, 0.85, 0.65))
 		axes.set_title("Channel %02d Voltage vs.\\@ DAC" % self.channel.channel)
 		axes.set_ylabel("Voltage (volts)")
-		axes.scatter(self.vdac_ramp_x, self.vdac_ramp_y, marker = ".", color = "k", legend = "Data")
+		axes.scatter(self.vdac_ramp_x, self.vdac_ramp_y, marker = ".", color = "k", label = "Data")
 		axes.plot(self.vdac_ramp_x, model(self.vdac_ramp_x), label = "Calibration model")
 		axes.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(32))
 		axes.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(4))
