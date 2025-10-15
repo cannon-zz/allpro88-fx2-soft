@@ -1152,7 +1152,7 @@ class allpro88(object):
 				continue
 			channel.set_cal(dac_cal_data["vdac"])
 		if channels_missing_cal:
-			logger.warning("no calibration data for channel(s) %s.  using default calibration" % ", ".join(channels_missing_cal))
+			logger.warning("no calibration data for channel(s) %s.  using default calibration" % ", ".join("%d" % i for i in channels_missing_cal))
 
 
 	def get_unused_bus(self, bus_obj = None):
