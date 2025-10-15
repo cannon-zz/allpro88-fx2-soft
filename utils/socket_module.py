@@ -663,6 +663,12 @@ class socket_module_68705(socket_module):
 
 
 class socket_module_1702A(socket_module):
+	# I encountered C1702A eprom chips in an RCA COSMAC system from
+	# 1976,  these require wild voltages:  +5 V, 0 V and -9 V for
+	# normal operation;  +5 V, 0 V, and -48 V for programming.  the
+	# chips are normal 24 pin DIP and are mechanically compatible with
+	# the standard socket module, but need voltages way outside the
+	# range supported by the base ALLPRO system.
 	name = "1702A"
 	module_id = 0x98
 
