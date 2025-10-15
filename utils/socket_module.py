@@ -196,6 +196,26 @@ class socket_module_AP88_PLCC(socket_module):
 	PLCC sockets, but can use all the others.
 	"""
 	name = "AP88 PLCC"
+	# NOTE:  kevtris reports that his socket module is ID 0x81.  I
+	# think that might be an error, because it is inconsistent with all
+	# the other information I have.  mine is 0x11, the schematics show
+	# that the "universal PLCC" socket module should be 0x11, the
+	# example messages from diagnostic software shown in the
+	# documentation all show 0x11 being reported.  however, mine is
+	# missing the 84 pin PLCC socket while his has it, so they are
+	# different part numbers, but the PCB should be identical because
+	# mine has an unpopulated footprint for that socket, and there is
+	# no way to modify the ID that gets reported, no jumpers on the
+	# PCB, the traces are fixed.  the confusion might have come from
+	# the pin numbering on the chip used for the ID register:  the data
+	# bus is wired to it in the order D0,D1,D2,D3,D7,D6,D5,D4 but if
+	# you didn't notice that the last 4 bits are reversed, assumed the
+	# data bus was connected sensibly, then you'd believe the 0x11
+	# hard-wired to that chip's input would get read out as 0x81.
+	# still though, checking in software so see what number you get
+	# would have corrected the misunderstanding, and there are *no*
+	# other errors anywhere else in his documentation that I've
+	# noticed, so ... maybe there are two versions of this module.
 	module_id = 0x11
 		# PIN NUMBER	CHANNEL NUMBER
 	sockets = {
