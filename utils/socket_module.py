@@ -30,6 +30,10 @@ class socket_module(object):
 	sockets = {}
 
 	def __init__(self, programmer):
+		#
+		# this must be set before calling .get_channel_proxies()
+		#
+
 		self.programmer = programmer
 
 		#
@@ -40,11 +44,10 @@ class socket_module(object):
 		# channel_proxy mappings.
 		#
 
-		self.sockets = dict((name, self.get_channel_proxies(programmer, pin_mapping)) for name, pin_mapping in self.sockets.items())
+		self.sockets = dict((name, self.get_channel_proxies(pin_mapping)) for name, pin_mapping in self.sockets.items())
 
 
-	@staticmethod
-	def get_channel_proxies(programmer, pin_to_channel_mapping):
+	def get_channel_proxies(self, pin_to_channel_mapping):
 		"""
 		From a dictionary mapping integer socket pin number to
 		integer programmer channel number, construct and return a
@@ -53,7 +56,7 @@ class socket_module(object):
 
 	`	Used by subclasses to initialize themselves.
 		"""
-		return dict((pin, programmer.channels[channel]) for pin, channel in pin_to_channel_mapping.items())
+		return dict((pin, self.programmer.channels[channel]) for pin, channel in pin_to_channel_mapping.items())
 
 
 	def pin_lookup(self, socket_name, channel):
