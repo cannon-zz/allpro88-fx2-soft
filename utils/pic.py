@@ -10,7 +10,10 @@
 #	https://wiki.kewl.org/projects:pickle
 #
 # I think the correct path forward is to write something that a project
-# like that could speak to, probably with some patches pushed upstream
+# like that could speak to, probably with some patches pushed upstream.
+# i.e., make the ALLPRO 88 look like a piece of bit-banging hardware those
+# projects can speak to, and let those projects worry about maintaining the
+# programming algorithms for the spectrum of PIC devices.
 #
 
 
