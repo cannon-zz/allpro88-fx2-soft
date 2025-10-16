@@ -93,10 +93,11 @@ class power(object):
 			if not set(voltage_map) <= valid_pins:
 				raise ValueError("invalid pins %s in voltage map \"%s\"" % (set(voltage_map) - valid_pins, name))
 			for volt in voltage_map.values():
-				if volt < 0:
-					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
 				# test that this type conversion works
 				allpro88.volt(volt)
+				# confirm value is valid
+				if volt < 0:
+					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
 		self.voltage_maps = voltage_maps
 		self.active_voltage_map = None
 		self.vth = allpro88.volt(vth) if vth else 0
