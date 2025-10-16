@@ -211,7 +211,10 @@ class power(object):
 		# delays are sensible, and all voltage maps in the sequence
 		# configure the same pins.  we don't want to crash during
 		# the sequence
-		pins = None
+		if self.active_voltage_map is not None:
+			pins = set(self.active_voltage_map)
+		else:
+			pins = None
 		for voltage_map, delay in sequence:
 			if voltage_map not in self.voltage_maps:
 				raise KeyError(voltage_map)
