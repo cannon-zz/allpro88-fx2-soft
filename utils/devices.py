@@ -76,13 +76,13 @@ class power(object):
 		guaranteed if VADJ is at least 4 V.
 
 		vth:  the voltage for the comparators used to test the
-		state of pins.  the default is 1.5 V, which is a compromise
-		voltage usually acceptable for 3.3 V through 5 V logic
-		parts.  NOTE:  use of the voltage measurement function on
-		any pin will leave this power supply's voltage set to the
-		measured pin voltage, and it will need to be reset to
-		return to using the comparators as digital inputs.  see
-		.reset_vth().
+		boolean state of pins.  the default is 1.5 V, which is a
+		compromise voltage usually acceptable for 3.3 V through 5 V
+		logic parts.  NOTE:  use of the voltage measurement
+		function on any pin will leave this power supply's voltage
+		set to the measured pin voltage, and it will need to be
+		reset to return to using the comparators as digital inputs.
+		see .reset_vth().
 		"""
 		self.programmer = programmer
 		self.socket = socket
@@ -130,6 +130,29 @@ class power(object):
 		self.programmer.vth = self.vth
 
 	def set_voltage_map(self, voltage_map):
+		"""
+		Switch the voltages on the socket's pins to those in
+		voltage_map, the name of one of the pin number-to-voltage
+		mappings provided at initialization time.
+
+		The pin number-to-voltage mappings are not required to all
+		name the same pin numbers, but for safety reasons this
+		method will not allow a voltage map to be selected whose
+		pin numbers are not a superset of the current mapping:  any
+		pin with a voltage configured for it in the currently
+		selected mapping must also be listed in the new mapping.
+		This restriction might be lifted in the future if a
+		sensible behaviour can be identified in those cases, but
+		for the time being changing which pins are powered on a
+		part requires the part to be power cycled.  See .off() and
+		.on().
+
+		The pin voltage DACs and, if included in the voltage map,
+		the VPUL power supply DAC, are configured and then clocked
+		simultaneously.  Pins that are set to 0 V are connected to
+		ground potential, but this configuration is done
+		pin-by-pin, before the voltage DACs are changed.
+		"""
 		# confirm that we are not leaving any already configured
 		# pins dangling.  whatever pins we are currently
 		# controlling, we must continue to control
@@ -177,7 +200,7 @@ class power(object):
 		minimum achievable delay.  if that is not acceptable, if
 		power must be sequenced onto a part with short, precise,
 		time intervals, then custom firmware support will be
-		needed.
+		needed for the programmer.
 		"""
 		# ensure we can iterate over it more than once and it's not
 		# empty
@@ -426,7 +449,7 @@ class bus_iic(object):
 		timeout += time.time()
 		while not bool(self.scl):
 			if time.time() > timeout:
-				raise IOError("bus scl is being low")
+				raise IOError("bus scl is being held low")
 
 	#
 	# bit-banging bus interface
