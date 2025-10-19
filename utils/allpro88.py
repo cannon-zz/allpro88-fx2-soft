@@ -884,6 +884,10 @@ class bus_parallel_ttl(bus_parallel):
 	A parallel bus with TTL logic levels.
 	"""
 	def __init__(self, programmer, socket, pin_numbers, **kwargs):
+		"""
+		programmer, socket, pin_numbers are as for the parent
+		class.
+		"""
 		super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE, **kwargs)
 
 
@@ -893,6 +897,9 @@ class bus_parallel_vdac(bus_parallel):
 	"""
 	def __init__(self, programmer, socket, pin_numbers, vdac, **kwargs):
 		"""
+		programmer, socket, pin_numbers are as for the parent
+		class.
+
 		vdac is the logic high voltage in volts.
 		"""
 		if vdac <= 0:
