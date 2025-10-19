@@ -25,6 +25,7 @@
 
 
 from enum import IntEnum
+import itertools
 import logging
 import math
 import numpy
@@ -1007,7 +1008,21 @@ class allpro88(object):
 			raise ValueError(cal_data)
 
 		# print status banner for logging purposes
-		logger.info("serial number:  %s\nsystem ID:  0x%X\nsocket module:  %s\nchannels installed (%d):  %s\nlast calibrated:  %s" % (self.serial_number, self.system_id, self.socket_module.name if self.socket_module else "not detected", len(self.channels_installed), tuple(channel.channel for channel in self.channels_installed), self.cal["time"]))
+		logger.info("serial number:  %s" % self.serial_number)
+		logger.info("system ID:  0x%X" % self.system_id)
+		logger.info("socket module:  %s" % (self.socket_module.name if self.socket_module else "not detected"))
+		channel_numbers = list(channel.channel for channel in self.channels_installed)
+		sequences = []
+		for i in channel_numbers:
+			if sequences and i == sequences[-1][-1] + 1:
+				sequences[-1].append(i)
+			else:
+				sequences.append([i])
+		for sequence in sequences:
+			if len(sequence) > 2:
+				sequence[1:-1] = ["..."]
+		logger.info("channels installed (%d):  %s" % (len(channel_numbers), list(itertools.chain.from_iterable(sequences))))
+		logger.info("last calibrated:  %s" % self.cal["time"])
 
 
 	def __enter__(self):
