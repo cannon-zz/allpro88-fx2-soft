@@ -584,6 +584,115 @@ class ds1230y(x28c64):
 	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 1)
 
 
+class tmm2365p(m27cx_width8_pulse_ce):
+	"""
+	this is a mask rom.  it can't be programmed.  it's similar to the
+	27c64 series parts with the following differences:
+		- pin 26 (N.C. on 27c64) is chip enable 2
+		- pin 27 (program enable on 27c64) is chip enable 1
+		- pin 20 (chip enable on 27c64) is the same but called chip
+		  enable 3
+		- whether the chip enables are active-high or active-low is
+		  programmable.
+		- the data sheet says the outputs are wired-or compatible,
+		  which would suggest the need for a pull-down resistor,
+		  but I think they just mean they're tri-state outputs that
+		  float when the chip is disabled.
+	the datasheet doesn't say, but I assume the chip enable lines are
+	individually programmable, so unless it's known how the part was
+	programmed 8 configurations need to be tested to determine which
+	setting results in the chip becoming active.  since the chip
+	enters a low-power state when not active, reducing is power
+	consumption to about 25% of its normal load, it might be possible
+	to use a current sensing test to automatically find the chip
+	enable configuration that activates it.
+	"""
+	socket_name = "DIP28"
+	voltage_maps = {
+		"read": {
+			1: 5.0,		# N.C., but tied to Vcc in some schematics
+			14: 0.0,	# GND
+			28: 5.0,	# Vcc
+		}
+	}
+	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2)
+	data_bus_pins = (11, 12, 13, 15, 16, 17, 18, 19)
+	chip_enable_pins = (27, 26, 20)
+	chip_enable_pin = None	# defined in parent class:  break code that might use it
+	output_enable_pin = 22
+
+
+	def __init__(self, programmer, mode):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets[self.socket_name]
+		if mode not in self.voltage_maps:
+			raise ValueError("unknown mode \"%s\"" % mode)
+		self.mode = mode
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj)
+		# address and data buses
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.address_bus_pins)
+		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.data_bus_pins)
+		# flags.  NOTE:  we call the vector of chip enable flags,
+		# implemented here as a bus, a "flag" (singular) so that
+		# the parent class' existing .chip_enable proxy will work
+		# with it as-is.
+		self.chip_enable_flag = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.chip_enable_pins, ignore_overflow = True)
+		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.output_enable_pin)
+
+	# read/write
+
+	@classmethod
+	def read_device(cls, imgfile, enable = 0):
+		with allpro88.allpro88() as programmer:
+			with cls(programmer, "read") as device:
+				device.chip_enable = enable
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
+					device.output_enable = True
+					imgfile.write(bytearray((device.data,)))
+					device.output_enable = False
+				device.chip_enable = ~enable
+
+	@classmethod
+	def write_device(cls, imgfile):
+		raise NotImplementedError("mask ROM:  not writable")
+
+	@classmethod
+	def find_enable(cls, address = 0):
+		"""
+		Set the address bus to address (default = 0), cycle through
+		the 8 possible settings for the chip enable lines, and, for
+		each, print the chip enable flags setting and the value of
+		the data bus.  hopefully by trying different address bus
+		values, a non-zero valued storage location can be found,
+		and that will reveal which chip enable setting is the
+		correct for the part.
+		"""
+		with allpro88.allpro88() as programmer:
+			with cls(programmer, "read") as device:
+				device.address = address
+				for flags in device.chip_enable_flags:
+					device.chip_enable = flags
+					device.output_enable = True
+					print("%02X %02X" % (flags, device.data))
+					device.output_enable = False
+					# after hitting the correct value
+					# for the enable flags, capacitance
+					# causes us to still see the last
+					# value on the data bus for a
+					# while, so we drive the pins to
+					# GND momentarily before trying the
+					# next value for the enable flags
+					# to figure out which value(s)
+					# really make the part work.
+					device.data = 0
+					device.data = None
+				device.output_enable = False
+
+
+smm2365 = tmm2365p
+
+
 ###
 #
 # Entry Point
