@@ -1,0 +1,268 @@
+# Copyright (C) 2025  Kipp Cannon
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
+# Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+#
+# support for Intel D87C51 microcontroller with integrated UV EPROM.
+#
+# available in 40 pin DIP, 44 pin PLCC, and 44 pin QFP.
+#
+
+
+import sys
+import time
+from tqdm import tqdm
+import allpro88
+import devices
+
+
+class intel_d87c51(object):
+	"""
+	8051 type microcontroller with integrated UV EPROM.
+	"""
+	# subclasses override these
+	socket_name = ""
+	# require one voltage map named "default", must include VPUL
+	voltage_maps = {}
+	# the documentation is contradictory.  one place claims the part
+	# has a 15 bit programming address bus on pins P1, P2.0--P2.5,
+	# P3.4, while most other places claim it's 12 bits on P1,
+	# P2.0--P2.3
+	address_bus_pins = ()
+	# 8 bit programming data bus is on P0
+	data_bus_pins = ()
+	# !EA pin is shared with Vpp
+	nea_pin = None
+	ale_pin = None
+	reset_pin = None
+	npsen_pin = None
+	xtal1_pin = None
+	# mode is on P2.6, P2.7, P3.3, P3.6, P3.7.  P2.7 serves double duty
+	# as an active low !ENABLE line for read operations.  when
+	# programming the part, P2.7 is one of the control lines selecting
+	# what part of the chip is being programmed, but during verify some
+	# documentation shows it being held high and pulled low to read
+	# data while others show it being held low while cycling through
+	# addresses and reading their contents.  experiments seem to show
+	# the latter works, so the reading modes below have it held at 0.
+	mode_pins = ()
+	modes = {
+		"program_code_data":	30,
+		"verify_code_data":	24,
+		"program_encryption":	22,
+		"program_lock_bit_1":	31,
+		"program_lock_bit_2":	7,
+		"program_lock_bit_3":	13,
+		"read_signature":	0
+	}
+
+	Tpw = 100	# program pulse width in microseconds
+	TGHGL = 10e-6	# wait this long in seconds between pulses
+	Vadj = 14.	# volts
+	Vprog = 12.75	# volts
+	# wait at least 48 clock cycles = 12 us from address being set and
+	# !ENABLE (P2.7) being asserted to data being available for read.
+	# I don't think the interface can go this fast so it doesn't
+	# matter, but there's no harm in being sure.
+	TELQV = 12e-6	# seconds
+
+	def __init__(self, programmer):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets[self.socket_name]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj)
+		# address and data buses
+		self.address_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.address_bus_pins)
+		self.data_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.data_bus_pins, pull = "up")
+		# programming control pins.  default states correspond to
+		# the "read signature" state, so the chip will power up in
+		# that configuration, which should be safe.
+		self.nea_flag = allpro88.flag_ttl_active_low(self.socket, self.nea_pin, default = False)
+		self.ale_flag = allpro88.flag_ttl(self.socket, self.ale_pin, default = True)
+		self.reset_flag = allpro88.flag_ttl(self.socket, self.reset_pin, default = True)
+		self.npsen_flag = allpro88.flag_ttl_active_low(self.socket, self.npsen_pin, default = True)
+		self.mode_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.mode_pins, default = self.modes["read_signature"])
+		# set TTL clock generator to 4 MHz and configure the clock
+		# pin
+		self.programmer.clkgen_mode = allpro88.CLKGEN_MODE.CLK_4MHZ
+		self.socket[self.xtal1_pin].config = allpro88.PINCON.POSCLK
+
+	def __enter__(self):
+		# set the VDAC on the !EA pin to the programming voltage.
+		# the power.on() operation will clock the value
+		# simultaneously with the other voltages, however the pin
+		# is not initially configured to use this voltage, it's
+		# configured as a TTL pin, so this has no effect on the
+		# part.  this voltage needs to be configured and ready for
+		# use to generate programming pulses on this pin.
+		self.socket[self.nea_pin].vdac = allpro88.volt(self.Vprog)
+		# now power on
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	# proxy descriptors
+	address = devices.read_write_proxy("address_bus")
+	data = devices.read_write_proxy("data_bus")
+	nea = devices.read_write_proxy("nea_flag")
+	ale = devices.read_write_proxy("ale_flag")
+	reset = devices.read_write_proxy("reset_flag")
+	npsen = devices.read_write_proxy("npsen_flag")
+	mode = devices.read_write_proxy("mode_bus")
+
+	# read/write
+
+	def set_programming_mode(self, mode):
+		self.reset = True	# logic high
+		self.npsen = True	# logic low
+		self.ale = True		# logic high
+		self.nea = False	# logic high
+		self.mode = self.modes[mode]
+
+	def read_signature_bytes(self):
+		self.set_programming_mode("read_signature")
+		signature = []
+		for self.address in (0x30, 0x31, 0x60):
+			time.sleep(self.TELQV)
+			signature.append(self.data)
+		self.address = None
+		return signature
+
+	@classmethod
+	def read_device(cls, imgfile):
+		with allpro88.allpro88() as programmer:
+			with cls(programmer) as device:
+				print("signature:", ["0x%X" % x for x in device.read_signature_bytes()])
+				device.set_programming_mode("verify_code_data")
+				for device.address in tqdm(device.address_bus, desc = "Reading"):
+					time.sleep(device.TELQV)
+					imgfile.write(bytearray((device.data,)))
+				device.address = None
+
+	@classmethod
+	def write_device(cls, imgfile, skip_bytes = 0xff):
+		"""
+		imfile = file object from which to read bytes
+
+		skip_bytes = erased parts typically reset to 0xff, so we
+		don't need to write these values to the part.  only 0 bits
+		are actually written to eproms. 1 bits do not change the
+		contents of the part.  an all-1's value, therefore, is a
+		no-op.  whatever value skip_bytes is set to will not be
+		written to the part (default = 0xff).  set to None to
+		disable this feature.
+		"""
+		# FIXME:  there isn't much error checking.  it would be
+		# good to confirm the file is the correct size for the
+		# part, for example, before burning bytes into the part.
+		# FIXME:  this code is untested!!!
+		with allpro88.allpro88() as programmer:
+			with cls(programmer) as device:
+				device.nea = False	# logic high
+				device.ale = True	# logic high
+				device.reset = True	# logic high
+				device.npsen = True	# logic low
+				device.mode = device.modes["program_code_data"]
+				for address in tqdm(device.address_bus, desc = "Writing", disable = False):
+					# read 1 byte from file
+					byte = imgfile.read(1)
+					byte = int.from_bytes(byte, byteorder = sys.byteorder)
+					# skip no-op bytes
+					if skip_bytes is not None and byte == skip_bytes:
+						continue
+					# write.  the address and data
+					# buses are set, the !EA pin's
+					# state is hacked into VDAC mode to
+					# put Vpp onto, then ALE is pulsed
+					# low 25 times, and !EA is returned
+					# to normal operation
+					device.address = address
+					device.data = byte
+					device.nea_flag.channel.confg = allpro88.PINCON.VDAC
+					for i in range(25):
+						device.ale_flag.pulse(device.Tpw, False, True)
+						time.sleep(self.TGHGL)
+					# return !EA to logic high
+					device.nea = False
+
+
+class intel_d87c51_dip(intel_d87c51):
+	socket_name = "DIP40"
+	voltage_maps = {
+		"default": {
+			20: 0.0,	# GND
+			40: 5.0,	# Vcc
+			"VPUL": 5.0
+		}
+	}
+	# the documentation is contradictory.  one place claims the part
+	# has a 15 bit programming address bus on pins P1, P2.0--P2.5,
+	# P3.4, while most other places claim it's 12 bits on P1,
+	# P2.0--P2.3
+	#address_bus_pins = (1, 2, 3, 4, 5, 6, 7, 8, 21, 22, 23, 24, 25, 26, 14)
+	address_bus_pins = (1, 2, 3, 4, 5, 6, 7, 8, 21, 22, 23, 24)
+	# 8 bit programming data bus is on P0
+	data_bus_pins = (39, 38, 37, 36, 35, 34, 33, 32)
+	# !EA pin is shared with Vpp
+	reset_pin = 9
+	xtal1_pin = 19
+	npsen_pin = 29
+	ale_pin = 30
+	nea_pin = 31
+	# mode is on P2.6, P2.7, P3.3, P3.6, P3.7
+	mode_pins = (27, 28, 13, 16, 17)
+
+
+
+class intel_d87c51_plcc(intel_d87c51):
+	socket_name = "PLCC44"
+	voltage_maps = {
+		"default": {
+			22: 0.0,	# GND
+			44: 5.0,	# Vcc
+			"VPUL": 5.0
+		}
+	}
+	# the documentation is contradictory.  one place claims the part
+	# has a 15 bit programming address bus on pins P1, P2.0--P2.5,
+	# P3.4, while most other places claim it's 12 bits on P1,
+	# P2.0--P2.3
+	#address_bus_pins = (2, 3, 4, 5, 6, 7, 8, 9, 24, 25, 26, 27, 28, 29, 16)
+	address_bus_pins = (2, 3, 4, 5, 6, 7, 8, 9, 24, 25, 26, 27)
+	# 8 bit programming data bus is on P0
+	data_bus_pins = (43, 42, 41, 40, 39, 38, 37, 36)
+	# !EA pin is shared with Vpp
+	reset_pin = 10
+	xtal1_pin = 21
+	npsen_pin = 32
+	ale_pin = 33
+	nea_pin = 35
+	# mode is on P2.6, P2.7, P3.3, P3.6, P3.7
+	mode_pins = (30, 31, 15, 18, 19)
+
+
+###
+#
+# Entry Point
+#
+###
+
+
+intel_d87c51_dip.read_device(open("dump.dat", "wb"))
