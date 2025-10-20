@@ -16,6 +16,14 @@
 
 
 #
+# This module provides an interface to the ALLPRO 88 programmer's hardware,
+# including features implemented in firmware in the USB interface module.
+# Code associated with socket module hardware, and code implementing
+# interface algorithms purely in host-side software are found elsewhere.
+#
+
+
+#
 # =============================================================================
 #
 #                                   Preamble
