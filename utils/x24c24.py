@@ -1,0 +1,126 @@
+# Copyright (C) 2022-2025  Kipp Cannon
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 3 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
+# Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+
+from tqdm import tqdm
+import allpro88
+import devices
+
+class x24c24(object):
+	"""
+	256 bit non-volatile RAM organized as 16 words of 16 bits with a
+	serial interface.  the part is both a RAM device and an EEPROM
+	device.  at power-up the EEPROM contents are copied into RAM
+	("recall").  RAM can be read from and written to without affecting
+	the EEPROM.  if desired, the RAM contents can be written to the
+	EEPROM ("store").  if a store operation is not performed, the RAM
+	will revert to the EEPROM contents on the next power cycle.  both
+	store and recall operations can be initiated either in hardware via
+	control pins or in software via commands.  here, only the software
+	interface is used, the control pins are held high (not asserted).
+	"""
+	def __init__(self, programmer):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP8"]
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				5: 0.0,
+				8: 5.0,
+				"VPUL": 5.0
+			}
+		})
+		self.ce_flag = allpro88.flag_ttl(self.socket, 1)
+		self.sk_flag = allpro88.flag_ttl(self.socket, 2)
+		self.di_flag = allpro88.flag_ttl(self.socket, 3)
+		# float output pin
+		self.do_flag = allpro88.flag_ttl(self.socket, 4, default = None)
+		self.nrecall_flag = allpro88.flag_ttl_active_low(self.socket, 6)
+		# to prevent accidental writes, !STORE must be held high
+		# while power is applied to and removed from the part.  the
+		# flag's default value is False, which for an active-low
+		# pin ties it to TTL high at power-on.  (the default
+		# default is False, but we set it here explicitly for
+		# safety)
+		self.nstore_flag = allpro88.flag_ttl_active_low(self.socket, 7, default = False)
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	# proxy descriptors
+	ce = devices.read_write_proxy("ce_flag")
+	sk = devices.read_write_proxy("sk_flag")
+	di = devices.read_write_proxy("di_flag")
+	do = devices.read_write_proxy("do_flag")
+	nrecall = devices.read_write_proxy("nrecall_flag")
+	nstore = devices.read_write_proxy("nstore_flag")
+
+	def command(self, command):
+		"""
+		Perform a non-data command, one of "WRDS", "STO", "WREN",
+		"RCL".  See the datasheet.
+		"""
+		command = {
+			"WRDS":	0x80,
+			"STO":	0x81,
+			"WREN":	0x84,
+			"RCL":	0x85
+		}[command]
+		self.ce = True
+		# chip clocks DI pin on rising edge
+		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
+			self.di = command & bit
+			self.sk = True
+			self.sk = False
+		self.ce = False
+
+	def read(self, addr):
+		"""
+		Read 16 bit word from address addr.
+		"""
+		if not 0 <= addr < 16:
+			raise ValueError(addr)
+		command = 0x80 | (addr << 3) | 0x6
+		self.ce = True
+		# chip clocks DI pin on rising edge
+		for bit in (0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01):
+			self.di = command & bit
+			self.sk = True
+			self.sk = False
+		# we clock DO pin on falling edge
+		value = 0
+		for bit in range(15):
+			value <<= 1
+			value |= 1 if self.do else 0
+			self.sk = True
+			self.sk = False
+		value <<= 1
+		value |= 1 if self.do else 0
+		self.ce = False
+		print(value)
+		return value
+
+
+with open("dump.dat", "wb") as dump:
+	with allpro88.allpro88() as programmer:
+		with x24c24(programmer) as device:
+			for addr in tqdm(range(16), desc = "Reading"):
+				dump.write(bytearray((device.read(addr),)))
