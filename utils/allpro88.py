@@ -798,19 +798,15 @@ class bus_parallel(object):
 		self.default = default
 		self.ignore_overflow = ignore_overflow
 		if pull is None:
-			pass
+			pull = 0
 		elif pull == "up":
-			active |= PINCON.PULLUP
-			inactive |= PINCON.PULLUP
-			flt |= PINCON.PULLUP
+			pull = PINCON.PULLUP
 		elif pull == "down":
-			active |= PINCON.PULLDN
-			inactive |= PINCON.PULLDN
-			flt |= PINCON.PULLDN
+			pull = PINCON.PULLDN
 		else:
 			raise ValueError(pull)
 		# send the bus definition command to the programmer
-		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active, inactive, flt, len(pin_numbers))
+		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active | pull, inactive | pull, flt | pull, len(pin_numbers))
 		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
 		self.programmer.write_command(command)
 		# set initial state
