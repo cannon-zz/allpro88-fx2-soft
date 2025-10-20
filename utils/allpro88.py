@@ -588,7 +588,7 @@ class flag(object):
 	applied to the pin, it will not take effect until power is applied
 	to the socket.
 	"""
-	def __init__(self, socket, pin_number, active, inactive, flt = PINCON.DISABLE, default = False):
+	def __init__(self, socket, pin_number, active, inactive, flt = PINCON.DISABLE, default = False, pull = None):
 		"""
 		socket, pin_number = the socket and socket pin number this
 		flag is controlling.
@@ -606,12 +606,33 @@ class flag(object):
 		will be set to 0, otherwise it will not be modified, and
 		the calling code is expected to set it to the desired
 		value.
+
+		default = the state (True, False, or None) to set the pin
+		in at power-on.
+
+		pull = one of "up" or "down" to add pull-up or pull-down
+		resistor, respectively, to the pin.  None (the default)
+		leaves the pin without pull-up/pull-down resistors.  the
+		effect of this is to modify the active, inactive and flt
+		pin configuration bits by setting the pull-up or pull-down
+		bit to true.  this is meant to be a convenience for calling
+		code, the same effect can be achieved by simply passing the
+		appropriate pin configuration bits to the active, inactive
+		and flt parameters.
 		"""
 		self.socket = socket
 		self.pin_number =  pin_number
-		self.active = active
-		self.inactive = inactive
-		self.flt = flt
+		if pull is None:
+			pull = 0
+		elif pull == "up":
+			pull = PINCON.PULLUP
+		elif pull == "down":
+			pull = PINCON.PULLDN
+		else:
+			raise ValueError(pull)
+		self.active = active | pull
+		self.inactive = inactive | pull
+		self.flt = flt | pull
 		self.default = default
 		# set initial state
 		if PINCON.VDAC not in (active, inactive, flt):
@@ -672,7 +693,8 @@ class flag_ttl(flag):
 	def __init__(self, socket, pin_number, **kwargs):
 		"""
 		kwargs are passed to parent class, e.g., what state to use
-		for floating.
+		for floating, whether or not to add a pull-up or pull-down
+		resistor.
 		"""
 		super(flag_ttl, self).__init__(socket, pin_number, active = PINCON.LOGICH, inactive = PINCON.LOGICL, **kwargs)
 
@@ -684,7 +706,8 @@ class flag_ttl_active_low(flag):
 	def __init__(self, socket, pin_number, **kwargs):
 		"""
 		kwargs are passed to parent class, e.g., what state to use
-		for floating.
+		for floating, whether or not to add a pull-up or pull-down
+		resistor.
 		"""
 		super(flag_ttl_active_low, self).__init__(socket, pin_number, active = PINCON.LOGICL, inactive = PINCON.LOGICH, **kwargs)
 
@@ -701,7 +724,8 @@ class flag_vdac(flag):
 		vdac = voltage to be used for high state.
 
 		kwargs are passed to parent class, e.g., what state to use
-		for floating.
+		for floating, whether or not to add a pull-up or pull-down
+		resistor.
 		"""
 		if vdac <= 0:
 			raise ValueError(vdac)
@@ -718,7 +742,8 @@ class flag_vdac_active_low(flag):
 		vdac = voltage to be used for high state.
 
 		kwargs are passed to parent class, e.g., what state to use
-		for floating.
+		for floating, whether or not to add a pull-up or pull-down
+		resistor.
 		"""
 		if vdac <= 0:
 			raise ValueError(vdac)
