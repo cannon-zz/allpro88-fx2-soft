@@ -32,6 +32,8 @@ Then, in the `fw/` directory,
 
 ## Install the Firmware
 
+Programming the device requires the `fxload` tool.  Debian users can install the `fxload` package with apt.
+
 For runtime single-use only (firmware gets installed into RAM by the host after the programmer has been powered up), use, for example,
 
 	$ fxload -t fx2lp -D /dev/bus/usb/001/008 -I build/firmware.ihx
