@@ -10,19 +10,19 @@ See https://github.com/cannon-zz/allpro88-fx2-hard for information about the har
 
 Compiling the firmware requires `sdcc`.  Debian users can install `sdcc` using apt.
 
-Then, in the `fw/` directory,
+Then, in the `fw/` directory:
 
 1.  To generate a new serial number to serve as a unique ID run
 
 		$ rm serial.a51 ; make serial.a51
 
-	NOTE:  each unit requires a unique serial number to allow calibration data to be associated with the correct unit.  If you know the original serial number for your unit and would like to use that instead of a randomly generated UUID, then isntead run, for example,
+	NOTE:  each unit requires a unique serial number to allow calibration data to be associated with the correct unit.  If you know the original serial number for your unit and would like to use that instead of a randomly generated UUID, then run, for example,
 
 		$ echo "12345" | python3 gen_serial.py >serial.a51
 
 	using, of course, your actual serial number
 
-	NOTE:  the serial number will be used to generate file names, and displayed in messages to the user, therefore it must be a string compatible with these applications.  Stick to printable ascii characters only, no whitespace and no slashes.
+	NOTE:  the serial number will be used to generate file names, and displayed in messages to the user, therefore it must be a string compatible with these applications.  Stick to printable ASCII characters only, no whitespace and no slashes.
 
 2.  After the serial number file has been generated, compile the firmware with
 
@@ -38,15 +38,15 @@ For runtime single-use only (firmware gets installed into RAM by the host after 
 
 	$ fxload -t fx2lp -D /dev/bus/usb/001/008 -I build/firmware.ihx
 
-To write the firmware into the onboard EEPROM, use, for example,
+but using the correct USB device file.  To write the firmware into the onboard EEPROM, use, for example,
 
 	$ fxload -t fx2lp -D /dev/bus/usb/001/008 -I build/firmware.ihx -c 0x01 -s Vend_Ax.hex
 
-In both cases, of course, choose the appropriate USB device file.
+but, again, using the correct USB device file.
 
 The `Vend_Ax.hex` file can be found in the `fw/` directory.
 
-NOTE:  the FX2 must detect the presence of the EEPROM at boot or the chip will refuse to write to it.  It doesn't have to have firmware in it but the EEPROM must be enabled, it must see that the chip is at the expected address.  It's not possible to power up the FX2 with the EEPROM disabled, then install the jumper and write firmware to the EEPROM.  That means that because buggy firmware can make the FX2 unresponsive (ask me how I know), if buggy firmware gets into the EEPROM and bricks the board there is no way to fix it using only software on the PC --- it really is bricked.  You're forced to power up the board with the EEPROM active if you want to write new firmware to it, but you can't if it contains buggy firmware.  If that happens, you'll need to remove the EEPROM, use the command above to boot the FX2 with firmware in RAM then reprogram or erase the EEPROM using the ALLPRO88.  It might be possible to boot the FX2 with the EEPROM disabled, with firmware loaded by the PC into RAM as above, and then use the ALLPRO88 to program the EEPROM in circuit.  DO NOT use the I2C EEPROM programming script in this project, as is, to do that as that will try to apply power to the part.  Think very carefully about what you're doing if you try this.
+NOTE:  the FX2 must detect the presence of the EEPROM at boot or the chip will refuse to write to it.  It doesn't have to have firmware in it but the EEPROM must be enabled, it must see that the chip is at the expected address.  It's not possible to power up the FX2 with the EEPROM disabled, then install the jumper and write firmware to the EEPROM.  That means that because buggy firmware can make the FX2 unresponsive (ask me how I know), if buggy firmware gets into the EEPROM and bricks the board it's very difficult to fix it using only software on the PC.  There are tools for doing this floating around on the internet if it happens to you.  The EEPROM disable jumper doesn't really disable the EEPROM, it just moves it to a different address on the I2C bus where the FX2 isn't looking, so you can boot the FX2 with the EEPROM disabled and upload a custom firmware whose only task is to erase the EEPROM chip at its alternate address.  After that it can be put back to its proper address and reprogrammed as above.
 
 ## USB Device Permissions
 
@@ -72,7 +72,7 @@ The pull-up voltage ramp graphs, in particular, are an especially sensitive way 
 
 If everything seems to be in order it's time to do a calibration.  There are two steps to this:  (i) calibrating the main power supplies, done by hand using a voltmeter, and (ii) calibrating the pin driver circuits with an automatic self-calibration procedure.
 
-The first part, calibrating the main power supplies, is very time consuming.  Right now the code is set up to semi-automate this for me using a voltmeter for which I have a PC interface.  That almost certainly won't work for you, so assume that you cannot calibrate the main power supplies.  Yet.  Unless something is broken the ALLPRO88 should actually be pretty accurately dialed in from the factory, even after all these years.  I own two and both were basically fine.  The calibration polynomials that would be measured here just squeeze that extra little 0.05 V of precision out them.
+The first part, calibrating the main power supplies, is very time consuming.  Right now the code is set up to semi-automate this for me using a voltmeter for which I have a PC interface.  That almost certainly won't work for you, so assume that you cannot calibrate the main power supplies.  Yet.  Unless something is broken the ALLPRO88 should actually be pretty accurately dialed in from the factory, even after all these years.  I own two and both were basically fine.  The calibration polynomials that would be measured here just squeeze that extra little 0.05 V of precision out of them.
 
 The second part, calibrating the pin driver circuits, is also very time consuming but it is fully automatic.  It works by assuming the main power supplies are calibrated, and then the ALLPRO88's own analogue voltage measurements are used to infer biases, offsets, and non-linearities in the pin driver circuits.
 
