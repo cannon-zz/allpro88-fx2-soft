@@ -62,7 +62,7 @@ _dev_dscr:
 	.db	0xff			; protocol (vendor specific)
 	.db	64			; packet size (ep0)
 	.dw	0x0912			; vendor id (https://pid.codes/)
-	.dw	0x0C00			; product id (https://pid.codes/1209/000C/)
+	.dw	0x88AA			; product id (https://pid.codes/1209/AA88/)
 	.dw	0x0002			; version id
 	.db	1			; manufacturure str idx
 	.db	2			; product str idx

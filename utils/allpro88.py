@@ -954,7 +954,7 @@ class allpro88(object):
 	#
 
 	idVendor = 0x1209
-	idProduct = 0x000C
+	idProduct = 0xAA88
 
 	ep_addr_out = 0x02
 	ep_addr_in = 0x86
