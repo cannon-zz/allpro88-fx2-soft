@@ -77,7 +77,8 @@ static BOOL errno = FALSE;
 /*
  * convert upper-case base 16 strings of various fixed lengths to numerical
  * values.  sets errno to TRUE if the input is not a valid upper case base
- * 16 number, and in that case the return value is undefined.
+ * 16 number, and in that case the return value is undefined.  assumes
+ * AUTOPTR1 is set to the address of the source.
  */
 
 
@@ -96,27 +97,27 @@ inline static BYTE hex_to_val(unsigned char digit)
 }
 
 
-inline static BYTE str_to_byte(const char *str)
+inline static BYTE str_to_byte(void)
 {
-	return hex_to_val(str[0]) << 4 | hex_to_val(str[1]);
+	return hex_to_val(XAUTODAT1) << 4 | hex_to_val(XAUTODAT1);
 }
 
 
-static WORD str_to_word(const char *str)
+static WORD str_to_word(void)
 {
-	return MAKEWORD(str_to_byte(str), str_to_byte(str + 2));
+	return MAKEWORD(str_to_byte(), str_to_byte());
 }
 
 
-static DWORD str_to_dword(const char *str)
+static DWORD str_to_dword(void)
 {
-	return MAKEDWORD(str_to_word(str), str_to_word(str + 4));
+	return MAKEDWORD(str_to_word(), str_to_word());
 }
 
 
 /*
  * write integers to base 16 strings of various fixed lengths.  assumes
- * AUTOPTR2 is set to the destination.
+ * AUTOPTR2 is set to the address of the destination.
  */
 
 
@@ -1277,39 +1278,34 @@ __xdata static union {
  */
 
 
-static void bus_parallel_define(BYTE bus_number, const char *s)
+static BOOL bus_parallel_define(BYTE bus_number)
 {
 	BYTE i;
 	BYTE width;
 	/* parse pin config register values and bus width */
-	bus[bus_number].parallel.state_true = str_to_byte(s);
-	s += 2;
-	bus[bus_number].parallel.state_false = str_to_byte(s);
-	s += 2;
-	bus[bus_number].parallel.state_float = str_to_byte(s);
-	s += 2;
-	bus[bus_number].parallel.width = width = str_to_byte(s);
-	s += 2;
+	bus[bus_number].parallel.state_true = str_to_byte();
+	bus[bus_number].parallel.state_false = str_to_byte();
+	bus[bus_number].parallel.state_float = str_to_byte();
+	bus[bus_number].parallel.width = width = str_to_byte();
 	/* check for error */
 	if(errno || width < 1 || width > 32)
 		goto error;
 	/* parse channel numbers */
 	for(i = 0; i < width; i++) {
-		BYTE channel = str_to_byte(s);
-		s += 2;
+		BYTE channel = str_to_byte();
 		/* check for error */
 		if(errno || channel > 87)
 			goto error;
 		bus[bus_number].parallel.bit_addr[i] = allpro88_channel_addr(channel);
 	}
 	/* check for correct end of string */
-	if(*s)
+	if(XAUTODAT1 != '\n')
 		goto error;
 	/* fill unused addresses with a safe value, just in case */
 	for(; i < 32; i++)
 		bus[bus_number].parallel.bit_addr[i] = bus[bus_number].parallel.bit_addr[0];
 	/* done */
-	return;
+	return 0;
 
 error:
 	/* disable the use of this bus as a parallel bus */
@@ -1317,7 +1313,7 @@ error:
 	bus[bus_number].parallel.state_false = PINCON_DISABLE;
 	bus[bus_number].parallel.state_float = PINCON_DISABLE;
 	bus[bus_number].parallel.width = 0;
-	return;
+	return 1;
 }
 
 
@@ -1641,20 +1637,20 @@ inline static BOOL in_buffer_not_full(void)
  */
 
 
-static void do_command(const char *command)
+static BOOL do_command(void)
 {
 	errno = FALSE;
-	switch(command[0]) {
+	switch(XAUTODAT1) {
 	/*
 	 * write byte to address
 	 */
 
 	case '=': {
 		/* decode address and byte */
-		WORD addr = str_to_word(&command[1]);
-		BYTE val = str_to_byte(&command[5]);
+		WORD addr = str_to_word();
+		BYTE val = str_to_byte();
 		/* check for error and correct end of string */
-		if(errno || command[7])
+		if(errno || XAUTODAT1 != '\n')
 			goto error;
 		/* write byte to address */
 		allpro88_write(addr, val);
@@ -1667,9 +1663,9 @@ static void do_command(const char *command)
 
 	case '?': {
 		/* decode address */
-		WORD addr = str_to_word(&command[1]);
+		WORD addr = str_to_word();
 		/* check for error and correct end of string */
-		if(errno || command[5])
+		if(errno || XAUTODAT1 != '\n')
 			goto error;
 		/* read from address, print byte into response */
 		puts_byte(allpro88_read(addr));
@@ -1682,23 +1678,24 @@ static void do_command(const char *command)
 	 */
 
 	case 'B': {
-		BYTE bus_number = hex_to_val(command[1]);
+		BYTE bus_number = hex_to_val(XAUTODAT1);
 		if(errno)
 			goto error;
-		switch(command[2]) {
+		switch(XAUTODAT1) {
 		/*
 		 * parallel bus
 		 */
 
 		case 'P': {
 			BYTE width = bus[bus_number].parallel.width;
-			switch(command[3]) {
+			switch(XAUTODAT1) {
 			/*
 			 * define bus
 			 */
 
 			case ':':
-				bus_parallel_define(bus_number, &command[4]);
+				if(bus_parallel_define(bus_number))
+					goto error;
 				break;
 
 			/*
@@ -1707,7 +1704,7 @@ static void do_command(const char *command)
 
 			case '?':
 				/* check for correct end of string */
-				if(command[4])
+				if(XAUTODAT1 != '\n')
 					goto error;
 				/* report the value on the bus */
 				if(!width)
@@ -1730,25 +1727,25 @@ static void do_command(const char *command)
 					goto error;
 				else if(width <= 8) {
 					/* decode the number to write */
-					BYTE value = str_to_byte(&command[4]);
+					BYTE value = str_to_byte();
 					/* check for error and correct end of string */
-					if(errno || command[6])
+					if(errno || XAUTODAT1 != '\n')
 						goto error;
 					/* set the bus state */
 					bus_parallel_write_byte(bus_number, value);
 				} else if(width <= 16) {
 					/* decode the number to write */
-					WORD value = str_to_word(&command[4]);
+					WORD value = str_to_word();
 					/* check for error and correct end of string */
-					if(errno || command[8])
+					if(errno || XAUTODAT1 != '\n')
 						goto error;
 					/* set the bus state */
 					bus_parallel_write_word(bus_number, value);
 				} else {
 					/* decode the number to write */
-					DWORD value = str_to_dword(&command[4]);
+					DWORD value = str_to_dword();
 					/* check for error and correct end of string */
-					if(errno || command[12])
+					if(errno || XAUTODAT1 != '\n')
 						goto error;
 					/* set the bus state */
 					bus_parallel_write_dword(bus_number, value);
@@ -1760,7 +1757,7 @@ static void do_command(const char *command)
 			 */
 
 			case '-':
-				if(!width || command[4])
+				if(!width || XAUTODAT1 != '\n')
 					goto error;
 				bus_parallel_float(bus_number);
 				break;
@@ -1770,7 +1767,7 @@ static void do_command(const char *command)
 			 */
 
 			default:
-				break;
+				goto error;
 			}
 			break;
 		}
@@ -1780,7 +1777,7 @@ static void do_command(const char *command)
 		 */
 
 		default:
-			break;
+			goto error;
 		}
 		break;
 	}
@@ -1791,7 +1788,7 @@ static void do_command(const char *command)
 
 	case 'C': {
 		/* check for correct end of string */
-		if(command[1])
+		if(XAUTODAT1 != '\n')
 			goto error;
 		puts_word(installed_channel_drivers);
 		newline();
@@ -1804,9 +1801,9 @@ static void do_command(const char *command)
 
 	case 'E': {
 		/* decode the 16 bit number to echo */
-		WORD addr = str_to_word(&command[1]);
+		WORD addr = str_to_word();
 		/* check for error and correct end of string */
-		if(errno || command[5])
+		if(errno || XAUTODAT1 != '\n')
 			goto error;
 		/* echo the number */
 		puts_word(addr);
@@ -1820,9 +1817,9 @@ static void do_command(const char *command)
 
 	case 'M': {
 		/* decode the 8 bit channel number */
-		BYTE channel = str_to_byte(&command[1]);
+		BYTE channel = str_to_byte();
 		/* check for error and correct end of string */
-		if(errno || command[3])
+		if(errno || XAUTODAT1 != '\n')
 			goto error;
 		/* measure the voltage, report the VTH DAC value */
 		puts_byte(allpro88_measure_pin_voltage(channel));
@@ -1835,11 +1832,11 @@ static void do_command(const char *command)
 	 */
 
 	case 'P': {
-		BYTE channel = str_to_byte(&command[1]);
-		WORD microseconds = str_to_word(&command[3]);
-		BYTE config = str_to_byte(&command[7]);
-		BYTE final_config = str_to_byte(&command[9]);
-		if(errno || command[11])
+		BYTE channel = str_to_byte();
+		WORD microseconds = str_to_word();
+		BYTE config = str_to_byte();
+		BYTE final_config = str_to_byte();
+		if(errno || XAUTODAT1 != '\n')
 			goto error;
 		pulse(channel, microseconds, config, final_config);
 		break;
@@ -1851,7 +1848,7 @@ static void do_command(const char *command)
 
 	case 'R':
 		/* check for correct end of string */
-		if(command[1])
+		if(XAUTODAT1 != '\n')
 			goto error;
 		/* execute hardware reset */
 		allpro88_hard_reset();
@@ -1863,7 +1860,7 @@ static void do_command(const char *command)
 
 	case 'V':
 		/* check for correct end of string */
-		if(command[1])
+		if(XAUTODAT1 != '\n')
 			goto error;
 		/* measure the voltage, report the VADJTH DAC value */
 		puts_byte(allpro88_measure_vadj_voltage());
@@ -1875,21 +1872,19 @@ static void do_command(const char *command)
 	 */
 
 	default:
-		break;
+		goto error;
 	}
 
+	return 0;
 error:
-	return;
+	return 1;
 }
 
 
 inline static void parse_out_buffer(void)
 {
-	/* start address of command string.  first command is at start of
-	 * end-point 2's ("out") buffer */
-	char *command = EP2FIFOBUF;
-	/* length of buffer's contents */
-	WORD n;
+	/* end of "out" buffer's contents */
+	const WORD out_end = (WORD) EP2FIFOBUF + MAKEWORD(EP2BCH, EP2BCL);
 
 	/* initialize autopointer 1 to the start address of end-point 2's
 	 * ("out") buffer and autopointer 2 to the start address of
@@ -1920,18 +1915,11 @@ inline static void parse_out_buffer(void)
 	 * way to do it presents itself, that would be nice.
 	 */
 
-	for(n = MAKEWORD(EP2BCH, EP2BCL); n; n--)
-		/* search for end-of-command character.  reading XAUTODAT1
-		 * increments the corresponding auto pointer.  */
-		if(XAUTODAT1 == '\n') {
-			/* null terminate and interpret.  command points to
-			 * start address */
-			char __xdata *next_cmd = (char __xdata *) MAKEWORD(AUTOPTRH1, AUTOPTRL1);
-			*(next_cmd - 1) = 0;
-			do_command(command);
-			/* save start address of next command */
-			command = next_cmd;
-		}
+	while(MAKEWORD(AUTOPTRH1, AUTOPTRL1) < out_end) {
+		if(do_command())
+			/* abort loop on error */
+			break;
+	}
 
 	/* arm the in end-point to send it to the host.  we do this even if
 	 * it's empty (byte count = 0) so that code running on the host
