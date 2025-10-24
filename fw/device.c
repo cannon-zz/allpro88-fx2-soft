@@ -1051,7 +1051,7 @@ void main_init(void)
 	 * interrupt, but it took so much screwing around to get just this
 	 * simple polling implementation to work that I don't want to tempt
 	 * fate.  attempting to follow the examples in the reference manual
-	 * led a bricked device.  the documentation is not at all clear.
+	 * led to a bricked device.  the documentation is not at all clear.
 	 */
 
 	WAKEUPCS = bmWU | bmDPEN | bmWUEN;
@@ -1470,6 +1470,10 @@ static void pulse(BYTE channel, WORD microseconds, BYTE config, BYTE final_confi
 	 *	microseconds = 1;
 	 * else
 	 *	microseconds -= 4;
+	 *
+	 * FIXME:  the minimum pulse length needs to be remeasured since
+	 * replacing the software bit-banged interface with the GPIF
+	 * scripts
 	 */
 __asm
 	clr	c
