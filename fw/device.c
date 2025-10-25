@@ -1801,12 +1801,12 @@ static BOOL do_command(void)
 
 	case 'E': {
 		/* decode the 16 bit number to echo */
-		WORD addr = str_to_word();
+		WORD value = str_to_word();
 		/* check for error and correct end of string */
 		if(errno || XAUTODAT1 != '\n')
 			goto error;
 		/* echo the number */
-		puts_word(addr);
+		puts_word(value);
 		newline();
 		break;
 	}
