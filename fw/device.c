@@ -67,7 +67,7 @@
 
 
 /*
- * TRUE = an error occured in a function call
+ * TRUE = an error occurred in a function call
  */
 
 
@@ -557,7 +557,7 @@ inline static void allpro88_set_VTST(BYTE vdac, BYTE idac)
  * set the two spare DACs.  these are two of the four DACs in the analogue
  * 2 board's AD7226 quad DAC chip.  they are not connected to anything
  * except resistors to ground.  the other two DACs in this chip control the
- * current and voltage of the VTST power suppy.
+ * current and voltage of the VTST power supply.
  */
 
 
@@ -913,13 +913,25 @@ void main_init(void)
 	 * explicitly re-arm them for each packet.  that's what we want.
 	 * endpoints 2, 4, 6, 8 have a WORDWIDE bit that must be cleared to
 	 * 0 (see below). */
+	/* FIXME:  only high-speed connections allow packets larger than 64
+	 * bytes.  the end-point description data reports a max packet size
+	 * of 64 bytes for full speed connections.  it doesn't hurt for
+	 * these buffers to be larger than that, but we need to make sure
+	 * not to put more than 64 bytes into a response packet if we're
+	 * not connected to a high speed interface. */
+	/* FIXME:  the config registers for the unused end-points are a
+	 * problem.  the technical reference manual at the end of section
+	 * 8.3 makes back-to-back contradictory claims.  it claims the
+	 * valid bit is ignored if buffer space is allocated, and says to
+	 * disable an unused end-point by clearing *only* the valid bit and
+	 * not touching the others */
 
 	EP1OUTCFG = 0;
 	EP1INCFG = 0;
 	EP2CFG = 0b10100010;	/* valid, out, bulk, 512 bytes, dbl buff'd */
-	EP4CFG = 0;
+	EP4CFG = 0;	/* FIXME: should, instead, do &= 0x7F ?*/
 	EP6CFG = 0b11100010;	/* valid, in, bulk, 512 bytes, dbl buff'd */
-	EP8CFG = 0;
+	EP8CFG = 0;	/* FIXME: should, instead, do &= 0x7F ?*/
 	SYNCDELAY;
 	EP2FIFOCFG &= ~bmWORDWIDE;
 	SYNCDELAY;
@@ -977,15 +989,14 @@ void main_init(void)
 	 * we are not actually setting their states, we are setting what
 	 * state they will be driven to when we switch them to output mode
 	 * in the next step.  finally, configure address bus and /RESET
-	 * GPIO pins for output set address and control bus pins for output
-	 * (if it isn't already, this now for real pulls /RESET low,
-	 * putting programmer into reset state).  from the initial
-	 * application of power until this point, while the GPIO pins were
-	 * tri-stated, pull up and pull down resistors have been holding
-	 * the /RD and /WR lines high and /RESET line low, so the output
-	 * enable operation should not be changing the state of the control
-	 * lines, we are merely taking over control of their states from
-	 * the resistors.
+	 * GPIO pins for output (if it isn't already, this now for real
+	 * pulls /RESET low, putting programmer into reset state).  from
+	 * the initial application of power until this point, while the
+	 * GPIO pins were tri-stated, pull up and pull down resistors have
+	 * been holding the /RD and /WR lines high and /RESET line low, so
+	 * the output enable operation should not be changing the state of
+	 * the control lines, we are merely taking over control of their
+	 * states from the resistors.
 	 */
 
 	PORTACFG = 0;
@@ -1010,9 +1021,9 @@ void main_init(void)
 	 * both of the buffers through the system before it believes it can
 	 * receive new data.  doing it once doesn't work, and the examples
 	 * show this being done twice at start-up.  if my belief is
-	 * correct, the correct number of times to do this is not
-	 * necessarily 2, but however many -uple's worth of buffering you
-	 * have configured the chip for (double, quadruple, etc.). */
+	 * correct, though, then the correct number of times to do this is
+	 * not necessarily 2, but however many -uple's worth of buffering
+	 * you have configured the chip for (double, quadruple, etc.). */
 
 	arm_out_endpoint();
 	arm_out_endpoint();
