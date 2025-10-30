@@ -16,7 +16,6 @@
 
 
 import time
-from tqdm import tqdm
 from . import allpro88
 from . import devices
 
@@ -34,12 +33,7 @@ class oled_module(object):
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP8"]
-		# put all pins are in a predictable state
-		for channel in self.socket.values():
-			channel.config = allpro88.PINCON.DISABLE
-			channel.vdac = 0
-			channel.bypass = False
-		# configure VPUL and VTH for I2C bus
+		# configure power, VPUL, VTH, and I2C bus
 		self.power = devices.power(self.programmer, self.socket, {
 			"default": {
 				1: 0.0,
