@@ -41,15 +41,12 @@ import os
 import time
 import usb.core
 import yaml
-from socket_module import socket_modules
+from .socket_module import socket_modules
 
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
 
-
-# FIXME:  when this is turned into a proper package, move this to the
-# package's __init__.py file.
 
 ALLPRO88_CAL_PATH = os.getenv("ALLPRO88_CAL_PATH", default = ".").split(":")
 

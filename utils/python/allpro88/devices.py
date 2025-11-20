@@ -17,7 +17,7 @@
 
 import operator
 import time
-from . import allpro88
+import allpro88
 
 
 #
