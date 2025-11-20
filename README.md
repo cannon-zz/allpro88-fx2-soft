@@ -50,7 +50,7 @@ NOTE:  the FX2 must detect the presence of the EEPROM at boot or the chip will r
 
 ## USB Device Permissions
 
-In the `fw/` directory is a file named `99-allpro88.rules`.  On a Debian system, put this file into `/etc/udev/rules.d/` so that when the ALLPRO88 is plugged into a USB port the corresponding USB device file is readable and writable by normal users.
+In the `udev/` directory is a file named `99-allpro88.rules`.  On a Debian system, put this file into `/etc/udev/rules.d/` so that when the ALLPRO88 is plugged into a USB port the corresponding USB device file is readable and writable by normal users.
 
 ## Test and Calibrate your ALLPRO88
 
