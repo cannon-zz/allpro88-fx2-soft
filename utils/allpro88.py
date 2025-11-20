@@ -330,7 +330,7 @@ class dacregister(object):
 		# always working for any DAC-to-voltage calibration mapping
 		# whose slope doesn't change sign.
 		lo, hi = 0, 256
-		if v >= self.cal(255.5, obj):
+		if v >= calfunc(255.5):
 			raise ValueError("voltage too high:  requested %g V > DAC limit of %g V" % (v, self.cal(255, obj)))
 		while hi - lo > 0.5:
 			mid = (hi + lo) / 2
