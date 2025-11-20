@@ -367,9 +367,9 @@ class channel_driver_test_suite(object):
 		# biasing network to ground greating a voltage differential
 		# across the PNP transistor's emitter-base junction.  the
 		# biasing network consists of a 10 kOhm resistor between
-		# the pull-up rail and the transitor's base, and a 10 kOhm
+		# the pull-up rail and the transistor's base, and a 10 kOhm
 		# resistor between the base and the 7406's output.  when
-		# the inverter's output if "false", the pair of resistors
+		# the inverter's output is "false", the pair of resistors
 		# put the base at 1/2 the voltage of the pull-up rail.  at
 		# room temperature the transistor requires about 0.6 V
 		# across the emitter-base junction before it conducts,
@@ -748,10 +748,10 @@ class channel_driver_test_suite(object):
 		forward-bias voltage of the PNP transistor's base-emitter
 		junction the circuit looks like the 68 Ohm resistor to
 		ground.  Once the voltage drop gets above about 600 mV
-		(approximately 10 mA of current flows) the transitor begins
-		to conduct, partially shorting the digital control signal
-		to ground and throttling the current pulled out through the
-		driver transistor's base.
+		(approximately 10 mA of current flows) the transistor
+		begins to conduct, partially shorting the digital control
+		signal to ground and throttling the current pulled out
+		through the driver transistor's base.
 
 		All of this circuitry appears in parallel across
 		whatever load is inserted into the socket that VTST is
