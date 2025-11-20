@@ -58,17 +58,15 @@ In the `udev/` directory is a file named `99-allpro88.rules`.  On a Debian syste
 
 ## Test and Calibrate your ALLPRO88
 
-The `utils/` directory is a mess, it's a work in progress.
-
 ### Loopback Test
 
-In `utils/` there is a `loopback.py` script.  With the ALLPRO88 plugged in and powered, running this script will confirm that communication with the system is working.  It does some I/O operations, confirms that they do the right thing, and reports the speed.
+In `utils/bin/` there is the `ap88_loopback` script.  With the ALLPRO88 plugged in and powered, running this script will confirm that communication with the system is working.  It does some I/O operations, confirms that they do the right thing, and reports the speed.
 
 Confirm that the socket module and the list of installed channels reported by this script is what you expect these things to be.
 
 ### Self Test
 
-In `utils/` there is a `self_test.py` script.  With the ALLPRO88 plugged in and powered, running this script will perform a sequence of tests on each pin driver.  It will print a log of test results to the terminal and dump a series of diagnostic plots into the directory in which it's running.  Many of the tests will report FAILURE.  At this time this is still normal for perfectly working units.  I don't have the pass/fail thresholds dialed in properly yet.  You need to look at the numbers yourself, see what values they tend to be, and decide if you think any channels appear to be different from the others or if they don't seem to be doing the right thing.  Look at the diagnostic plots and flip through them looking for a channel whose graphs are different from the others.  If they all seem to be the same, probably it's working.
+In `utils/bin/` there is the `ap88_self_test` script.  With the ALLPRO88 plugged in and powered, running this script will perform a sequence of tests on each pin driver.  It will print a log of test results to the terminal and dump a series of diagnostic plots into the directory in which it's running.  Many of the tests will report FAILURE.  At this time this is still normal for perfectly working units.  I don't have the pass/fail thresholds dialed in properly yet.  You need to look at the numbers yourself, see what values they tend to be, and decide if you think any channels appear to be different from the others or if they don't seem to be doing the right thing.  Look at the diagnostic plots and flip through them looking for a channel whose graphs are different from the others.  If they all seem to be the same, probably it's working.
 
 The pull-up voltage ramp graphs, in particular, are an especially sensitive way to detect faults in the pin driver circuits.  Look for graphs whose slopes are different from the rest, or graphs that plateau at some maximum voltage instead of continuing all the way to the top.
 
@@ -80,7 +78,7 @@ The first part, calibrating the main power supplies, is very time consuming.  Ri
 
 The second part, calibrating the pin driver circuits, is also very time consuming but it is fully automatic.  It works by assuming the main power supplies are calibrated, and then the ALLPRO88's own analogue voltage measurements are used to infer biases, offsets, and non-linearities in the pin driver circuits.
 
-This entire process is also accomplished using the `self_test.py` script.  Check the command line options for more information.
+This entire process is also accomplished using the `ap88_self_test` script.  Check the command line options for more information.
 
 When completed, the calibration process will write the calibration data to a file keyed to the ALLPRO88 unit (the serial number is in the filename).  Put this file into some directory and set the `ALLPRO88_CAL_PATH` environment variable to that directory's name.  After, that calibration data should be loaded automatically by any tool using the programmer.
 

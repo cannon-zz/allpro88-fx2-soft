@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 # Copyright (C) 2022-2024  Kipp Cannon
 #
 # This program is free software; you can redistribute it and/or modify it
@@ -16,8 +18,8 @@
 
 
 from tqdm import tqdm
-from . import allpro88
-from . import devices
+import allpro88
+from allpro88 import devices
 
 class w25x10avaiz(object):
 	def __init__(self, programmer):

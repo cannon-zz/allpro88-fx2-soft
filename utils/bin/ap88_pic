@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 #
 # I needed to program a PIC16F676 to make a PS/2 to Apple 2 keyboard
 # interface adapter to resurrect an Apple 2 clone motherboard I got my
@@ -23,7 +25,7 @@ import time
 from tqdm import tqdm
 from intelhex import IntelHex
 import allpro88
-import devices
+from allpro88 import devices
 
 
 logger = logging.getLogger(__name__)
