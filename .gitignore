@@ -15,3 +15,11 @@
 *.iic
 docs/html
 build
+
+aclocal.m4
+autom4te.cache
+config.log
+config.status
+configure
+*Makefile
+*Makefile.in

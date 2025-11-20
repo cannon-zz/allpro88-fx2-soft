@@ -48,6 +48,10 @@ The `Vend_Ax.hex` file can be found in the `fw/` directory.
 
 NOTE:  the FX2 must detect the presence of the EEPROM at boot or the chip will refuse to write to it.  It doesn't have to have firmware in it but the EEPROM must be enabled, it must see that the chip is at the expected address.  It's not possible to power up the FX2 with the EEPROM disabled, then install the jumper and write firmware to the EEPROM.  That means that because buggy firmware can make the FX2 unresponsive (ask me how I know), if buggy firmware gets into the EEPROM and bricks the board it's very difficult to fix it using only software on the PC.  There are tools for doing this floating around on the internet if it happens to you.  The EEPROM disable jumper doesn't really disable the EEPROM, it just moves it to a different address on the I2C bus where the FX2 isn't looking, so you can boot the FX2 with the EEPROM disabled and upload a custom firmware whose only task is to erase the EEPROM chip at its alternate address.  After that it can be put back to its proper address and reprogrammed as above.
 
+## Install the Utilities
+
+FIXME:  not yet documented.
+
 ## USB Device Permissions
 
 In the `udev/` directory is a file named `99-allpro88.rules`.  On a Debian system, put this file into `/etc/udev/rules.d/` so that when the ALLPRO88 is plugged into a USB port the corresponding USB device file is readable and writable by normal users.
