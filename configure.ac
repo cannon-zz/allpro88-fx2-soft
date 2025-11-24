@@ -22,6 +22,9 @@ AC_CONFIG_FILES([\
 ])
 
 
+AC_PROG_INSTALL
+
+
 #
 # Check for Python
 #
