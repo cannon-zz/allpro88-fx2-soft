@@ -21,6 +21,7 @@ autom4te.cache
 config.log
 config.status
 configure
+configure~
 *Makefile
 *Makefile.in
 utils/python/allpro88/paths.py
