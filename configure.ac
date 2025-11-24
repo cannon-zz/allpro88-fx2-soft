@@ -19,10 +19,19 @@ AC_CONFIG_FILES([\
 	utils/bin/Makefile \
 	utils/python/Makefile \
 	utils/python/allpro88/Makefile \
+	utils/python/allpro88/paths.py \
 ])
 
 
 AC_PROG_INSTALL
+
+
+#
+# Extra directories
+#
+
+
+AC_SUBST([pkglocalstatedir],["\${localstatedir}/${PACKAGE}"])
 
 
 #

@@ -23,3 +23,4 @@ config.status
 configure
 *Makefile
 *Makefile.in
+utils/python/allpro88/paths.py

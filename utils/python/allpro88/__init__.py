@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO)
 
 
-ALLPRO88_CAL_PATH = os.getenv("ALLPRO88_CAL_PATH", default = ".").split(":")
+from .paths import *
 
 
 #
