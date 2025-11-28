@@ -428,6 +428,7 @@ class socket_module_AP88_PLCC(socket_module):
 			48:	47
 		},
 
+		# 52 pin PLCC socket
 		"PLCC52": {
 			1:	50,
 			2:	51,
