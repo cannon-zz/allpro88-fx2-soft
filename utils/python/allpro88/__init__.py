@@ -985,6 +985,10 @@ class allpro88(object):
 		channel_group_bit_map, = self.write_command("C")
 		self.channels_installed = tuple(channel for i, channel in enumerate(self.channels) if (1 << (i // 8)) & channel_group_bit_map)
 
+		# print status banner for logging purposes
+		logger.info("serial number:  %s" % self.serial_number)
+		logger.info("system ID:  0x%X" % self.system_id)
+
 		# configure for the installed socket module
 		try:
 			# retrieve the class
@@ -998,9 +1002,20 @@ class allpro88(object):
 		else:
 			# initialize
 			self.socket_module = self.socket_module(self)
+			logger.info("socket module ID:  0x%02X / \"%s\"" % (self.socket_module_id, self.socket_module.name))
 
-		# keep track of what bus numbers are in use
-		self.bus = {}
+		# pretty-print the list of installed channels
+		channel_numbers = list(channel.channel for channel in self.channels_installed)
+		sequences = []
+		for i in channel_numbers:
+			if sequences and i == sequences[-1][-1] + 1:
+				sequences[-1].append(i)
+			else:
+				sequences.append([i])
+		for sequence in sequences:
+			if len(sequence) > 2:
+				sequence[1:-1] = ["..."]
+		logger.info("channels installed (%d):  %s" % (len(channel_numbers), list(itertools.chain.from_iterable(sequences))))
 
 		# install calibration model (defaults if no calibration
 		# model is provided).  NOTE:  yes, testing for specific
@@ -1036,23 +1051,10 @@ class allpro88(object):
 		else:
 			# calling code error
 			raise ValueError(cal_data)
-
-		# print status banner for logging purposes
-		logger.info("serial number:  %s" % self.serial_number)
-		logger.info("system ID:  0x%X" % self.system_id)
-		logger.info("socket module:  %s" % (self.socket_module.name if self.socket_module else "not detected"))
-		channel_numbers = list(channel.channel for channel in self.channels_installed)
-		sequences = []
-		for i in channel_numbers:
-			if sequences and i == sequences[-1][-1] + 1:
-				sequences[-1].append(i)
-			else:
-				sequences.append([i])
-		for sequence in sequences:
-			if len(sequence) > 2:
-				sequence[1:-1] = ["..."]
-		logger.info("channels installed (%d):  %s" % (len(channel_numbers), list(itertools.chain.from_iterable(sequences))))
 		logger.info("last calibrated:  %s" % self.cal["time"])
+
+		# keep track of what bus numbers are in use
+		self.bus = {}
 
 
 	def __enter__(self):
