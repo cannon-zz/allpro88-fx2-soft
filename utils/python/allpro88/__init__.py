@@ -1348,8 +1348,14 @@ class allpro88(object):
 	def socket_module_id(self):
 		"""
 		Returns the ID of the socket module installed in the
-		programmer, or 0xff is no module is installed.
+		programmer, or 0xff is no module is installed.  If the
+		environment variable ALLPRO88_SOCKET_MODULE is set, then it
+		is interpreted as a base 16 integer and its value is used
+		instead.
 		"""
+		socket_module_id = os.getenv("ALLPRO88_SOCKET_MODULE")
+		if socket_module_id:
+			return int(socket_module_id, 16)
 		return self.read_addr(0x0280)
 
 
