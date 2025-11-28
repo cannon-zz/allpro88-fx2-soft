@@ -104,9 +104,7 @@ When completed, the calibration process will write the calibration data to a fil
 
 The ALLPRO88 was reverse engineered by kevtris
 
-http://kevtris.org/index.html
-
-but I can't find his online documentation.  The links that come up in search engines lead to error pages.
+http://blog.kevtris.org/blogfiles/allpro88/
 
 The Cypress FX2 firmware in this project was developed from a firmware template forked from
 
