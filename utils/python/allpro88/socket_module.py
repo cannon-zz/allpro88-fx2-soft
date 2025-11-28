@@ -645,20 +645,6 @@ class socket_module_AP88_PLCC(socket_module):
 		}
 	}
 
-	def __init__(self, *args, **kwargs):
-		super(socket_module_AP88_PLCC, self).__init__(*args, **kwargs)
-
-		# provide socket definitions for DIP packages smaller than
-		# 48 pins.  these packages get inserted into the 48 pin
-		# socket according to the diagram on the socket module's
-		# case.  the drawing only shows 8, 16, 20, 24, 28, 32 and
-		# 40 pin packages, but for completeness we generate
-		# definitions for all even counts of pins starting with 2.
-
-		for n in range(2, 48, 2):
-			self.sockets["DIP%d" % n] = dict((i, self.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
-
-
 	def set_bypass(self, channel, enabled):
 		# bypass capacitor is turned on and off with bit 0.
 		# silently ignore requests to turn on or off bypass
@@ -673,6 +659,27 @@ class socket_module_AP88_PLCC(socket_module):
 		else:
 			return
 		self.programmer.write_addr(address, 1 if enabled else 0)
+
+# for the PLCC socket modeul, provide socket definitions for DIP packages
+# smaller than 48 pins.  these packages get inserted into the 48 pin socket
+# according to the diagram on the socket module's case.  the drawing only
+# shows 8, 16, 20, 24, 28, 32 and 40 pin packages, but for completeness we
+# generate definitions for all even counts of pins starting with 2.
+#
+# why we can't put this code inside the class definition requires going
+# down an extraordinarily deep rabit hole that I'm not sure I've fully
+# wrapped my head around.  apparently name resolution inside a class
+# definition code block is restricted to the current scope (and, obviously,
+# the global scope).  a for loop code block does not introduce a new scope,
+# but a second for loop inside that for loop does create a new scope (this
+# is the part I don't understand:  why, and how?).  therefore, the sockets
+# reference inside the generator expression raises a NameError, aparently
+# because it's inside a nested loop and that name doesn't exist there.  the
+# LHS of the assignment is fine because it's in the outmost for loop which
+# hasn't introduced a new scope.
+
+for n in range(2, 48, 2):
+	socket_module_AP88_PLCC.sockets["DIP%d" % n] = dict((i, socket_module_AP88_PLCC.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
 
 
 class socket_module_68705(socket_module):
