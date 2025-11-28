@@ -965,6 +965,10 @@ class allpro88(object):
 		# retrieve the USB device
 		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
 		if self.device is None:
+			# try falling back to ID used during development
+			self.idProduct = 0x000C
+			self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
+		if self.device is None:
 			raise ValueError("USB device not found (vid:pid = %04X:%04X)" % (self.idVendor, self.idProduct))
 
 		# firmware resets itself and the programmer.
