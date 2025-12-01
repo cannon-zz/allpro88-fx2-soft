@@ -106,6 +106,8 @@ The ALLPRO88 was reverse engineered by kevtris
 
 http://blog.kevtris.org/blogfiles/allpro88/
 
+Note that the site is http, not https, but the server will respond on the https port with an error page, so if you have the "https everywhere" feature turned on in your browser you will be blocked from accessing his documents.  If you are having trouble, check for that and try temporarily turning it off for this site.
+
 The Cypress FX2 firmware in this project was developed from a firmware template forked from
 
 https://github.com/djmuhlestein/fx2lib.git
