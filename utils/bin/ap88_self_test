@@ -40,7 +40,10 @@ import time
 from tqdm import tqdm
 import yaml
 import allpro88
-import hioki3801
+try:
+	import hioki3801
+except ImportError:
+	pass
 
 
 #
