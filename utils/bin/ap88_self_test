@@ -125,13 +125,13 @@ class power_supply_sweep(object):
 					set_vadj(vadj)
 					time.sleep(10. / 256)
 
-	def sweep(self, attr, leave_at = 0, meter = None):
+	def sweep(self, attr, meter = None):
 		# need VADJ at max to test other power supplies
 		if attr != "vadj":
 			self.programmer.vadj = 255
 		# run a DAC from 0 to 255 inclusively and measure the
 		# output voltage.  to make this process go faster, only
-		# every 5th value is measured.
+		# every 5th value is measured (includes 0 and 255)
 		ramp_x = numpy.arange(0, 256, 5)
 		ramp_y = numpy.zeros_like(ramp_x, dtype = "double")
 		for i, dac in enumerate(ramp_x):
@@ -147,10 +147,13 @@ class power_supply_sweep(object):
 				# measure the 5 second arithmetic mean
 				ramp_y[i] = meter.time_average(5.)
 				print("voltage = %g V" % ramp_y[i])
-		# leave DAC at requested value (typically 0 for safety)
-		setattr(self.programmer, attr, leave_at)
+		# leave DAC at 0 for safety.  also set VADJ DAC to 0 for
+		# safety
+		setattr(self.programmer, attr, 0)
 		if attr == "vpul":
 			self.programmer.load_dacs()
+		if attr != "vadj":
+			self.programmer.vadj = 0
 		# done
 		return ramp_x, ramp_y
 
@@ -191,7 +194,7 @@ class power_supply_sweep(object):
 		print("\ncalibrating main adjustable power supply, VADJ.\nConnect multimeter leads:\n\t+ --> DIN 1 (primary), pin A5\n\t- --> DIN 1 (primary), pin C1\nPress Enter when ready ...")
 		input()
 		# after sweep, must be left at max for other tests
-		self.vadj_ramp_x, self.vadj_ramp_y = self.sweep("vadj", leave_at = 255, meter = meter)
+		self.vadj_ramp_x, self.vadj_ramp_y = self.sweep("vadj", meter = meter)
 		self.vadj_model = numpy.polynomial.Polynomial.fit(self.vadj_ramp_x[1:-3], self.vadj_ramp_y[1:-3], 2, w = dacfitweights[self.vadj_ramp_x[1:-3]]).convert()
 		self.plot("vadj", self.vadj_ramp_x, self.vadj_ramp_y, self.vadj_model)
 		return self.vadj_ramp_x, self.vadj_ramp_y, self.vadj_model
