@@ -107,16 +107,17 @@ class power_supply_sweep(object):
 		if which:
 			raise ValueError("unrecognized power supplies: %s" % which)
 
-	def test_vadj_ramp(self):
+	def test_vadj_ramp(self, n = 3):
 		"""
-		Ramps VADJ up and down in a triangle wave pattern.
+		Ramps VADJ up and down slowly in a triangle wave pattern
+		with a period of about 20 s.
 		"""
 		with tqdm(desc = "VADJ", total = 255, mininterval = 0.) as progress:
 			def set_vadj(vadj):
 				self.programmer.vadj = progress.n = vadj
 				progress.refresh()
 
-			for i in range(3):
+			for i in range(n):
 				for vadj in range(256):
 					set_vadj(vadj)
 					time.sleep(10. / 256)
