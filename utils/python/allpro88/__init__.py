@@ -1355,9 +1355,29 @@ class allpro88(object):
 		is interpreted as a base 16 integer and its value is used
 		instead.
 		"""
+		# NOTE:  the ID register lives in the circuitry of the
+		# socket module, and as such this code might seem to be
+		# better located in the socket module implementation.
+		# however, we need to use the ID to decide what socket
+		# module is installed, so, really, retrieving the socket
+		# module ID is a function of the programmer, not the socket
+		# module.
 		socket_module_id = os.getenv("ALLPRO88_SOCKET_MODULE")
 		if socket_module_id:
 			return int(socket_module_id, 16)
+		# FIXME;  the PLCC socket module will respond with the ID
+		# value when any address in the socket module address range
+		# is read.  I'm using 0x0280 because it's what was in
+		# kevtris' notes, but do all socket modules work this way
+		# or if not what specific address are all socket modules
+		# guaranteed to respond on?  for building custom socket
+		# modules it would be nice to be able to read back data
+		# from them, for example if a higher voltage power supply
+		# is provided to handle special parts (like C1702 eproms)
+		# it would be nice to confirm its status before applying
+		# power to a chip.  so ... we can't have the ID value on
+		# every single address, we need there to be some addresses
+		# available for other things.  which ones?
 		return self.read_addr(0x0280)
 
 
