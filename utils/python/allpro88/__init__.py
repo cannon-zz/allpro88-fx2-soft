@@ -138,31 +138,31 @@ class CLKGEN_MODE(IntEnum):
 	# pin drivers.  the 6 other outputs are labelled "125KHz",
 	# "250KHz", "500KHz", "1MHz", "2MHz", and "4MHz", which are
 	# together labelled "PHASE TAPS".  the "KHz" labels are surely
-	# typographic errors, and mean "kHz".  they don't appear to be
-	# connected to anything, except the 4 MHz output which loops back to
-	# another PAL one of whose outputs provides the clock for the x273
-	# register.  my guess is something is being done to ensure the
-	# clock generator PAL's configuration bits are latched at a special
-	# point in its internal state sequence.  the lowest three data bus
-	# bits input to the timer PAL are labelled "PHSEL0", "PHSEL1" and
-	# "PHSEL2".  there are no labels on the rest.  what it *looks* like
-	# to me is the PAL is implementing a ripple counter, dividing down
-	# an input clock by factors of 2, with one of the six divided down
-	# outputs or "nothing" selected for an output phase by the three
-	# configuration bits, and the other phase output being generated as
-	# the inverse of the first.  that would suggest that 0x00 through
-	# 0x07 should be valid configurations:  6 frequencies, off, and a
-	# manually toggle option, for a total of 8 configurations.
-	# kevtris' notes say 0x07 is not valid, and none of his
-	# configurations correspond to the 125 kHz output shown on the
-	# schematic.  he says not to select 0x07 or it will damage the
+	# typographic errors, and mean "kHz".  except for the 4 MHz output,
+	# they don't appear to be connected to anything.  the 4 MHz output
+	# loops back to another PAL one of whose outputs provides the clock
+	# for the x273 register.  my guess is something is being done to
+	# ensure the clock generator PAL's configuration bits are latched
+	# at a special point in its state sequence.  the lowest three data
+	# bus bits input to the timer PAL are labelled "PHSEL0", "PHSEL1"
+	# and "PHSEL2".  there are no labels on the rest.  what it *looks*
+	# like to me is the PAL is implementing a ripple counter, dividing
+	# down an input clock by factors of 2, with one of the six divided
+	# down outputs or "nothing" selected for an output phase by the
+	# three configuration bits, and the other phase output being
+	# generated as the inverse of the first.  that would suggest that
+	# 0x00 through 0x07 should be valid configurations:  6 frequencies,
+	# off, and a manually toggle option, for a total of 8
+	# configurations.  kevtris' notes say 0x07 is not valid, and none
+	# of his configurations correspond to the 125 kHz output shown on
+	# the schematic.  he says not to select 0x07 or it will damage the
 	# circuit, but I would have guessed it enables the 125 kHz mode.
 	# it's possible his PAL chip is malfunctioning, but I've confirmed
 	# that both of my systems behave the same way.  there is no 125 kHz
 	# clock configuration.  how could any selection damage something?
 	# in mode 0x07 both phase outputs get stuck high.  the concern here
 	# is not that the clock generator circuit might be damaged but that
-	# the pin driver circuits will be.  a pin driver uses one phase to
+	# the pin driver circuits will be.  pin drivers use one phase to
 	# switch the TTL high output on and off and the other phase to
 	# switch the TTL low output on and off, so the two phases must
 	# never both be on at the same time or both TTL high and low
@@ -176,11 +176,11 @@ class CLKGEN_MODE(IntEnum):
 
 	DISABLE = 0x00		# both phases low.  pin drivers will float
 	BITBANG = 0x01		# use POLARITY to select state
-	CLK_4MHZ = 0x02
-	CLK_2MHZ = 0x03
-	CLK_1MHZ = 0x04
-	CLK_500KHZ = 0x05
-	CLK_250KHZ = 0x06
+	CLK_4MHZ = 0x02		# 4 MHz
+	CLK_2MHZ = 0x03		# 2 MHz
+	CLK_1MHZ = 0x04		# 1 MHz
+	CLK_500KHZ = 0x05	# 500 kHz
+	CLK_250KHZ = 0x06	# 250 kHz
 	CLK_125KHZ = 0x07	# not correctly implemented.  do not use!
 	POLARITY = 0x80		# 1 = phase 0 is high in BITBANG mode
 
@@ -219,9 +219,10 @@ class volt(float):
 
 class dacregister(object):
 	"""
-	Write a value to a DAC register.  Provides type conversion and
-	range checking to ensure the value written is allowed, and will
-	optionally apply a volts-to-DAC count calibration function.
+	Descriptor encapsulating control of a DAC register.  Provides type
+	conversion and range checking to ensure the value written to the
+	DAC is allowed, and will optionally apply a volts-to-DAC count
+	calibration function.
 	"""
 	def __init__(self, address = None, transient = 0.):
 		# DAC register address.  if this is None then the object to
@@ -257,12 +258,13 @@ class dacregister(object):
 
 	def calfunc(self, obj):
 		"""
-		Retrieve the calibration curve for this DAC.  The object
+		Retrieve the calibration function for this DAC.  The object
 		obj must have a dictionary named .cal containing an entry
 		whose key equals the name of this descriptor.  For example
-		an object with a dacdescriptor attribute named .vadj must
-		also have a .cal attribute contraining a dictionary with a
-		"vadj" entry providing the calibration function.
+		an object with a dacregister attribute named .vadj must
+		also have the calibration function in .cal["vadj"], i.e.,
+		have a .cal dictionary with a "vadj" entry providing the
+		calibration function.
 		"""
 		return obj.cal[self.name]
 
@@ -342,7 +344,7 @@ class dacregister(object):
 		else:
 			dac = lo
 		# can't use round() because it rounds half odd integers up
-		# but half even integers douwn.  round(1.5) == round(2.5).
+		# and half even integers douwn.  round(1.5) == round(2.5).
 		# perhaps if we extended the loop until hi-lo <= 0.25 and
 		# then used round() it would be, statistically speaking, a
 		# better inverse, but *this* algorithm, with the loop above
@@ -387,8 +389,8 @@ class channel_proxy(object):
 		self.set_cal()
 
 	config = property(fset = lambda self, config: self.programmer.write_addr(self.address, config), doc = """
-	Write only access to pin configuration register.  See PINCON for
-	values.
+	Write only access to pin configuration register.  See PINCON enum
+	for values.
 	""")
 
 	vdac = dacregister()
@@ -411,10 +413,12 @@ class channel_proxy(object):
 		supplies and DACs are calibrated at the factory to provide
 		a nominal ratio of 0.1 V per DAC count.  The pin driver
 		VDAC output circuitry includes an emitter-follower silicon
-		power transistor and a Shottky reverse protection diode,
-		which together reduce the output voltage by about 0.7 V.
-		The default calibration is, therefore, 0.1 V/count - 0.7 V
-		above a minimum of 0.19 V.
+		power transistor and a Schottky reverse protection diode,
+		which together reduce the output voltage by about 0.7 V
+		from the DAC output.  Due to grounding issues I don't yet
+		understand, the output cannot be pulled lower than a little
+		below 0.2 V.  The default calibration is, therefore, 0.1
+		V/count - 0.7 V above a minimum of 0.19 V.
 		"""
 		poly = numpy.polynomial.Polynomial(cal_data["poly"])
 		# this dictionary attribute is used by the .vdac descriptor
@@ -424,8 +428,8 @@ class channel_proxy(object):
 
 	def __bool__(self):
 		"""
-		State of this channel's comparator:  1 = voltage on pin is
-		above VTH;  0 = voltage on pin is below VTH.
+		State of this channel's comparator:  True = voltage on pin
+		is above VTH;  False = voltage on pin is below VTH.
 
 		NOTE:  with VTH and pin driver power supplies off, in
 		some units the comparator reports logic 0 while in others
@@ -441,14 +445,17 @@ class channel_proxy(object):
 		comparator outputs, and therefore must be set to at least 4
 		V for the associated digital chip to interpret a "high"
 		voltage on an input as a logic 1 state.  This is almost
-		certainly a design error, but the logic family used for the
-		8-to-1 multiplexer chip for the comparator read-back is
-		from a logic family that can tolerate high voltages on its
-		inputs, and there is sufficient current limiting resistance
-		in the circuit to protect it that VADJ can be configured
-		for any voltage without damaging the comparator read-back
-		circuits.
+		certainly a design error, it should have been pulled up to
+		+5 V, but the logic family used for the 8-to-1 multiplexer
+		chip for the comparator read-back can tolerate high
+		voltages on its inputs, and there is sufficient current
+		limiting resistance in the circuit to protect it that VADJ
+		can be configured for any voltage without damaging the
+		comparator read-back circuits.
 		"""
+		# only bit 0 of the data bus is connected to the comparator
+		# output multiplexor, the other bits will be pulled high
+		# weakly and must be disregarded.
 		return bool(self.programmer.read_addr(self.address) & 1)
 
 	def measure_v(self, n = 1):
@@ -463,21 +470,23 @@ class channel_proxy(object):
 		NOTE:  see the note in .__bool__() about the minimum VADJ
 		voltage required for reliable comparator operation.
 		"""
+		# check n before we go farther
 		n = int(n)
 		assert n > 0
+
+		# collect measurements.  NOTE:  to improve performance, we
+		# assume the calibration model is monotonic in DAC count,
+		# so that taking the median of the measured DAC counts and
+		# calibrating that to a voltage is identical to calibrating
+		# each DAC count to a voltage individually and taking the
+		# median of those.
 		measurements = []
 		for i in range(n):
-			# to improve performance, the voltage measurement
-			# bisection search is run by the firmware in the
-			# USB interface board.  that function reports the
-			# DAC count that approximates the pin voltage.
+			# the voltage measurement bisection search is run
+			# by the firmware in the USB interface board.  that
+			# function reports the DAC count that approximates
+			# the pin voltage.
 			dac, = self.programmer.write_command("M%02X" % self.channel)
-			# save.  NOTE:  to improve performance, we assume
-			# the calibration model is monotonic in DAC count,
-			# so that taking the median of the measured DAC
-			# counts and calibrating to a voltage is identical
-			# to calibrating each DAC count to a voltage and
-			# taking the median of those.
 			measurements.append(dac)
 		# choose median of measurements, convert DAC count to
 		# voltage, and report value
@@ -595,35 +604,35 @@ class flag(object):
 	"""
 	def __init__(self, socket, pin_number, active, inactive, flt = PINCON.DISABLE, default = False, pull = None):
 		"""
-		socket, pin_number = the socket and socket pin number this
-		flag is controlling.
+		socket, pin_number = the socket object and integer pin
+		number this flag is controlling.
 
-		active = the PINCON register configuration for the active
-		state.
+		active = the PINCON configuration register enum for the
+		active state.
 
-		inactive = the PINCON register configuration for the
+		inactive = the PINCON configuration register enum for the
 		inactive state.
 
-		flt = the PINCON register configuration for the floating
-		state.
+		flt = the PINCON configuration register enum for the
+		floating state.
 
-		If none of the three states is a VDAC output, the VDAC DAC
+		If none of the three states is the VDAC mode, the VDAC DAC
 		will be set to 0, otherwise it will not be modified, and
 		the calling code is expected to set it to the desired
 		value.
 
 		default = the state (True, False, or None) to set the pin
-		in at power-on.
+		to at power-on.
 
 		pull = one of "up" or "down" to add pull-up or pull-down
-		resistor, respectively, to the pin.  None (the default)
-		leaves the pin without pull-up/pull-down resistors.  the
+		resistors, respectively, to the bus, or None (the default)
+		to leave the bus without pull-up/pull-down resistors.  The
 		effect of this is to modify the active, inactive and flt
 		pin configuration bits by setting the pull-up or pull-down
-		bit to true.  this is meant to be a convenience for calling
-		code, the same effect can be achieved by simply passing the
-		appropriate pin configuration bits to the active, inactive
-		and flt parameters.
+		bit to true.  This is meant to be a convenience for calling
+		code.  The same effect can be achieved by passing the
+		appropriate bitwise-OR'ed pin configuration bits to the
+		active, inactive and flt parameters.
 		"""
 		self.socket = socket
 		self.pin_number =  pin_number
@@ -763,36 +772,16 @@ class bus_parallel(object):
 	"""
 	A collection of pins whose digital states represent an integer
 	number.  The pins can be used for output or input.  To set the
-	state of the pins, i.e., to use the bus for output, write a value
-	to the bus.  To use the bus for input, write None to the bus to
-	float the pins.  To read the state of the pins, read a value from
-	the bus.
+	state of the pins, i.e., to use the bus for output, .write() an
+	integer value to the bus.  To use the bus for input, .write() None
+	to the bus to float the pins.  To read the state of the pins,
+	.read() a value from the bus.
 
 	A bus may be any number of bits in size between 1 and 32,
-	inclusively.  Up to 8 buses may be defined and in use
-	simultaneously.  For example, a 64 bit bus must be implemented in
-	software using 2 of the 8 32 bit buses.  These are limitations of
-	the programmer interface firmware.
-
-	default sets the initial state of the bus, which will be passed to
-	.write() to perform the configuration.  If not specified, or set to
-	None, the bus is initialized to a floating state.  Note that if the
-	configured default initial state involves any pins being driven to
-	non-zero voltages, those voltages will not take effect until power
-	is applied to the socket.  Pins configured for ground potential
-	take effect immediately.
-
-	ignore_overflow disables or enables (the default) range checking on
-	values written to the bus.  Normally ValueError is raised if a
-	value that requires more bits to represent than the bus possess is
-	written to the bus, but sometimes it's convenient to ignore
-	overflows.  One example is when parts have several enable
-	lines, it can be convenient to combine them into a "bus" to simplify
-	setting them to the correct configuration:  write a specific value
-	to the bus to enable the part, but if disabling it means writing
-	the bitwise inverse of that value it's inconvenient to look up the
-	bus size and do a bitwise and to clip the bits to the bus width,
-	it's easier to just disable the bus width test.
+	inclusively.  Up to 8 buses may be defined simultaneously.  For
+	example, a 64 bit bus must be implemented in software using 2 of
+	the 8 32 bit buses.  These are limitations of the programmer
+	interface firmware.
 
 	NOTE:  see also devices.read_write_proxy to create a descriptor to
 	make calling the .read() and .write() methods of an instance of
@@ -802,21 +791,42 @@ class bus_parallel(object):
 		"""
 		programmer is the allpro88 programmer instance, and socket
 		the socket in which the part is inserted.  pin_numbers is a
-		sequence containing the pin numbers corresponding to the
-		bus' bits, least-significant bit first.  active, inactive
-		and flt are the PINCON configuration bits to use for the
-		active, inactive and floating states.  default sets the
-		initial state of the bus (default = floating).
+		sequence containing the socket pin numbers corresponding to
+		the bus' bits, least-significant bit first.  active,
+		inactive and flt are the PINCON configuration register
+		enums to use for the active, inactive and floating states.
+
+		default sets the initial state of the bus, which will be
+		passed to .write() to perform the configuration.  If not
+		specified, or set to None, the bus is initialized to a
+		floating state.  Note that if the default initial state
+		involves any pins being driven to non-zero voltages, those
+		voltages will not take effect until power is applied to the
+		socket.  Pins configured for ground potential take effect
+		immediately.
+
+		Normally ValueError is raised if a value is written to the
+		bus that requires more bits than the bus possesses.  This
+		check can be disabled by setting ignore_overflow to True.
+		For example, when parts have many enable lines, it can be
+		convenient to combine them into a "bus" to simplify setting
+		them to the correct configuration.  One specific value will
+		enable the part, while any other value will disable it.
+		Using the bitwise inverse of the "enable" value is often a
+		convenient value to use for the disabled state, but that
+		will trigger an overflow error without awkward additional
+		step to clip the bits to the bus width.  ignore_overflow
+		can be used to simplify this code.
 
 		pull = one of "up" or "down" to add pull-up or pull-down
-		resistors, respectively, to the bus.  None (the default)
-		leaves the bus without pull-up/pull-down resistors.  the
+		resistors, respectively, to the bus, or None (the default)
+		to leave the bus without pull-up/pull-down resistors.  The
 		effect of this is to modify the active, inactive and flt
 		pin configuration bits by setting the pull-up or pull-down
-		bit to true.  this is meant to be a convenience for calling
-		code, the same effect can be achieved by simply passing the
-		appropriate pin configuration bits to the active, inactive
-		and flt parameters.
+		bit to true.  This is meant to be a convenience for calling
+		code.  The same effect can be achieved by passing the
+		appropriate bitwise-OR'ed pin configuration bits to the
+		active, inactive and flt parameters.
 		"""
 		if not (1 <= len(pin_numbers) <= 32):
 			raise ValueError("bus width out of range: 1 <= %d <= 32" % len(pin_numbers))
@@ -850,7 +860,7 @@ class bus_parallel(object):
 	def channels(self):
 		"""
 		The channel_proxy instances for the pins in this bus, in
-		order.
+		order from least significant to most significant.
 		"""
 		return tuple(self.socket[pin_number] for pin_number in self.pin_numbers)
 
@@ -858,16 +868,16 @@ class bus_parallel(object):
 		"""
 		Return the integer value corresponding to the bus' pin
 		voltage comparators.  The "high"/"low" states are defined
-		by the VTH voltage, not the .inactive and .active states.
+		by the VTH voltage.
 		"""
 		word, = self.programmer.write_command("B%01XP?" % self.bus_number)
 		return word
 
 	def write(self, word):
 		"""
-		Set the pins of the bus to either .inactive or .active
-		according to the bits of the integer word.  If word is None
-		the pins are floated.
+		Set the pins of the bus to either the inactive or active
+		states according to the bits of the integer word.  If word
+		is None then all pins are set to the flt state.
 		"""
 		# float the bus if word is None
 		if word is None:
@@ -914,6 +924,10 @@ class bus_parallel_ttl(bus_parallel):
 		"""
 		programmer, socket, pin_numbers are as for the parent
 		class.
+
+		kwargs are passed to parent class, e.g., what state to use
+		for floating, whether or not to add a pull-up or pull-down
+		resistor.
 		"""
 		super(bus_parallel_ttl, self).__init__(programmer, socket, pin_numbers, active = PINCON.LOGICH, inactive = PINCON.LOGICL, flt = PINCON.DISABLE, **kwargs)
 
@@ -928,6 +942,10 @@ class bus_parallel_vdac(bus_parallel):
 		class.
 
 		vdac is the logic high voltage in volts.
+
+		kwargs are passed to parent class, e.g., what state to use
+		for floating, whether or not to add a pull-up or pull-down
+		resistor.
 		"""
 		if vdac <= 0:
 			raise ValueError(vdac)
