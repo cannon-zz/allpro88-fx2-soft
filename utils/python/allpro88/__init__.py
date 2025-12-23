@@ -268,7 +268,7 @@ class dacregister(object):
 		"""
 		return obj.cal[self.name]
 
-	def cal(self, dac, obj):
+	def cal(self, obj, dac):
 		"""
 		Convert DAC count to voltage.  .calfunc() is called on obj
 		to retrieve the calibration function, which is passed an
@@ -277,36 +277,7 @@ class dacregister(object):
 		"""
 		return self.calfunc(obj)(dac)
 
-	def __set__(self, obj, val):
-		"""
-		Set the DAC register.  If the value is a volt object, the
-		calibration function is applied to convert the voltage to
-		an integer count, which is then written to the DAC
-		register.  Otherwise, the value supplied is converted to an
-		integer, and then written to the DAC register.  In both
-		cases, before writing the integer DAC count to the register
-		it is confirmed to be in [0, 255].  If any of the
-		conversion steps or safety checks fail, an exception will
-		be raised, typically ValueError, but OverflowError and
-		others are possible depending on the nature of the failure.
-		"""
-		# if the calling code has given us a volt value, convert to
-		# DAC count
-		if type(val) is volt:
-			dac = self.invcal(val, obj)
-		else:
-			# verify int compatibility
-			dac = int(val)
-		# verify range
-		if not 0 <= dac <= 255:
-			raise ValueError("0 <= dac <= 255:  %d" % dac)
-		# address of DAC register
-		address = self.dac_address if self.dac_address is not None else obj.dac_address
-		# write the value and pause for transient
-		obj.write_addr(address, dac)
-		time.sleep(self.transient)
-
-	def invcal(self, v, obj):
+	def invcal(self, obj, v):
 		"""
 		Convert voltage to DAC count.  Uses a bisection search to
 		invert the .cal() method and returns the integer DAC count
@@ -330,7 +301,7 @@ class dacregister(object):
 		# whose slope doesn't change sign.
 		lo, hi = 0, 256
 		if v >= calfunc(255.5):
-			raise ValueError("voltage too high:  requested %g V > DAC limit of %g V" % (v, self.cal(255, obj)))
+			raise ValueError("voltage too high:  requested %g V >= DAC limit of %g V" % (v, self.cal(obj, 255.5)))
 		while hi - lo > 0.5:
 			mid = (hi + lo) / 2
 			cal = calfunc(mid)
@@ -360,6 +331,35 @@ class dacregister(object):
 		while dac > 0 and calfunc(dac - 1) == calfunc(dac):
 			dac -= 1
 		return dac
+
+	def __set__(self, obj, val):
+		"""
+		Set the DAC register.  If the value is a volt object,
+		self.invcal() converts the voltage to an integer count,
+		which is written to the DAC register.  Otherwise, the value
+		is converted to an integer, and then written to the DAC
+		register.  In both cases, before writing the integer DAC
+		count to the register it is confirmed to be in [0, 255].
+		If any of the conversion steps or safety checks fail, an
+		exception will be raised, typically ValueError, but
+		OverflowError and others are possible depending on the
+		nature of the failure.
+		"""
+		# if the calling code has given us a volt value, convert to
+		# DAC count
+		if type(val) is volt:
+			dac = self.invcal(obj, val)
+		else:
+			# verify int compatibility
+			dac = int(val)
+		# verify range
+		if not 0 <= dac <= 255:
+			raise ValueError("0 <= dac <= 255:  %d" % dac)
+		# address of DAC register
+		address = self.dac_address if self.dac_address is not None else obj.dac_address
+		# write the value and pause for transient
+		obj.write_addr(address, dac)
+		time.sleep(self.transient)
 
 
 class channel_proxy(object):
@@ -490,7 +490,7 @@ class channel_proxy(object):
 			measurements.append(dac)
 		# choose median of measurements, convert DAC count to
 		# voltage, and report value
-		return self.programmer.vth.cal(numpy.median(measurements), self.programmer)
+		return self.programmer.vth.cal(self.programmer, numpy.median(measurements))
 
 	def pulse(self, microseconds, config, final_config):
 		"""
@@ -1249,7 +1249,7 @@ class allpro88(object):
 		Quantize the voltage v to the voltage it will be reported
 		as if measured using VTH and the .measure_v() method.
 		"""
-		return self.vth.cal(self.vth.invcal(v, self), self)
+		return self.vth.cal(self, self.vth.invcal(self, v))
 
 
 	#
