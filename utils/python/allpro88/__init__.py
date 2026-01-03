@@ -33,6 +33,7 @@
 
 
 from enum import IntEnum
+import functools
 import itertools
 import logging
 import math
@@ -999,11 +1000,6 @@ class allpro88(object):
 		# initialize their pin mappings
 		self.channels = tuple(channel_proxy(self, i) for i in range(88))
 
-		# retrieve the bit map of installed channel groups and
-		# populate the tuple of installed channel drivers
-		channel_group_bit_map, = self.write_command("C")
-		self.channels_installed = tuple(channel for i, channel in enumerate(self.channels) if (1 << (i // 8)) & channel_group_bit_map)
-
 		# print status banner for logging purposes
 		logger.info("serial number:  %s" % self.serial_number)
 		logger.info("system ID:  0x%X" % self.system_id)
@@ -1366,6 +1362,18 @@ class allpro88(object):
 		return val
 
 
+	@functools.cached_property
+	def channels_installed(self):
+		"""
+		Tuple of installed channel drivers.
+		"""
+		# retrieve the bit map of installed channel groups
+		channel_group_bit_map, = self.write_command("C")
+		# populate the tuple of installed channel drivers
+		channels_installed = tuple(channel for i, channel in enumerate(self.channels) if (1 << (i // 8)) & channel_group_bit_map)
+		return channels_installed
+
+
 	def echo(self, val):
 		"""
 		Echo a 4 digit number (USB loop-back test).
@@ -1395,7 +1403,7 @@ class allpro88(object):
 	#
 
 
-	@property
+	@functools.cached_property
 	def socket_module_id(self):
 		"""
 		Returns the ID byte of the socket module installed in the
@@ -1442,7 +1450,7 @@ class allpro88(object):
 		return self.read_addr(0x0280)
 
 
-	@property
+	@functools.cached_property
 	def system_id(self):
 		# this reports the value hard-wired into the low 4 bits of
 		# the 74LS244 U9 on the ANALOGUE 1 board.
