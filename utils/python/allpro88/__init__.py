@@ -1247,13 +1247,18 @@ class allpro88(object):
 	def round_v(self, v):
 		"""
 		Quantize the voltage v to the voltage it will be reported
-		as if measured using VTH and the .measure_v() method.
+		as if measured using VTH and the channel_proxy.measure_v()
+		method.
 		"""
 		return self.vth.cal(self, self.vth.invcal(self, v))
 
 
 	#
 	# USB I/O
+	# =======
+	#
+	# Methods to send commands to and receive responses from the
+	# embedded controller.
 	#
 
 
@@ -1367,19 +1372,31 @@ class allpro88(object):
 	@property
 	def socket_module_id(self):
 		"""
-		Returns the ID of the socket module installed in the
-		programmer, or 0xff is no module is installed.  If the
-		environment variable ALLPRO88_SOCKET_MODULE is set, then it
-		is interpreted as a base 16 integer and its value is used
-		instead.
+		Returns the ID byte of the socket module installed in the
+		programmer, or 0xff is no module is installed.  See the
+		socket_modules table in the socket_module module for the
+		IDs recognized by this library.
+
+		If the environment variable ALLPRO88_SOCKET_MODULE is set,
+		then instead of probing the socket module the environment
+		variable is interpreted as a base 16 integer and its value
+		is reported as the ID byte.  For diagnostic purposes it is
+		sometimes useful to run the programmer with the socket
+		module removed, but some code will not function properly if
+		the socket module's ID byte cannot be retrieved.  The
+		environment variable provides a work-around for these
+		situations.  Do not use this feature as a general purpose
+		configuration mechanism.  Circuitry could be damaged if the
+		control software believes a different socket module is
+		installed than actually is.
 		"""
 		# NOTE:  the ID register lives in the circuitry of the
 		# socket module, and as such this code might seem to be
 		# better located in the socket module implementation.
 		# however, we need to use the ID to decide what socket
-		# module is installed, so, really, retrieving the socket
-		# module ID is a function of the programmer, not the socket
-		# module.
+		# module is installed, so retrieving the socket module ID
+		# is better thought of as a function of the programmer, not
+		# the socket module.
 		socket_module_id = os.getenv("ALLPRO88_SOCKET_MODULE")
 		if socket_module_id:
 			return int(socket_module_id, 16)
@@ -1401,25 +1418,13 @@ class allpro88(object):
 
 	@property
 	def system_id(self):
+		# this reports the value hard-wired into the low 4 bits of
+		# the 74LS244 U9 on the ANALOGUE 1 board.
+		#
 		# in the ALLPRO88 documentation some command line
-		# diagnostic tools are shown producing example output
-		# reporting a "system ID" of 0x3 and "adapter ID" of 0x11.
-		# other examples show an "analog ID" of 0x03.  the "adapter
-		# ID" definitely refers to the socket board ID.  mine is
-		# 0x11, like the examples (kevtris' is 0x81).  but where do
-		# the "system ID" and "analog ID" come from?  are they
-		# synonyms for the same number?  kevtris' documentation
-		# describes an A1STAT register (status register on the
-		# analogue 1 board), whose low nibble he says is hard-wired
-		# to report 0x3, curiously the same as both the "system ID"
-		# and "analog ID" shown in the examples in the
-		# documentation.  my unit also reports 0x3 in that nibble,
-		# and the circuit responsible for that behaviour can be
-		# seen in the schematics in the serivce manual, where there
-		# is a comment written about the value being hard-wired to
-		# 0x3.  is this the "system ID" and/or "analog ID"?  are
-		# they synonyms?  I'm guessing they are, and it is, and
-		# that's what this descriptor returns.
+		# diagnostic tools are shown reporting a "system ID" of
+		# 0x3, and other examples show an "analog ID" of 0x03.
+		# these are likely synonyms for this ID nibble.
 		#
 		# Logical Devices made other devices similar to the
 		# ALLPRO88, including an older ALLPRO that had only 4
