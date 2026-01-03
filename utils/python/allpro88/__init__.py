@@ -832,7 +832,6 @@ class bus_parallel(object):
 			raise ValueError("bus width out of range: 1 <= %d <= 32" % len(pin_numbers))
 		self.programmer = programmer
 		self.socket = socket
-		self.bus_number = self.programmer.get_unused_bus(self)
 		self.pin_numbers = tuple(pin_numbers)
 		self.max_word = (1 << len(pin_numbers)) - 1
 		self.default = default
@@ -845,6 +844,8 @@ class bus_parallel(object):
 			pull = PINCON.PULLDN
 		else:
 			raise ValueError(pull)
+		# get an unallocated bus
+		self.bus_number = self.programmer.get_unused_bus(self)
 		# send the bus definition command to the programmer
 		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active | pull, inactive | pull, flt | pull, len(pin_numbers))
 		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
