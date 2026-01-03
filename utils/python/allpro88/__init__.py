@@ -1327,17 +1327,13 @@ class allpro88(object):
 
 
 	#
-	# higher level interface
+	# Command Interface
+	# =================
 	#
-
-
-	def echo(self, val):
-		"""
-		Echo a 4 digit number (USB loop-back test).
-		"""
-		assert 0 <= val <= 0xffff
-		val, = self.write_command("E%04X" % val)
-		return val
+	# These methods export some of the embedded controller's command
+	# set.  Other portion's of the embedded controller's command set
+	# are handled by the channel_proxy and bus_parallel classes.
+	#
 
 
 	def write_addr(self, addr, val):
@@ -1367,6 +1363,35 @@ class allpro88(object):
 		val, = self.write_command("?%04X" % addr)
 		assert 0 <= val <= 0xff
 		return val
+
+
+	def echo(self, val):
+		"""
+		Echo a 4 digit number (USB loop-back test).
+		"""
+		assert 0 <= val <= 0xffff
+		val, = self.write_command("E%04X" % val)
+		return val
+
+
+	def reset(self):
+		"""
+		Reset the ALLPRO88 programmer hardware.  This has no effect
+		on the USB interface module.  For example, bus definitions
+		and so on remain valid, although without reconfiguring the
+		ALLPRO88 hardware, it's unlikely existing bus definitions
+		will behave as expected.
+		"""
+		self.write_command("R")
+
+
+	#
+	# Register Access
+	# ===============
+	#
+	# The following provide access to the programmer's controlling
+	# registers.
+	#
 
 
 	@property
@@ -1549,14 +1574,3 @@ class allpro88(object):
 		# circuit fails to prevent an overload it could be seen to
 		# be above that.
 		return vdac / 5.0
-
-
-	def reset(self):
-		"""
-		Reset the ALLPRO88 programmer hardware.  This has no effect
-		on the USB interface module.  For example, bus definitions
-		and so on remain valid, although without reconfiguring the
-		ALLPRO88 hardware, it's unlikely existing bus definitions
-		will behave as expected.
-		"""
-		self.write_command("R")
