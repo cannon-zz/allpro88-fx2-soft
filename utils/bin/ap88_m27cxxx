@@ -75,16 +75,15 @@ class m27cx_width8_pulse_ce(object):
 
 	# read/write
 
-	@classmethod
-	def read_device(cls, imgfile):
-		with allpro88.allpro88() as programmer:
-			with cls(programmer, "read") as device:
-				device.chip_enable = True
-				for device.address in tqdm(device.address_bus, desc = "Reading"):
-					device.output_enable = True
-					imgfile.write(bytearray((device.data,)))
-					device.output_enable = False
-				device.chip_enable = False
+	def read(self):
+		data = bytearray(len(self))
+		self.chip_enable = True
+		for i, self.address in enumerate(tqdm(self.address_bus, desc = "Reading")):
+			self.output_enable = True
+			data[i] = self.data
+			self.output_enable = False
+		self.chip_enable = False
+		return data
 
 	@classmethod
 	def write_device(cls, imgfile, skip_bytes = 0xff):
@@ -189,18 +188,18 @@ class m27cx_width16_pulse_ce(m27cx_width8_pulse_ce):
 	"""
 	# read/write
 
-	@classmethod
-	def read_device(cls, imgfile):
-		with allpro88.allpro88() as programmer:
-			with cls(programmer, "read") as device:
-				device.chip_enable = True
-				for device.address in tqdm(device.address_bus, desc = "Reading"):
-					device.output_enable = True
-					data = device.data
-					# write low byte then high byte
-					imgfile.write(bytearray((data & 0xff, data >> 8)))
-					device.output_enable = False
-				device.chip_enable = False
+	def read(self):
+		data = bytearray(2 * len(self))
+		self.chip_enable = True
+		for i, self.address in enumerate(tqdm(self.address_bus, desc = "Reading")):
+			self.output_enable = True
+			val =  device.data
+			# store low byte first, then high byte
+			data[2 * i + 0] = val & 0xff
+			data[2 * i + 1] = val >> 8
+			self.output_enable = False
+		self.chip_enable = False
+		return data
 
 	@classmethod
 	def write_device(cls, imgfile):
@@ -213,18 +212,18 @@ class m27cx_width16_program_enable(m27cx_width8_program_enable):
 	"""
 	# read/write
 
-	@classmethod
-	def read_device(cls, imgfile):
-		with allpro88.allpro88() as programmer:
-			with cls(programmer, "read") as device:
-				device.chip_enable = True
-				for device.address in tqdm(device.address_bus, desc = "Reading"):
-					device.output_enable = True
-					data = device.data
-					# write low byte then high byte
-					imgfile.write(bytearray((data & 0xff, data >> 8)))
-					device.output_enable = False
-				device.chip_enable = False
+	def read(self):
+		data = bytearray(2 * len(self))
+		self.chip_enable = True
+		for i, self.address in enumerate(tqdm(self.address_bus, desc = "Reading")):
+			self.output_enable = True
+			val =  device.data
+			# store low byte first, then high byte
+			data[2 * i + 0] = val & 0xff
+			data[2 * i + 1] = val >> 8
+			self.output_enable = False
+		self.chip_enable = False
+		return data
 
 	@classmethod
 	def write_device(cls, imgfile):
@@ -650,16 +649,15 @@ class tmm2365p(m27cx_width8_pulse_ce):
 
 	# read/write
 
-	@classmethod
-	def read_device(cls, imgfile, enable = 0):
-		with allpro88.allpro88() as programmer:
-			with cls(programmer, "read") as device:
-				device.chip_enable = enable
-				for device.address in tqdm(device.address_bus, desc = "Reading"):
-					device.output_enable = True
-					imgfile.write(bytearray((device.data,)))
-					device.output_enable = False
-				device.chip_enable = ~enable
+	def read(self, enable = 0):
+		data = bytearray(len(self))
+		self.chip_enable = enable
+		for i, self.address in enumerate(tqdm(self.address_bus, desc = "Reading")):
+			self.output_enable = True
+			data[i] = self.data
+			self.output_enable = False
+		self.chip_enable = ~enable
+		return data
 
 	@classmethod
 	def write_device(cls, imgfile):
@@ -708,4 +706,6 @@ smm2365 = tmm2365p
 ###
 
 
-nmc27c16q.read_device(open("dump.dat", "wb"))
+with allpro88.allpro88() as programmer:
+	with m27c256(programmer, "read") as device:
+		open("dump.dat", "wb").write(device.read())
