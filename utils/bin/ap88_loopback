@@ -22,16 +22,16 @@ from tqdm import tqdm
 import allpro88
 
 with allpro88.allpro88() as programmer:
-	for i in tqdm(range(100000), desc = "loopback test"):
+	for i in tqdm(range(150000), desc = "loopback test"):
 		snd = random.randint(0, 0xffff)
 		rcv = programmer.echo(snd)
 		assert rcv == snd
 
-	for i in tqdm(range(100000), desc = "port read speed test"):
+	for i in tqdm(range(150000), desc = "port read speed test"):
 		# device address 0x0280 is the socket board ID
 		programmer.read_addr(0x0280)
 
 	programmer.pcr_enable = True
-	for i in tqdm(range(70000), desc = "voltage read speed test"):
+	for i in tqdm(range(40000), desc = "voltage read speed test"):
 		random.choice(programmer.channels_installed).measure_v()
 	programmer.pcr_enable = False
