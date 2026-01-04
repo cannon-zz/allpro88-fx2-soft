@@ -1,3 +1,3 @@
 ACTION!="add|change", GOTO="allpro88_end"
-SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="AA88", MODE="666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1209", ATTRS{idProduct}=="aa88", MODE="666"
 LABEL="allpro88_end"
