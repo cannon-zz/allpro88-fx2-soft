@@ -61,6 +61,12 @@ class m27cx_width8_pulse_ce(object):
 		# done.  if an exception has occured, continue processing
 		return False
 
+	def __len__(self):
+		"""
+		The number of words in this part.
+		"""
+		return len(self.address_bus)
+
 	# proxy descriptors
 	address = devices.read_write_proxy("address_bus")
 	data = devices.read_write_proxy("data_bus")
