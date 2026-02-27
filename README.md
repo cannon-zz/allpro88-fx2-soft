@@ -100,6 +100,13 @@ At this time, this entire process is also accomplished using the `ap88_self_test
 
 When completed, the calibration process will write the calibration data to a file keyed to the ALLPRO88 unit (the serial number is in the filename).  Put this file into the `${prefix}/var/allpro88/` directory (where `${prefix}` is the directory selected at install time).  Alternatively, if a different directory is desired, set the `ALLPRO88_CAL_PATH` environment variable to that directory's name.  After, that calibration data should be loaded automatically by any tool using the programmer.
 
+## To Do
+
+- Make it faster.  A minipro can dump 64k words in 0.5 s.
+	- Transfer numeric values as raw binary instead of ASCII hex.
+	- Move WAKEUP pin VBUS monitoring to interrupt handler.
+	- Non-DAC write waveform can omit the 0.5 us pause
+
 ## Credit
 
 The ALLPRO88 was reverse engineered by kevtris
