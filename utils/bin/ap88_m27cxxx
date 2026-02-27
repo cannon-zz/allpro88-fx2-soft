@@ -86,15 +86,15 @@ class m27cx_width8_pulse_ce(object):
 		return data
 
 	@classmethod
-	def write_device(cls, imgfile, skip_bytes = 0xff):
+	def write_device(cls, imgfile, skip_byte = 0xff):
 		"""
 		imfile = file object from which to read bytes
 
-		skip_bytes = erased parts typically reset to 0xff, so we
+		skip_byte = erased parts typically reset to 0xff, so we
 		don't need to write these values to the part.  only 0 bits
 		are actually written to eproms. 1 bits do not change the
 		contents of the part.  an all-1's value, therefore, is a
-		no-op.  whatever value skip_bytes is set to will not be
+		no-op.  whatever value skip_byte is set to will not be
 		written to the part (default = 0xff).  set to None to
 		disable this feature.
 		"""
@@ -122,7 +122,7 @@ class m27cx_width8_pulse_ce(object):
 					byte = imgfile.read(1)
 					byte = int.from_bytes(byte, byteorder = sys.byteorder)
 					# skip no-op bytes
-					if skip_bytes is not None and byte == skip_bytes:
+					if skip_byte is not None and byte == skip_byte:
 						continue
 					# write.  repeat until read-back
 					# value matches byte
@@ -165,7 +165,8 @@ class m27cx_width8_pulse_ce(object):
 
 class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 	"""
-	M27Cx style chip, 8 bit data bus, programmed by asserting program enable pin.
+	M27Cx style chip, 8 bit data bus, programmed by asserting program
+	enable pin.
 	"""
 	# subclasses override these.  see also parent class
 	program_enable_pin = 0
@@ -178,7 +179,7 @@ class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 	program_enable = devices.read_write_proxy("program_enable_flag")
 
 	@classmethod
-	def write_device(cls, imgfile):
+	def write_device(cls, imgfile, skip_byte = 0xff):
 		raise NotImplementedError("not yet implemented for this part")
 
 
