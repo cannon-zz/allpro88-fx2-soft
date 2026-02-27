@@ -1501,7 +1501,7 @@ static void pulse(BYTE channel, WORD microseconds, BYTE config, BYTE final_confi
 {
 	WORD addr = allpro88_channel_addr(channel);
 	(microseconds);	/* silence unreference parameter warning */
-	/* measured shortest pulse duration is bout 4 us, so subtract that
+	/* measured shortest pulse duration is about 4 us, so subtract that
 	 * much off the count.  need to do this in assembly, because the
 	 * SDCC optimizer thinks microseconds is unused and removes all the
 	 * code.  the loop, below, needs microseconds to be >= 1 or it will
