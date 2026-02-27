@@ -769,20 +769,30 @@ static void scan_installed_channel_drivers(void)
  * performance).  we need to ensure enough time passes between setting VTH
  * and reading the comparator state.  what's here seems to be OK, but I've
  * not carefully tested it.  in a test that sets a pin to a random voltage,
- * measures it, and repeats as fast as possible, the 60 NOPs seem to
+ * measures it, and repeats as fast as possible, having 60 NOPs hard-coded
+ * in each iteration of the loop seemed to
  * slightly improve the magnitude of the residual over having none at all,
- * but the test seems to mostly work almost perfectly even without them,
- * which I don't understand.  I've left them in just to be safe.  obviously
- * only the first iteration would need them anyway, the second shouldn't
- * need more than 30, the third not more than 15, and so on.  that might be
- * why it appears that they aren't needed:  most bits don't require the
- * NOPs because the change in voltage is too small to need them, and for
- * those that do need the NOPs mostly it's not necessary for the voltage to
- * finish slewing to already have the correct answer on the comparator,
- * only for voltages very close to the voltage of that bit will checking
- * the comparator too soon be a problem, and maybe that's relatively rare
- * (nevertheless, failing to wait is still incorrect).  FIXME: think about
- * some kind of jump table trick to have less NOPs on each iteration.
+ * but the test seemed to work almost perfectly even without any NOPs at
+ * all, which I don't understand.  What's here, how, should meet the timing
+ * requirements, although it's not yet as fast as it could be if written by
+ * hand in assembly.
+ *
+ * The fact that with careful cycle counting it turns out only two special
+ * cases need to be handled, that the lower order bits have enough overhead
+ * in the loop that no additional NOPs are required might be why it appears
+ * no NOPs are needed at all:  most bits really don't require the NOPs
+ * because the change in voltage is too small, and for those that do need
+ * the NOPs mostly it's not necessary for the voltage to finish slewing to
+ * already have the correct answer on the comparator;  only for voltages
+ * very close to the voltage of that bit will checking the comparator too
+ * soon be a problem, and maybe that's relatively rare.  In any case,
+ * failing to wait is still incorrect.
+ *
+ * FIXME:  the number of NOPs required is close to (test_bit >> 1).
+ * if DPTR is pointed to the start of 64 NOP instructions, and (64 -
+ * (test_bit >> 1)) loaded into A then JMP @ A+DPTR will jump to the
+ * correct point in the NOP sequence, with a 7% safety margin on the
+ * timing.
  */
 
 
@@ -793,13 +803,31 @@ static BYTE allpro88_measure_pin_voltage(BYTE channel)
 	BYTE test_bit;
 	for(test_bit = 0x80; test_bit; test_bit >>= 1) {
 		allpro88_set_VTH(vdac | test_bit);
-		/* 60 NOPs = 5 us pause = 12.5 V slew delay */
-		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
-		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
-		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
-		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
-		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
-		NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+		/* function return followed by 4 POP instructions,
+		 * equivalent to 8 NOP.  each case test is a CJNE (4 NOP)
+		 * plus a SJMP (3 NOP) if it succedes, and they are
+		 * evaluated last-to-first, i.e. the 0x80 case is checked
+		 * last, and if that fails then the default is run. */
+		switch(test_bit) {
+		case 0x80:
+			/* 12.5 V slew delay = 5 us = 60 NOPs */
+			/* this code path has cost us 8 + 2 * 4 + 3 = 19
+			 * NOPs to get here so we need 41 more, 15 of which
+			 * come from falling through to the next case so we
+			 * need 26 here */
+			NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+			NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+			NOP; NOP; NOP; NOP; NOP; NOP;
+		case 0x40:
+			/* 6.25 V slew delay = 2.5 us = 30 NOPs */
+			/* this code path has cost us 8 + 4 + 3 = 15 NOPs
+			 * to get here so we need 15 more */
+			NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP; NOP;
+			NOP; NOP; NOP; NOP; NOP;
+		default:
+			/* the default case runs if the 0x80 test fails, so
+			 * this code path has cost us 16 NOPs equivalent */
+		}
 		if(allpro88_read(addr) & 1)
 			vdac |= test_bit;
 	}
