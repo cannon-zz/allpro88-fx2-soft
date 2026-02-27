@@ -514,6 +514,32 @@ class nm27c256v(m27cx_width8_pulse_ce):
 class d2764a(m27c64):
 	pass
 
+class hn482764g(m27c64):
+	# similar to 2764 but with 21 V programming voltage and 50 ms
+	# program pulse duration.  if only reading, the parts are
+	# identical.  NOTE'  the datasheet lists two programming
+	# algorithms, with different voltages and timings.  neither is
+	# currently implemented here, but the voltages here are for the
+	# standard, non-"high performance", algorithm.  the high
+	# performance algorithm increases Vcc to 6 V, reduces the program
+	# pulse to 1 ms +/- 50 us, and then after the programmed byte
+	# verifies correctly a final "over program" step writes it one more
+	# time with a >4 ms pulse.
+	voltage_maps = {
+		"read": {
+			1: 5.0,		# Vpp
+			14: 0.0,	# GND
+			28: 5.0,	# Vcc
+		},
+		# these voltage a
+		"program": {
+			1: 21.0,	# Vpp
+			14: 0.0,	# GND
+			28: 5.0,	# Vcc
+		}
+	}
+	Tpw = 50000	# program pulse width in microseconds
+
 
 class m27c1001(m27cx_width8_program_enable):
 	socket_name = "DIP32"
