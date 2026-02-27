@@ -350,6 +350,7 @@ class m27c64(m27cx_width8_program_enable):
 	chip_enable_pin = 20
 	output_enable_pin = 22
 	program_enable_pin = 27
+	# no connection = 26
 
 
 class m27c128(m27cx_width8_program_enable):
