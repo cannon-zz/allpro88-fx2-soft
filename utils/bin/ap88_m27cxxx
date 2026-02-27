@@ -150,6 +150,11 @@ class m27cx_width8_pulse_ce(object):
 					else:
 						# retries exhausted
 						raise IOError("device failed:  25 tries to write 0x%X at address 0x%X, read-back is 0x%X" % (byte, address, verify))
+				# FIXME'  now the part should be put into
+				# read mode, and the entire contents
+				# verified starting at address 0 to confirm
+				# that writing to any of the addresses
+				# hasn't corrupted data at other addresses.
 
 	def _write_verify(self, device):
 		# for internal use only.  configures the chip for read-back
