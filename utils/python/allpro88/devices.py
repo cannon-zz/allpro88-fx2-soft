@@ -234,10 +234,10 @@ class power(object):
 		else:
 			pins = None
 		for voltage_map, delay in sequence:
-			if voltage_map not in self.voltage_maps:
-				raise KeyError(voltage_map)
 			if delay < 0:
 				raise ValueError("invalid delay %g" % delay)
+			# the following also confirms that voltage_map is
+			# in self.voltage_maps
 			if pins is None:
 				pins = set(self.voltage_maps[voltage_map])
 			elif pins != set(self.voltage_maps[voltage_map]):
@@ -251,8 +251,8 @@ class power(object):
 		"""
 		Turn the power supplies on, applying power to the part.  If
 		sequence is None (the default), then use the voltages in
-		the voltage map named voltage_map, or in the voltage map
-		named "default" if a name is not given.
+		the voltage map named voltage_map, or in "default" if a
+		name is not given.
 
 		If sequence is not None, then voltage_map is ignored, and
 		sequence must be an iterable of (voltage map name, delay)
