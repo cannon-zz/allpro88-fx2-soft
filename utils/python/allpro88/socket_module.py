@@ -211,6 +211,21 @@ class socket_module_AP88_PLCC(socket_module):
 	determined by the number of channels installed in your programmer.
 	For example, a 48 channel programmer cannot use the three largest
 	PLCC sockets, but can use all the others.
+
+	The DIP and reverse DIP (RDIP) sockets of all sizes are for parts
+	inserted in the central 48 pin ZIF DIP socket.  Parts are inserted
+	as far from the handle as possible, with pin 1 at the end of the
+	part closest to the handle.  DIP sockets number pins as shown in
+	the diagrams on the socket module, with pin 1 on the right-hand
+	side of the socket.  RDIP sockets number pins flipped
+	left-to-right, i.e., with the part rotated 180 degrees about its
+	major axis, with pin 1 on the left side of the socket.
+
+	The RDIP, socket definitions are intended to simplify the use of
+	adapters that hold parts in a dead-bug orientation.  For example if
+	a chip has had its legs cut too short to be held by the ZIF socket
+	and an IC clip is used as an adapter, the natural mating
+	orientation has the IC upside down with respect to the ZIF socket.
 	"""
 	name = "AP88 PLCC"
 	# NOTE:  kevtris reports that his socket module is ID 0x81.  I
@@ -663,8 +678,9 @@ class socket_module_AP88_PLCC(socket_module):
 # for the PLCC socket module, provide socket definitions for DIP packages
 # smaller than 48 pins.  these packages get inserted into the 48 pin socket
 # according to the diagram on the socket module's case.  the drawing only
-# shows 8, 16, 20, 24, 28, 32 and 40 pin packages, but for completeness we
-# generate definitions for all even counts of pins starting with 2.
+# shows 8, 16, 20, 24, 28, 32 and 40 pin packages, and only upright, but
+# for completeness we generate definitions for all even counts of pins
+# starting with 2, and also dead-bug style, reversed, insertions.
 #
 # why we can't put this code inside the class definition requires going
 # down an extraordinarily deep rabit hole that I'm not sure I've fully
@@ -680,6 +696,7 @@ class socket_module_AP88_PLCC(socket_module):
 
 for n in range(2, 48, 2):
 	socket_module_AP88_PLCC.sockets["DIP%d" % n] = dict((i, socket_module_AP88_PLCC.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
+	socket_module_AP88_PLCC.sockets["RDIP%d" % n] = dict((i, socket_module_AP88_PLCC.sockets["DIP%d" % n][n + 1 - i]) for i in range(1, n + 1))
 
 
 class socket_module_68705(socket_module):
