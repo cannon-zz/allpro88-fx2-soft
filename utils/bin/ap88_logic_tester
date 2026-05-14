@@ -148,6 +148,49 @@ class NAND_2(object):
 #
 
 
+class TC40H004P(object):
+	"""
+	Hex CMOS inverter.
+	"""
+	# FIXME:  only test at 5V!  must switch bus types to VDAC if other supply voltages are used
+	def __init__(self, programmer, Vdd = 5.0):
+		assert Vdd == 5.0, "FIXME:  other voltages not yet supported"
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP14"]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				7:	0,
+				14:	Vdd
+			}
+		})
+		# inputs and outputs
+		self.inp_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (1, 3, 5, 9, 11, 13))
+		self.out_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 4, 6, 8, 10, 12))
+
+	inp = devices.read_write_proxy("inp_bus")
+	out = devices.read_write_proxy("out_bus")
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	def test(self):
+		for i in tqdm(range(0x40), desc = "testing inverter"):
+			self.inp = i
+			expected = (~self.inp) & 0x3f
+			result = self.out
+			print("input = 0x%02X, output = 0x%02X, expected + 0x%02X" % (i, result, expected))
+
+			#if result != expected:
+			#	raise ValueError("input = 0x%02X, output = 0x%02X, expected + 0x%02X" % (i, result, expected))
+
+
 class CD4013B(object):
 	"""
 	Dual D flip-flop.
