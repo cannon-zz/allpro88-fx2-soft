@@ -68,9 +68,9 @@ class socket_module(object):
 		#
 		# convert socket pin mapping look-up table from class
 		# attribute to instance attribute.  also convert socket pin
-		# mappings in the look-up table from integer pin number
-		# -to- integer channel mappings to integer pin number -to-
-		# channel_proxy mappings.
+		# mappings in the look-up table from mappings of integer
+		# pin number to integer channel number to mappings of
+		# integer pin number to channel_proxy object.
 		#
 
 		self.sockets = dict((name, self.get_channel_proxies(pin_mapping)) for name, pin_mapping in self.sockets.items())
@@ -106,7 +106,7 @@ class socket_module(object):
 		Given the name of a socket on this socket module and a
 		channel number, return the pin number of the given socket
 		corresponding to that channel number.  This finds use in
-		diagnostic programs where it can be helpful to report to
+		diagnostic programmes where it can be helpful to report to
 		the user which pin number a channel that is being tested
 		corresponds to so that a probe can be inserted into the
 		socket.
@@ -141,10 +141,10 @@ class socket_module_2708(socket_module):
 	# just 2708.
 	#
 	# 2708 probably refers to the TMS2708 series EPROM parts.  these
-	# require a 25 V to 27 V (26 V nominal) program pulse.  that is at
-	# the very upper end of what the ALLPRO88 can deliver to a pin.  it
-	# can drive a pin to a little over 25 V, which should meet the
-	# minimum requirements to program one of these parts, but it's
+	# require a 25 V to 27 V (26 V nominal) programme pulse.  that is
+	# at the very upper end of what the ALLPRO88 can deliver to a pin.
+	# it can drive a pin to a little over 25 V, which should meet the
+	# minimum requirements to programme one of these parts, but it's
 	# maybe not 100% reliable, and if an ALLPRO88 is even just slightly
 	# misadjusted it might not be able to get all the way to 25 V.
 	# this is probably why a custom socket module was provided for this
@@ -199,7 +199,7 @@ class socket_module_PAC1000(socket_module):
 	# pin QFP package and an 88 pin PGA package, neither of which is
 	# supported by the standard socket module.  the 100 pin version has
 	# more pins than a maxed-out ALLPRO88 has channels, but surely not
-	# all pins need to be used to program the part.
+	# all pins need to be used to programme the part.
 
 
 class socket_module_AP88_PLCC(socket_module):
@@ -660,7 +660,7 @@ class socket_module_AP88_PLCC(socket_module):
 			return
 		self.programmer.write_addr(address, 1 if enabled else 0)
 
-# for the PLCC socket modeul, provide socket definitions for DIP packages
+# for the PLCC socket module, provide socket definitions for DIP packages
 # smaller than 48 pins.  these packages get inserted into the 48 pin socket
 # according to the diagram on the socket module's case.  the drawing only
 # shows 8, 16, 20, 24, 28, 32 and 40 pin packages, but for completeness we
@@ -702,7 +702,7 @@ class socket_module_1702A(socket_module):
 	# otherwords the chips are effectively running on a 14 V supply
 	# with high and low logic levels of 14 V and 9 V, respectively.  if
 	# that's true, these roms can be dumped with the standard socket
-	# module.  a custom module is only required to program them.
+	# module.  a custom module is only required to programme them.
 	name = "1702A"
 	module_id = 0x98
 
