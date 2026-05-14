@@ -102,10 +102,11 @@ When completed, the calibration process will write the calibration data to a fil
 
 ## To Do
 
-- Make it faster.  A minipro can dump 64k words in 0.5 s.
+- Make it faster.
+	- A minipro can dump 64k words in 0.5 s.  Would require ~10x increase in I/O ops/second.
 	- Transfer numeric values as raw binary instead of ASCII hex.
 	- Move WAKEUP pin VBUS monitoring to interrupt handler.
-	- Non-DAC write waveform can omit the 0.5 us pause
+	- Non-DAC write waveform can omit the 0.5 us pause.
 
 ## Credit
 
