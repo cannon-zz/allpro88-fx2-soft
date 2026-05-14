@@ -1469,21 +1469,30 @@ class allpro88(object):
 		# remember right now.  socket modules for the older ALLPRO
 		# are compatible with the ALLPRO88, they simply mate with
 		# the one DIN connector.  the ALLPRO88's other connector
-		# (which only carries the higher-numbered channel outputs,
-		# and nothing else) is left with nothing plugged into it.
-		# my guess is that all ALLPRO-like units look exactly the
-		# same to the host PC:  a memory mapped array of registers
-		# that control the pin drivers.  they probably used the
-		# same ISA interface board for all such systems, and this
-		# ID might be how to tell which kind of unit is plugged
-		# into the computer, because there might be literally no
-		# other way to tell the difference.  if those guesses are
-		# correct, then this library and the USB interface board
-		# will work just fine with an ALLPRO (non-88), perhaps with
-		# just a few features disabled.  in that case, this library
-		# should use this system ID code to enable or disable the
-		# appropriate features.  someone with an ALLPRO (non-88)
-		# would need to do some research on that.
+		# (which only carries the higher-numbered channel outputs)
+		# is left with nothing plugged into it.  my guess is that
+		# all ALLPRO-like units look exactly the same to the host
+		# PC:  a memory mapped array of registers that control the
+		# pin drivers.  they probably used the same ISA interface
+		# board for all such systems, and this ID might be how to
+		# tell which kind of unit is plugged into the computer,
+		# because there might be literally no other way to tell the
+		# difference.  if those guesses are correct, then this
+		# library and the USB interface board will work just fine
+		# with an ALLPRO non-88, perhaps with just a few features
+		# disabled.  in that case, this library should use this
+		# system ID code to enable or disable the appropriate
+		# features.  someone with an ALLPRO non-88 would need to do
+		# some research on that.
+		#
+		# One of the service manual versions I have tracked down
+		# lists the following system ID's:
+		#
+		#	ALLPRO 88 = 0x03
+		#	ALLPRO C  = 0x02
+		#	ALLPRO B  = 0X01
+		#
+		# I don't know what the "C" and "B" variants are.
 
 		return self.read_addr(0x0300) & 0xf
 
