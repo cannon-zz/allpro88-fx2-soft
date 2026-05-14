@@ -1002,7 +1002,7 @@ class allpro88(object):
 
 		# print status banner for logging purposes
 		logger.info("serial number:  %s" % self.serial_number)
-		logger.info("system ID:  0x%X" % self.system_id)
+		logger.info("system ID:  0x%X / \"%s\"" % (self.system_id, self.system_id_str))
 
 		# configure for the installed socket module
 		try:
@@ -1484,7 +1484,16 @@ class allpro88(object):
 		# system ID code to enable or disable the appropriate
 		# features.  someone with an ALLPRO non-88 would need to do
 		# some research on that.
-		#
+
+		return self.read_addr(0x0300) & 0xf
+
+	@property
+	def system_id_str(self):
+		"""
+		Based on the value of .system_id, report a string
+		description of the programmer.  Typically used for
+		diagnostic messages.
+		"""
 		# One of the service manual versions I have tracked down
 		# lists the following system ID's:
 		#
@@ -1493,8 +1502,12 @@ class allpro88(object):
 		#	ALLPRO B  = 0X01
 		#
 		# I don't know what the "C" and "B" variants are.
-
-		return self.read_addr(0x0300) & 0xf
+		names = {
+			0x01:	"ALLPRO B",
+			0x02:	"ALLPRO C",
+			0x03:	"ALLPRO 88"
+		}
+		return names.get(self.system_id, "unknown")
 
 	pcr_enable = property(fset = lambda self, enable: self.write_addr(0x030c, PCR.ENABLE | PCR.NIDLE if enable else PCR.DISABLE), doc =
 	"""
