@@ -459,7 +459,7 @@ class channel_driver_test_suite(object):
 			# the applied VPUL voltage is obtained by adding
 			# the calibration model's diode_vf parameter to the
 			# vpul calibration model.
-			self.vpul_ramp_x[dac] = self.programmer.vpul.cal(dac, self.programmer) + diode_vf
+			self.vpul_ramp_x[dac] = self.programmer.vpul.cal(self.programmer, dac) + diode_vf
 			self.vpul_ramp_y[dac] = self.measure_v()
 
 		# disable channel
@@ -678,7 +678,7 @@ class channel_driver_test_suite(object):
 		self.channel.config = allpro88.PINCON.DISABLE
 
 		# report deviation from calibration model
-		expected = self.round_v(numpy.fromiter((self.channel.vdac.cal(x, self.channel) for x in self.vdac_ramp_x), "double"))
+		expected = self.round_v(numpy.fromiter((self.channel.vdac.cal(self.channel, x) for x in self.vdac_ramp_x), "double"))
 		max_residual = abs(self.vdac_ramp_y[1:] - expected[1:]).max()
 		rms_residual = ((self.vdac_ramp_y[1:] - expected[1:])**2.).mean()**0.5
 		# allow 1 VTH DAC count of measurement error
