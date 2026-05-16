@@ -181,14 +181,13 @@ class TC40H004P(object):
 		return False
 
 	def test(self):
-		for i in tqdm(range(0x40), desc = "testing inverter"):
+		for i in tqdm(range(len(self.inp_bus)), desc = "testing gates"):
 			self.inp = i
 			expected = (~self.inp) & 0x3f
 			result = self.out
 			print("input = 0x%02X, output = 0x%02X, expected + 0x%02X" % (i, result, expected))
-
-			#if result != expected:
-			#	raise ValueError("input = 0x%02X, output = 0x%02X, expected + 0x%02X" % (i, result, expected))
+			if result != expected:
+				print("FAIL")
 
 
 class CD4013B(object):
