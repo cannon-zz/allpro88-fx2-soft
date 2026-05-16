@@ -138,6 +138,17 @@ class NAND_2(object):
 		if v_low > 0.4 or v_high < 2.4:
 			raise ValueError("output voltages bad")
 
+	@staticmethod
+	def eval(val, input_mask, output_mask):
+		"""
+		Compute NAND evaluated for the bits of val selected using
+		input_mask.  The single-bit result is returned as the bit
+		defined by output_mask.  NOTE:  output_mask is not checked
+		to confirm that it is a single bit value.
+		"""
+		return output_mask if (val & input_mask != input_mask) else 0
+
+
 
 #
 # =============================================================================
@@ -223,6 +234,48 @@ class CD4013B(object):
 		for i, flip_flop in enumerate(self.flip_flops, 1):
 			print("testing flip flop %d" % i)
 			flip_flop.test()
+
+
+class HD14093BP(object):
+	"""
+	Quad 2-input NAND with Schmitt trigger inputs.
+	"""
+	def __init__(self, programmer, Vdd = 5.0):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets["DIP14"]
+		# power pins
+		self.power = devices.power(self.programmer, self.socket, {
+			"default": {
+				7:	0,
+				14:	Vdd
+			}
+		}, vth = 4.0)
+		# inputs and outputs
+		self.inp_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (1, 2, 5, 6, 8, 9, 12, 13))
+		self.out_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (3, 4, 10, 11))
+
+	inp = devices.read_write_proxy("inp_bus")
+	out = devices.read_write_proxy("out_bus")
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		# done.  if an exception has occured, continue processing
+		return False
+
+	def test(self):
+		for i in tqdm(range(len(self.inp_bus)), desc = "testing gates"):
+			self.inp = i
+			result = self.out
+			expected = 0
+			for input_mask, output_mask in ((0x3, 0x1), (0xc, 0x2), (0x30, 0x4), (0xc0, 0x8)):
+				expected |= NAND_2.eval(i, input_mask, output_mask)
+			print("input = 0x%02X, output = 0x%01X, expected + 0x%01X" % (i, result, expected))
+			if result != expected:
+				print("FAIL")
 
 
 class SN7400(object):
