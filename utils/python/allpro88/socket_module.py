@@ -122,13 +122,91 @@ class socket_module(object):
 
 
 class socket_module_DIP_MODULE(socket_module):
+	"""
+	I believe this is the 40 pin DIP only socket module with the single
+	96 pin DIN connector that shipped with the earlier programmers,
+	preceding the ALLPRO88.  If so, this should be compatible with the
+	PLCC socket module, being equivalent to the first 40 channels of
+	the 48 pin DIP socket.  What's here is based on those guesses, but
+	I HAVE NOT CHECKED.
+
+	NOTE:  if you have one of these socket modules, CHECK THIS CODE FOR
+	CORRECTNESS BEFORE USING IT.  And please let me know either way so
+	I can remove this warning or fix the code.
+
+	The DIP and reverse DIP (RDIP) sockets of all sizes are for parts
+	inserted in the central ZIF DIP socket.  Parts are inserted as far
+	from the handle as possible, with pin 1 at the end of the part
+	closest to the handle.  DIP sockets number pins as shown in the
+	diagrams on the socket module, with pin 1 on the right-hand side of
+	the socket, increasing counter-clockwise.  RDIP sockets number pins
+	flipped left-to-right, i.e., with the part rotated 180 degrees
+	about its major axis, with pin 1 on the left side of the socket
+	increasing clockwise.
+
+	The RDIP socket definitions are intended to simplify the use of
+	adapters that hold parts in a dead-bug orientation.  For example if
+	a chip has had its legs cut too short to be held by the ZIF socket
+	and an IC clip inserted into the ZIF socket is used as an adapter,
+	the natural mating orientation has the IC upside down with respect
+	to the ZIF socket.
+	"""
 	name = "DIP MODULE"
 	module_id = 0x02
-	# I suspect this means the 40 pin DIP only socket module with the
-	# single 96 pin DIN connector that shipped with the earlier
-	# programmer, preceding the ALLPRO88.  if so, this should be
-	# exactly compatible with the PLCC socket module, being equivalent
-	# to the upper 40 pins of the 48 pin DIP socket.
+		# PIN NUMBER	CHANNEL NUMBER
+	sockets = {
+		# 40 pin DIP socket
+		"DIP40": {
+			1:	40,
+			2:	41,
+			3:	42,
+			4:	43,
+			5:	32,
+			6:	33,
+			7:	34,
+			8:	35,
+			9:	24,
+			10:	25,
+			11:	26,
+			12:	27,
+			13:	16,
+			14:	17,
+			15:	18,
+			16:	19,
+			17:	8,
+			18:	9,
+			19:	10,
+			20:	11,
+			21:	0,
+			22:	1,
+			23:	2,
+			24:	3,
+			25:	4,
+			26:	5,
+			27:	6,
+			28:	7,
+			29:	12,
+			30:	13,
+			31:	14,
+			32:	15,
+			33:	20,
+			34:	21,
+			35:	22,
+			36:	23,
+			37:	28,
+			38:	29,
+			39:	30,
+			40:	31
+		}
+	}
+
+	def set_bypass(self, channel, enabled):
+		# bypass capacitor is turned on and off with bit 0.  raise
+		# ValueError if the channel number is out of range.
+		if not 0 <= channel < 40:
+			raise ValueError(channel)
+		address = 0x0280 + channel
+		self.programmer.write_addr(address, 1 if enabled else 0)
 
 
 class socket_module_2708(socket_module):
@@ -213,19 +291,21 @@ class socket_module_AP88_PLCC(socket_module):
 	PLCC sockets, but can use all the others.
 
 	The DIP and reverse DIP (RDIP) sockets of all sizes are for parts
-	inserted in the central 48 pin ZIF DIP socket.  Parts are inserted
-	as far from the handle as possible, with pin 1 at the end of the
-	part closest to the handle.  DIP sockets number pins as shown in
-	the diagrams on the socket module, with pin 1 on the right-hand
-	side of the socket.  RDIP sockets number pins flipped
-	left-to-right, i.e., with the part rotated 180 degrees about its
-	major axis, with pin 1 on the left side of the socket.
+	inserted in the central ZIF DIP socket.  Parts are inserted as far
+	from the handle as possible, with pin 1 at the end of the part
+	closest to the handle.  DIP sockets number pins as shown in the
+	diagrams on the socket module, with pin 1 on the right-hand side of
+	the socket, increasing counter-clockwise.  RDIP sockets number pins
+	flipped left-to-right, i.e., with the part rotated 180 degrees
+	about its major axis, with pin 1 on the left side of the socket
+	increasing clockwise.
 
-	The RDIP, socket definitions are intended to simplify the use of
+	The RDIP socket definitions are intended to simplify the use of
 	adapters that hold parts in a dead-bug orientation.  For example if
 	a chip has had its legs cut too short to be held by the ZIF socket
-	and an IC clip is used as an adapter, the natural mating
-	orientation has the IC upside down with respect to the ZIF socket.
+	and an IC clip inserted into the ZIF socket is used as an adapter,
+	the natural mating orientation has the IC upside down with respect
+	to the ZIF socket.
 	"""
 	name = "AP88 PLCC"
 	# NOTE:  kevtris reports that his socket module is ID 0x81.  I
@@ -675,28 +755,31 @@ class socket_module_AP88_PLCC(socket_module):
 			return
 		self.programmer.write_addr(address, 1 if enabled else 0)
 
-# for the PLCC socket module, provide socket definitions for DIP packages
-# smaller than 48 pins.  these packages get inserted into the 48 pin socket
-# according to the diagram on the socket module's case.  the drawing only
-# shows 8, 16, 20, 24, 28, 32 and 40 pin packages, and only upright, but
-# for completeness we generate definitions for all even counts of pins
-# starting with 2, and also dead-bug style, reversed, insertions.
+# for the DIP and PLCC socket modules, provide socket definitions for DIP
+# packages smaller than ZIF DIP socket size.  these packages get inserted
+# into the ZIF DIP socket according to the diagram on the socket module's
+# case.  the drawing only shows a few package sizes, and only inserted
+# upright, but for completeness we generate definitions for all even counts
+# of pins starting with 2, and also dead-bug style, reversed, insertions.
 #
 # why we can't put this code inside the class definition requires going
 # down an extraordinarily deep rabit hole that I'm not sure I've fully
 # wrapped my head around.  apparently name resolution inside a class
-# definition code block is restricted to the current scope (and, obviously,
-# the global scope).  a for loop code block does not introduce a new scope,
-# but a second for loop inside that for loop does create a new scope (this
-# is the part I don't understand:  why, and how?).  therefore, the sockets
-# reference inside the generator expression raises a NameError, aparently
-# because it's inside a nested loop and that name doesn't exist there.  the
-# LHS of the assignment is fine because it's in the outmost for loop which
-# hasn't introduced a new scope.
+# definition code block is restricted to the current scope (and the global
+# scope).  a for loop code block does not introduce a new scope, but a
+# second for loop inside that for loop does create a new scope (this is the
+# part I don't understand:  how, and why the asymmetry?).  therefore, the
+# sockets reference inside the generator expression raises a NameError,
+# aparently because it's inside a nested loop and that name doesn't exist
+# there.  the LHS of the assignment is fine because it's in the outmost for
+# loop which hasn't introduced a new scope.
 
 for n in range(2, 48, 2):
 	socket_module_AP88_PLCC.sockets["DIP%d" % n] = dict((i, socket_module_AP88_PLCC.sockets["DIP48"][24 - n // 2 + i]) for i in range(1, n + 1))
 	socket_module_AP88_PLCC.sockets["RDIP%d" % n] = dict((i, socket_module_AP88_PLCC.sockets["DIP%d" % n][n + 1 - i]) for i in range(1, n + 1))
+	if n < 40:
+		socket_module_DIP_MODULE.sockets["DIP%d" % n] = dict((i, socket_module_DIP_MODULE.sockets["DIP40"][20 - n // 2 + i]) for i in range(1, n + 1))
+		socket_module_DIP_MODULE.sockets["RDIP%d" % n] = dict((i, socket_module_DIP_MODULE.sockets["DIP%d" % n][n + 1 - i]) for i in range(1, n + 1))
 
 
 class socket_module_68705(socket_module):
