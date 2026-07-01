@@ -36,8 +36,11 @@ class m27cx_width8_pulse_ce(object):
 	output_enable_pin = 0
 	Tpw = 100	# program pulse width in microseconds
 	Vadj = "auto"
+	compatible_socket_modules = ("AP88 PLCC", "DIP MODULE")
 
 	def __init__(self, programmer, mode):
+		if programmer.socket_module.name not in self.compatible_socket_modules:
+			raise ValueError("socket module must be one of %s" % ", ".join(map("\"%s\"".__mod__, sorted(self.compatible_socket_modules))))
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
 		if mode not in self.voltage_maps:
