@@ -1388,7 +1388,7 @@ class allpro88(object):
 		Reset the ALLPRO88 programmer hardware.  This has no effect
 		on the USB interface module.  For example, bus definitions
 		and so on remain valid, although without reconfiguring the
-		ALLPRO88 hardware, it's unlikely existing bus definitions
+		ALLPRO88 hardware it's unlikely existing bus definitions
 		will behave as expected.
 		"""
 		self.write_command("R")
@@ -1425,28 +1425,30 @@ class allpro88(object):
 		installed than actually is.
 		"""
 		# NOTE:  the ID register lives in the circuitry of the
-		# socket module, and as such this code might seem to be
-		# better located in the socket module implementation.
-		# however, we need to use the ID to decide what socket
-		# module is installed, so retrieving the socket module ID
-		# is better thought of as a function of the programmer, not
-		# the socket module.
+		# socket module, however we need to use the ID to decide
+		# what socket module is installed, so retrieving the socket
+		# module ID is better thought of as a function of the
+		# programmer, which is why this code is here and not part
+		# of the socket_module code.
 		socket_module_id = os.getenv("ALLPRO88_SOCKET_MODULE")
 		if socket_module_id:
 			return int(socket_module_id, 16)
-		# FIXME;  the PLCC socket module will respond with the ID
-		# value when any address in the socket module address range
-		# is read.  I'm using 0x0280 because it's what was in
-		# kevtris' notes, but do all socket modules work this way
-		# or if not what specific address are all socket modules
-		# guaranteed to respond on?  for building custom socket
-		# modules it would be nice to be able to read back data
-		# from them, for example if a higher voltage power supply
-		# is provided to handle special parts (like C1702 eproms)
-		# it would be nice to confirm its status before applying
-		# power to a chip.  so ... we can't have the ID value on
-		# every single address, we need there to be some addresses
-		# available for other things.  which ones?
+		# FIXME:  addresses 0x0280 through 0x02ff inclusively
+		# comprise an I/O window reserved for use by the socket
+		# module.  the PLCC socket module will respond with the ID
+		# byte when any address in that range is read.  I'm using
+		# 0x0280 because it's what was in kevtris' notes, but for
+		# the PLCC module, at least, any address in the socket
+		# module space could be used.  I'm sure the PLCC module's
+		# behaviour is just for simplicity, and there is a specific
+		# adddress where the ID byte is required to reside, but I
+		# don't know what it is.  some modules contain additional
+		# power supplies to provide voltages outside the limits of
+		# the programmer's own supplies, and for those modules
+		# there must be ways to confirm voltage levels by reading
+		# from status registers.  I tried reverse-compiling an
+		# ALLPRO88 DOS program so see if I could see where it
+		# reads the socket module ID byte from, but gave up.
 		return self.read_addr(0x0280)
 
 
@@ -1475,8 +1477,8 @@ class allpro88(object):
 		# PC:  a memory mapped array of registers that control the
 		# pin drivers.  they probably used the same ISA interface
 		# board for all such systems, and this ID might be how to
-		# tell which kind of unit is plugged into the computer,
-		# because there might be literally no other way to tell the
+		# tell which kind of unit is plugged into the computer.
+		# there might be literally no other way to tell the
 		# difference.  if those guesses are correct, then this
 		# library and the USB interface board will work just fine
 		# with an ALLPRO non-88, perhaps with just a few features
