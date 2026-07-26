@@ -1676,7 +1676,7 @@ inline static BOOL in_buffer_not_full(void)
  */
 
 
-static BOOL do_command(void)
+inline static BOOL do_command(void)
 {
 	errno = FALSE;
 	switch(XAUTODAT1) {
