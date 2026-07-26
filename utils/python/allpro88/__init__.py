@@ -1546,8 +1546,14 @@ class allpro88(object):
 		This method triggers the output latch clock signal.
 		Calling this method causes the VPUL DAC and all per-pin
 		VDAC DACs to set their outputs to their most recently
-		latched input value.  NOTE:  until this method is called,
-		there will be no change in the outputs of those DACs.
+		latched input value.
+
+		NOTE:  until this method is called, there will be no change
+		in the outputs of those DACs.
+
+		NOTE:  all DACs are updated, so be certain that they all
+		are set to safe values.  The hardware reset command sets
+		all DACs to 0.
 		"""
 		self.write_addr(0x0308, 0)
 		# wait for transient response
