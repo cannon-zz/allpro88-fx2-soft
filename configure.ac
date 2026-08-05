@@ -20,6 +20,7 @@ AC_CONFIG_FILES([\
 	utils/python/Makefile \
 	utils/python/allpro88/Makefile \
 	utils/python/allpro88/paths.py \
+	utils/share/Makefile \
 ])
 
 

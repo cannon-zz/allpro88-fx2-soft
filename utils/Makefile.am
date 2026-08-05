@@ -1,1 +1,1 @@
-SUBDIRS = bin python
+SUBDIRS = bin python share
