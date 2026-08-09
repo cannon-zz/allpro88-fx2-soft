@@ -363,6 +363,44 @@ class m27c64(m27cx_width8_program_enable):
 	program_enable_pin = 27
 	# no connection = 26
 
+	def read_id(self):
+		# FIXME:  somehow this should work for most parts, not just
+		# m27c64.  figure how how to generic-ify it and move it to
+		# a base class
+		if self.mode != "read":
+			raise ValueError("mode is \"%s\";  must be in \"read\" mode to read ID" % self.mode)
+		# float the address bus:  we need to control the pins ourselves
+		self.address = None
+		# set A9 to 12.0 V
+		self.socket[self.address_bus_pins[9]].vdac = allpro88.volt(12.0)
+		self.programmer.load_dacs()
+		self.socket[self.address_bus_pins[9]].config = allpro88.PINCON.VDAC
+		# set the select pins
+		device.program_enable = False
+		device.chip_enable = True
+		device.output_enable = True
+		# A0:
+		#	low:	data = manuf
+		#	high:	data = dev.
+		self.socket[self.address_bus_pins[0]].config = allpro88.PINCON.LOGICL
+		manufacturer_id = self.data
+		self.socket[self.address_bus_pins[0]].config = allpro88.PINCON.LOGICH
+		device_id = self.data
+		# set the select pins
+		device.program_enable = False
+		device.chip_enable = False
+		device.output_enable = False
+		# restore address bus config.  FIXME:  this assumes the bus
+		# uses TTL output modes.  if the bus uses VDAC for non-5V
+		# parts then this will screw up the bus.  maybe should
+		# get the controller to reinitialize the bus.
+		self.socket[self.address_bus_pins[0]].config = allpro88.PINCON.DISABLE
+		self.socket[self.address_bus_pins[9]].config = allpro88.PINCON.DISABLE
+		self.socket[self.address_bus_pins[9]].vdac = 0
+		self.programmer.load_dacs()
+		# done
+		return manufacturer_id, device_id
+
 
 class m27c128(m27cx_width8_program_enable):
 	# datasheet for M27128A-2F1
