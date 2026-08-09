@@ -1,4 +1,4 @@
-# Copyright (C) 2022-2025  Kipp Cannon
+# Copyright (C) 2022-2026  Kipp Cannon
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -116,7 +116,7 @@ class power:
 				if volt < 0:
 					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
 		self.voltage_maps = voltage_maps
-		self.active_voltage_map = None
+		self.active_voltage_map_name = None
 		self.vth = allpro88.volt(vth) if vth else 0
 		if vadj == "auto":
 			# whichever is larger:  4 V or the highest
@@ -126,6 +126,10 @@ class power:
 			self.vadj = allpro88.volt(max(4., self.max() + 2.))
 		else:
 			self.vadj = allpro88.volt(vadj)
+
+	@property
+	def active_voltage_map(self):
+		return None if self.active_voltage_map_name is None else self.voltage_maps[self.active_voltage_map_name]
 
 	def max(self):
 		"""
@@ -147,11 +151,11 @@ class power:
 		"""
 		self.programmer.vth = self.vth
 
-	def set_voltage_map(self, voltage_map):
+	def set_voltage_map(self, voltage_map_name):
 		"""
 		Switch the voltages on the socket's pins to those in
-		voltage_map, the name of one of the pin number-to-voltage
-		mappings provided at initialization time.
+		voltage_map_name, the name of one of the pin
+		number-to-voltage mappings provided at initialization time.
 
 		The pin number-to-voltage mappings are not required to all
 		name the same pin numbers, but for safety reasons this
@@ -171,20 +175,22 @@ class power:
 		ground potential, but this configuration is done
 		pin-by-pin, before the voltage DACs are changed.
 		"""
+		# check for invalid name
+		voltage_map = self.voltage_maps[voltage_map_name]
 		# confirm that we are not leaving any already configured
 		# pins dangling.  whatever pins we are currently
 		# controlling, we must continue to control
-		new_voltage_map = self.voltage_maps[voltage_map]
-		if self.active_voltage_map is not None:
+		if self.active_voltage_map_name is not None:
 			current_pins = set(self.active_voltage_map)
 			new_pins = set(new_voltage_map)
 			if not new_pins >= current_pins:
-				raise ValueError("cannot reduce set of configured pins:  %s --> %s" % (str(current_pins), str(new_pins)))
+				raise ValueError("cannot switch from \"%s\" to \"%s\":  cannot reduce set of configured pins:  %s --> %s" % (self.active_voltage_map_name, voltage_map_name, str(current_pins), str(new_pins)))
 
 		# switch to new voltage map.  configure pins and the VPUL
 		# dac.
-		self.active_voltage_map = new_voltage_map
-		for pin, voltage in self.active_voltage_map.items():
+		self.active_voltage_map_name = voltage_map_name
+		assert voltage_map == self.active_voltage_map
+		for pin, voltage in voltage_map.items():
 			if pin == "VPUL":
 				self.programmer.vpul = allpro88.volt(voltage) if voltage else 0
 			else:
@@ -202,7 +208,7 @@ class power:
 					pin.vdac = 0
 		# if VPUL was not explicitly set in the voltage map,
 		# default to 0 V.
-		if "VPUL" not in self.active_voltage_map:
+		if "VPUL" not in voltage_map:
 			self.programmer.vpul = 0
 		# clock the VPUL and pin driver dacs
 		self.programmer.load_dacs()
@@ -229,7 +235,7 @@ class power:
 		# delays are sensible, and all voltage maps in the sequence
 		# configure the same pins.  we don't want to crash during
 		# the sequence
-		if self.active_voltage_map is not None:
+		if self.active_voltage_map_name is not None:
 			pins = set(self.active_voltage_map)
 		else:
 			pins = None
@@ -294,7 +300,7 @@ class power:
 		"""
 		# set VPUL and pin dacs to 0
 		self.programmer.vpul = 0
-		if self.active_voltage_map is not None:
+		if self.active_voltage_map_name is not None:
 			for pin in self.active_voltage_map:
 				if pin != "VPUL":
 					self.socket[pin].vdac = 0
@@ -303,14 +309,14 @@ class power:
 		self.programmer.load_dacs()
 		# now that power has been removed, it is safe to disable
 		# pins
-		if self.active_voltage_map is not None:
+		if self.active_voltage_map_name is not None:
 			for pin in self.active_voltage_map:
 				if pin != "VPUL":
 					pin = self.socket[pin]
 					pin.bypass = False
 					pin.config = allpro88.PINCON.DISABLE
 		# no active voltage map
-		self.active_voltage_map = None
+		self.active_voltage_map_name = None
 		# set main dacs to 0
 		self.programmer.vadj = 0
 		self.programmer.vth = 0
