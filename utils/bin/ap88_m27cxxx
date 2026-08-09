@@ -38,14 +38,14 @@ class m27cx_width8_pulse_ce:
 	Vadj = "auto"
 	compatible_socket_modules = ("AP88 PLCC", "DIP MODULE")
 
-	def __init__(self, programmer, mode):
+	def __init__(self, programmer, default_mode = "read"):
 		if programmer.socket_module.name not in self.compatible_socket_modules:
 			raise ValueError("socket module must be one of %s" % ", ".join(map("\"%s\"".__mod__, sorted(self.compatible_socket_modules))))
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
-		if mode not in self.voltage_maps:
-			raise ValueError("unknown mode \"%s\"" % mode)
-		self.mode = mode
+		if default_mode not in self.voltage_maps:
+			raise ValueError("unknown default_mode \"%s\"" % default_mode)
+		self.default_mode = default_mode
 		# power pins
 		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj)
 		# address and data buses
@@ -56,7 +56,7 @@ class m27cx_width8_pulse_ce:
 		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.output_enable_pin)
 
 	def __enter__(self):
-		self.power.on(self.mode)
+		self.power.on(self.default_mode)
 		return self
 
 	def __exit__(self, exc_type, exc_val, exc_tb):
@@ -75,6 +75,14 @@ class m27cx_width8_pulse_ce:
 	data = devices.read_write_proxy("data_bus")
 	chip_enable = devices.read_write_proxy("chip_enable_flag")
 	output_enable = devices.read_write_proxy("output_enable_flag")
+
+	@property
+	def mode(self):
+		return self.power.active_voltage_map_name
+
+	@mode.setter
+	def mode(self, new_mode_name):
+		self.power.set_voltage_map(new_mode_name)
 
 	# read/write
 
@@ -179,8 +187,8 @@ class m27cx_width8_program_enable(m27cx_width8_pulse_ce):
 	# subclasses override these.  see also parent class
 	program_enable_pin = 0
 
-	def __init__(self, programmer, mode):
-		super(m27cx_width8_program_enable, self).__init__(programmer, mode)
+	def __init__(self, programmer, default_mode = "read"):
+		super(m27cx_width8_program_enable, self).__init__(programmer, default_mode = default_mode)
 		self.program_enable_flag = allpro88.flag_ttl_active_low(self.socket, self.program_enable_pin)
 
 	# proxy descriptors.  see also parent class
@@ -452,8 +460,8 @@ class msm538002e(m27cx_width16_pulse_ce):
 	address_bus_pins = (10, 9, 8, 7, 6, 5, 4, 3, 41, 40, 39, 38, 37, 36, 35, 34, 33, 2, 1)
 	data_bus_pins = (14, 16, 18, 20, 23, 25, 27, 29, 15, 17, 19, 21, 24, 26, 28, 30)
 
-	def __init__(self, programmer, mode):
-		super(m27cx_width16_pulse_ce, self).__init__(programmer, mode)
+	def __init__(self, programmer, default_mode = "read"):
+		super(m27cx_width16_pulse_ce, self).__init__(programmer, default_mode = default_mode)
 		# .byte_mode_flag's default is set to False (logic high).
 		# this is the default default for the active low flag
 		# class, but we write it explicitly here just to be clear
@@ -665,12 +673,12 @@ class tmm2365p(m27cx_width8_pulse_ce):
 	output_enable_pin = 22
 
 
-	def __init__(self, programmer, mode):
+	def __init__(self, programmer, default_mode = "read"):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
-		if mode not in self.voltage_maps:
-			raise ValueError("unknown mode \"%s\"" % mode)
-		self.mode = mode
+		if default_mode not in self.voltage_maps:
+			raise ValueError("unknown default_mode \"%s\"" % default_mode)
+		self.default_mode = default_mode
 		# power pins
 		self.power = devices.power(self.programmer, self.socket, self.voltage_maps, vadj = self.Vadj)
 		# address and data buses
