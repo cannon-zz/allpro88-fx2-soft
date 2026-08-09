@@ -31,7 +31,7 @@ import allpro88
 from allpro88 import devices
 
 
-class intel_d87c51(object):
+class intel_d87c51:
 	"""
 	8051 type microcontroller with integrated UV EPROM.
 	"""

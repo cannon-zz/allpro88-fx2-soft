@@ -37,7 +37,7 @@
 #
 
 
-class socket_module(object):
+class socket_module:
 	#
 	# subclasses over-ride these
 	#

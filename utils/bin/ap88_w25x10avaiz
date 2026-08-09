@@ -21,7 +21,7 @@ from tqdm import tqdm
 import allpro88
 from allpro88 import devices
 
-class w25x10avaiz(object):
+class w25x10avaiz:
 	def __init__(self, programmer):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets["DIP8"]

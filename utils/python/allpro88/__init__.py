@@ -218,7 +218,7 @@ class volt(float):
 	pass
 
 
-class dacregister(object):
+class dacregister:
 	"""
 	Descriptor encapsulating control of a DAC register.  Provides type
 	conversion and range checking to ensure the value written to the
@@ -363,7 +363,7 @@ class dacregister(object):
 		time.sleep(self.transient)
 
 
-class channel_proxy(object):
+class channel_proxy:
 	"""
 	An interface to the capabilities of a single pin driver channel.
 	Features include setting the configuration of the pin, measuring
@@ -581,7 +581,7 @@ class channel_proxy(object):
 #
 
 
-class flag(object):
+class flag:
 	"""
 	A tri-state logic interface on one of a socket's pins, with default
 	initial value.  The pin can be used for output or input.  To set
@@ -763,7 +763,7 @@ class flag_vdac_active_low(flag):
 		return not super(flag_vdac_active_low, self).read()
 
 
-class bus_parallel(object):
+class bus_parallel:
 	"""
 	A collection of pins whose digital states represent an integer
 	number.  The pins can be used for output or input.  To set the
@@ -959,7 +959,7 @@ class bus_parallel_vdac(bus_parallel):
 #
 
 
-class allpro88(object):
+class allpro88:
 	#
 	# USB information
 	#

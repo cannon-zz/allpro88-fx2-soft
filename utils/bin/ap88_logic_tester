@@ -34,7 +34,7 @@ from allpro88 import devices
 #
 
 
-class D_flip_flop(object):
+class D_flip_flop:
 	# FIXME:  this is hard-coded for TTL I/O
 	def __init__(self, programmer, socket, D_pin, clk_pin, S_pin, R_pin, Q_pin, Qbar_pin):
 		self.programmer = programmer
@@ -105,7 +105,7 @@ class D_flip_flop(object):
 			previous = False
 
 
-class NAND_2(object):
+class NAND_2:
 	# FIXME:  this is hard-coded for TTL I/O
 	def __init__(self, programmer, socket, in_pins, out_pin):
 		self.programmer = programmer
@@ -159,7 +159,7 @@ class NAND_2(object):
 #
 
 
-class TC40H004P(object):
+class TC40H004P:
 	"""
 	Hex CMOS inverter.
 	"""
@@ -201,7 +201,7 @@ class TC40H004P(object):
 				print("FAIL")
 
 
-class CD4013B(object):
+class CD4013B:
 	"""
 	Dual D flip-flop.
 	"""
@@ -236,7 +236,7 @@ class CD4013B(object):
 			flip_flop.test()
 
 
-class HD14093BP(object):
+class HD14093BP:
 	"""
 	Quad 2-input NAND with Schmitt trigger inputs.
 	"""
@@ -278,7 +278,7 @@ class HD14093BP(object):
 				print("FAIL")
 
 
-class SN7400(object):
+class SN7400:
 	"""
 	Quad 2-input NAND
 	"""
@@ -315,7 +315,7 @@ class SN7400(object):
 			gate.test()
 
 
-class SN74244(object):
+class SN74244:
 	"""
 	Octal line driver
 	"""
@@ -395,7 +395,7 @@ class SN74244(object):
 		print("lowest high output = %.3g V, highest low output = %.3g V" % (lowest_hi, highest_lo))
 
 
-class SN74245(object):
+class SN74245:
 	"""
 	Octal bus transciever
 	"""
@@ -469,7 +469,7 @@ class SN74245(object):
 					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts_out)))
 
 
-class SN74273(object):
+class SN74273:
 	"""
 	Octal D-type latch.
 	"""

@@ -59,7 +59,7 @@ except ImportError:
 dacfitweights = numpy.fromfunction(numpy.polynomial.Polynomial((1., -2. / 255, +2. / 255**2)), (256,))
 
 
-class power_supply_sweep(object):
+class power_supply_sweep:
 	"""
 	Notes on power supply behaviour
 
@@ -240,7 +240,7 @@ class power_supply_sweep(object):
 		return self.vtst_ramp_x, self.vtst_ramp_y, self.vtst_model
 
 
-class channel_driver_test_suite(object):
+class channel_driver_test_suite:
 	"""
 	Run a series of tests on a single pin driver channel, and collect
 	the results for reporting.  Also, provide the utilities to perform

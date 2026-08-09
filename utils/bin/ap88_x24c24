@@ -21,7 +21,7 @@ from tqdm import tqdm
 import allpro88
 from allpro88 import devices
 
-class x24c24(object):
+class x24c24:
 	"""
 	256 bit non-volatile RAM organized as 16 words of 16 bits with a
 	serial interface.  the part is both a RAM device and an EEPROM

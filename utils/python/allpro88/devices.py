@@ -29,7 +29,7 @@ import allpro88
 #
 
 
-class power(object):
+class power:
 	"""
 	Device power management.  Sequences application of voltages to a
 	part, provides for selection from among several voltage
@@ -327,14 +327,14 @@ class power(object):
 #
 
 
-class read_write_proxy(object):
+class read_write_proxy:
 	"""
 	Descriptor to map the get and set operations of an attribute to the
 	.read() and .write() methods, respectively, of some object.
 
 	Example:
 
-	class thing(object):
+	class thing:
 		def __init__(self):
 			# instance attribute with .read() and .write()
 			# methods
@@ -388,7 +388,7 @@ class read_write_proxy(object):
 #
 
 
-class bus_iic(object):
+class bus_iic:
 	"""
 	IIC (aka I2C) bus.  NOTE:  must set VPUL = VCC for the chip and VTH
 	to the minimum bus "high" state voltage.
@@ -610,7 +610,7 @@ class bus_iic(object):
 #
 
 
-class bus_spi(object):
+class bus_spi:
 	"""
 	SPI bus.  Calling code must set VTH for the device to VCC - 1 V.
 

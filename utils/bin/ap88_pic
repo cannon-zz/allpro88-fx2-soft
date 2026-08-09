@@ -50,7 +50,7 @@ def ih_set_word(ih, addr, word):
 
 
 
-class pic(object):
+class pic:
 	"""
 	PIC12F629/675/PIC16F630/676
 

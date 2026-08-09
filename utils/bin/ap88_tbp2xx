@@ -22,7 +22,7 @@ import allpro88
 from allpro88 import devices
 
 
-class tbp2xx(object):
+class tbp2xx:
 	"""
 	TBP24x parts:  4 bit PROMs.
 	TBP28x parts:  8 bit PROMs.

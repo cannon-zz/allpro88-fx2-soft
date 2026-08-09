@@ -22,7 +22,7 @@ from tqdm import tqdm
 import allpro88
 from allpro88 import devices
 
-class iic_eeprom(object):
+class iic_eeprom:
 	socket = "DIP8"
 	voltage_maps = {
 		"default": {

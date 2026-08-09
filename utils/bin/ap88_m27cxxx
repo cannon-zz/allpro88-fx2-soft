@@ -23,7 +23,7 @@ import allpro88
 from allpro88 import devices
 
 
-class m27cx_width8_pulse_ce(object):
+class m27cx_width8_pulse_ce:
 	"""
 	M27Cx style chip, 8 bit data bus, programmed by pulsing chip enable.
 	"""

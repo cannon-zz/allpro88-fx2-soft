@@ -26,7 +26,7 @@ from luma.oled.device import ssd1306
 from luma.core.render import canvas
 
 
-class oled_module(object):
+class oled_module:
 	# top 6 bits of I2C address (fixed value for SSD1306 devices)
 	device_id = 0b011110
 	# lowest bit of I2C address (configured on carrier PCB)
