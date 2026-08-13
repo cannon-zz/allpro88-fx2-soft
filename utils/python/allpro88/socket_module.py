@@ -833,7 +833,7 @@ class socket_module_68HC705(socket_module):
 #
 
 
-socket_modules = dict((cls.module_id, cls) for cls in (
+by_id = dict((cls.module_id, cls) for cls in (
 	socket_module_DIP_MODULE,
 	socket_module_2708,
 	socket_module_TMS370,
@@ -848,3 +848,5 @@ socket_modules = dict((cls.module_id, cls) for cls in (
 	socket_module_1468705,
 	socket_module_68HC705
 ))
+
+by_name = dict((cls.name, cls) for cls in by_id.values())

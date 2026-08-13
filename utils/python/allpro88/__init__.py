@@ -42,7 +42,6 @@ import os
 import time
 import usb.core
 import yaml
-from .socket_module import socket_modules
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +49,7 @@ logging.basicConfig(level = logging.INFO)
 
 
 from .paths import *
+from . import socket_module
 
 
 #
@@ -1001,7 +1001,7 @@ class allpro88:
 		# configure for the installed socket module
 		try:
 			# retrieve the class
-			self.socket_module = socket_modules[self.socket_module_id]
+			self.socket_module = socket_module.by_id[self.socket_module_id]
 		except KeyError as e:
 			if self.socket_module_id == 0xff:
 				logger.warning("no socket module detected")
@@ -1389,8 +1389,8 @@ class allpro88:
 		"""
 		Returns the ID byte of the socket module installed in the
 		programmer, or 0xff is no module is installed.  See the
-		socket_modules table in the socket_module module for the
-		IDs recognized by this library.
+		by_id table in the socket_module module for the IDs
+		recognized by this library.
 
 		If the environment variable ALLPRO88_SOCKET_MODULE is set,
 		then instead of probing the socket module the environment
