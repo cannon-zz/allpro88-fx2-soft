@@ -1414,7 +1414,13 @@ class allpro88:
 		# of the socket_module code.
 		socket_module_id = os.getenv("ALLPRO88_SOCKET_MODULE")
 		if socket_module_id:
-			return int(socket_module_id, 16)
+			try:
+				socket_module_id = int(socket_module_id, 16)
+			except ValueError:
+				raise ValueError("invalid environment variable ALLPRO88_SOCKET_MODULE=\"%s\":  require base 16 integer between 0x00 and 0xff inclusively" % os.getenv("ALLPRO88_SOCKET_MODULE"))
+			if not 0 <= socket_module_id <= 255:
+				raise ValueError("invalid environment variable ALLPRO88_SOCKET_MODULE=\"%s\":  require base 16 integer between 0x00 and 0xff inclusively" % os.getenv("ALLPRO88_SOCKET_MODULE"))
+			return socket_module_id
 		# FIXME:  addresses 0x0280 through 0x02ff inclusively
 		# comprise a 128 byte I/O window reserved for use by the
 		# socket module.  the PLCC socket module will respond with
