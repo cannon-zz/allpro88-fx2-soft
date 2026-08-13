@@ -1394,16 +1394,17 @@ class allpro88:
 
 		If the environment variable ALLPRO88_SOCKET_MODULE is set,
 		then instead of probing the socket module the environment
-		variable is interpreted as a base 16 integer and its value
-		is reported as the ID byte.  For diagnostic purposes it is
-		sometimes useful to run the programmer with the socket
-		module removed, but some code will not function properly if
-		the socket module's ID byte cannot be retrieved.  The
-		environment variable provides a work-around for these
-		situations.  Do not use this feature as a general purpose
-		configuration mechanism.  Circuitry could be damaged if the
-		control software believes a different socket module is
-		installed than actually is.
+		variable's value is interpreted as a base 16 integer and
+		that number is reported as the ID byte.  For diagnostic
+		purposes it is sometimes useful to run the programmer with
+		the socket module removed, but some code will not function
+		properly if the socket module's ID byte cannot be
+		retrieved.  The environment variable provides a work-around
+		for these situations.  Do not use this feature as a general
+		purpose configuration mechanism.  Circuitry could be
+		damaged if the control software believes a different socket
+		module is installed than actually is.
+
 		"""
 		# NOTE:  the ID register lives in the circuitry of the
 		# socket module, however we need to use the ID to decide
@@ -1415,21 +1416,19 @@ class allpro88:
 		if socket_module_id:
 			return int(socket_module_id, 16)
 		# FIXME:  addresses 0x0280 through 0x02ff inclusively
-		# comprise an I/O window reserved for use by the socket
-		# module.  the PLCC socket module will respond with the ID
-		# byte when any address in that range is read.  I'm using
-		# 0x0280 because it's what was in kevtris' notes, but for
-		# the PLCC module, at least, any address in the socket
-		# module space could be used.  I'm sure the PLCC module's
-		# behaviour is just for simplicity, and there is a specific
-		# adddress where the ID byte is required to reside, but I
-		# don't know what it is.  some modules contain additional
-		# power supplies to provide voltages outside the limits of
-		# the programmer's own supplies, and for those modules
-		# there must be ways to confirm voltage levels by reading
-		# from status registers.  I tried reverse-compiling an
-		# ALLPRO88 DOS program so see if I could see where it
-		# reads the socket module ID byte from, but gave up.
+		# comprise a 128 byte I/O window reserved for use by the
+		# socket module.  the PLCC socket module will respond with
+		# the ID byte when any address in that range is read.  I'm
+		# sure there's a correct address, the address where Logical
+		# Devices' DOS software would look for the ID, but I don't
+		# know what it is.  I tried reverse-compiling an ALLPRO88
+		# DOS program so see if I could see where it reads the
+		# socket module ID byte from, but gave up.  I'm retrieving
+		# the ID byte from 0x0280 because that's what was in
+		# kevtris' notes, but I think both of us only have access
+		# to the PLCC socket module, we don't have examples of
+		# other's, so I think what the correct address should be
+		# remains an open question.
 		return self.read_addr(0x0280)
 
 
