@@ -115,6 +115,9 @@ class power:
 				# confirm value is valid
 				if volt < 0:
 					raise ValueError("invalid voltage %g in \"%s\"" % (volt, name))
+			# confirm at least one ground pin is configured
+			if 0. not in voltage_map.values():
+				raise ValueError("no return/ground pin in \"%s\"" % name)
 		self.voltage_maps = voltage_maps
 		self.active_voltage_map_name = None
 		self.vth = allpro88.volt(vth) if vth else 0
