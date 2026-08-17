@@ -418,7 +418,7 @@ class bus_iic:
 	hi = allpro88.PINCON.PULLUP
 	flt = allpro88.PINCON.PULLUP
 
-	def __init__(self, socket, sda, scl, strict_arbitration = False):
+	def __init__(self, socket, sda, scl, strict_arbitration = False, with_pull_up = True):
 		"""
 		socket:  the socket object containing the part
 		sda:  the pin number for SDA
@@ -437,7 +437,32 @@ class bus_iic:
 		strict_arbitration to False).  if you encounter a part that
 		seems to not be working reliably, try setting
 		strict_arbitration to True and see if that helps.
+
+		if with_pull_up is True (the default) then pull-up
+		resistors are attached to the SDA and SCL lines.  the IIC
+		bus requires pull-up resistors because all I/O pins on all
+		parts are open collector / open drain style pins.  when
+		driving an IIC bus in a device that contains pull-up
+		resistors in its own circuit, it's best to disable pull-up
+		resistors here by setting with_pull_up=False to avoid
+		loading the bus lines too heavily or creating current paths
+		between distinct power supplies through the bus interface
+		pins.
+
+		NOTE:  the ALLPRO88 and the device whose IIC bus is being
+		controlled must share a common power supply return.  Be
+		sure also define at least one ground pin and connect it to
+		the part's ground rail.
 		"""
+		# convert class attributes to instance attributes and
+		# disable pull-up resistors if requested
+		self.lo = self.lo
+		self.hi = self.hi
+		self.flt = self.flt
+		if not with_pull_up:
+			self.lo &= ~allpro88.PINCON.PULLUP
+			self.hi &= ~allpro88.PINCON.PULLUP
+			self.flt &= ~allpro88.PINCON.PULLUP
 		# the socket object containing the part
 		self.socket = socket
 		# whether to do additional bus timing and arbitration error
