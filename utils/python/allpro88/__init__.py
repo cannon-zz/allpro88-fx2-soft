@@ -982,16 +982,12 @@ class allpro88:
 	def __init__(self, cal_data = "auto", idVendor = idVendor, idProduct = idProduct):
 		# 512 byte buffer
 		self.buf = usb.core.array.array("B", (0,) * 512)
-		# replace class attributes with instance attributes
-		self.idVendor = idVendor
-		self.idProduct = idProduct
+
 		# retrieve the USB device
-		self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
-		if self.device is None:
-			# try falling back to ID used during development
-			self.idProduct = 0x000C
-			self.device = usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct)
-		if self.device is None:
+		# FIXME:  allow more than one programmer to be connected
+		for self.device in usb.core.find(idVendor = self.idVendor, idProduct = self.idProduct, find_all = True):
+			break
+		else:
 			raise ValueError("USB device not found (vid:pid = %04X:%04X)" % (self.idVendor, self.idProduct))
 
 		# firmware resets itself and the programmer.
