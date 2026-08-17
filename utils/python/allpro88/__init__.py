@@ -471,9 +471,18 @@ class channel_proxy:
 		NOTE:  see the note in .__bool__() about the minimum VADJ
 		voltage required for reliable comparator operation.
 		"""
-		# check n before we go farther
+		# first check n
 		n = int(n)
-		assert n > 0
+		if n < 1:
+			raise ValueError("require n integer >= 1 (got %d)" % n)
+		if n > 100:
+			# because we pack all voltage read commands into a
+			# single USB packet, there is a limit to how many
+			# readings we can take.  I think the exact limit is
+			# 128 readings:  4 bytes per command = 512 bytes,
+			# the maximum packet size.  set the limit a bit
+			# lower in case I can't count correctly.
+			raise ValueError("n too large")
 
 		# collect measurements, select median of measurements,
 		# convert DAC count to voltage, and report value.  NOTE: to
