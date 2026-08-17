@@ -28,5 +28,7 @@ import os
 
 
 ALLPRO88_CAL_PATH = "@pkglocalstatedir@".replace("${localstatedir}", "@localstatedir@").replace("${prefix}", "@prefix@")
-
 ALLPRO88_CAL_PATH = os.getenv("ALLPRO88_CAL_PATH", default = ALLPRO88_CAL_PATH).split(":")
+
+
+ALLPRO88_DATA_PATH = "@datarootdir@/@PACKAGE@".replace("${prefix}", "@prefix@")
