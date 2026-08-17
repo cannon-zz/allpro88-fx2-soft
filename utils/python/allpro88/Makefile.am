@@ -7,5 +7,6 @@ pkgpythondir = $(pkgpyexecdir)
 pkgpython_PYTHON = \
 	__init__.py \
 	devices.py \
+	logic_tester.py \
 	paths.py \
 	socket_module.py

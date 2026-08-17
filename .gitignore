@@ -25,3 +25,4 @@ configure~
 *Makefile
 *Makefile.in
 utils/python/allpro88/paths.py
+utils/share/logic_tester_database.tar.gz

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-# Copyright (C) 2023-2024  Kipp Cannon
+# Copyright (C) 2023-2026  Kipp Cannon
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -17,527 +17,48 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 
+import argparse
 import math
 import random
 import sys
 from tqdm import tqdm
 import allpro88
-from allpro88 import devices
+import allpro88.devices
+import allpro88.logic_tester
 
 
 #
 # =============================================================================
 #
-#                              Functional Blocks
+#                                 Command Line
 #
 # =============================================================================
 #
 
 
-class D_flip_flop:
-	# FIXME:  this is hard-coded for TTL I/O
-	def __init__(self, programmer, socket, D_pin, clk_pin, S_pin, R_pin, Q_pin, Qbar_pin):
-		self.programmer = programmer
-		self.socket = socket
-
-		self.D_pin = D_pin
-		self.clk_pin = clk_pin
-		self.S_pin = S_pin
-		self.R_pin = R_pin
-		self.Q_pin = Q_pin
-		self.Qbar_pin = Qbar_pin
-
-		# inputs
-		self.D_flag = allpro88.flag_ttl(self.socket, self.D_pin)
-		self.clk_flag = allpro88.flag_ttl(self.socket, self.clk_pin)
-		self.S_flag = allpro88.flag_ttl(self.socket, self.S_pin)
-		self.R_flag = allpro88.flag_ttl(self.socket, self.R_pin)
-		# outputs
-		self.Q_flag = allpro88.flag_ttl(self.socket, self.Q_pin, default = None)
-		self.Qbar_flag = allpro88.flag_ttl(self.socket, self.Qbar_pin, default = None)
-
-	D = devices.read_write_proxy("D_flag")
-	clk = devices.read_write_proxy("clk_flag")
-	S = devices.read_write_proxy("S_flag")
-	R = devices.read_write_proxy("R_flag")
-	Q = devices.read_write_proxy("Q_flag")
-	Qbar = devices.read_write_proxy("Qbar_flag")
-
-	def check_Q(self, val, Qbar_val = None):
-		val = bool(val)
-		Q = self.Q
-		if Q != val:
-			raise ValueError("Q:  expected %s, got %s" % (val, Q))
-		Qbar = self.Qbar
-		if Qbar_val is None:
-			# default expected value is inverse of Q's expected
-			# value
-			Qbar_val = not Q
-		if Qbar != Qbar_val:
-			raise ValueError("Qbar:  expected %s, got %s" % (Qbar_val, Qbar))
-		return Q
-
-	def test(self):
-		# reset
-		self.R = True
-		# all inputs low
-		self.D = self.clk = self.S = self.R = False
-		# is Q false?
-		self.check_Q(False)
-		# clock 512 bits into D, confirm output
-		for i in tqdm(range(1024), desc = "testing D and clk"):
-			self.D = i & 2
-			self.clk = i & 1
-			if i & 1:
-				self.check_Q(i & 2)
-		# repeatedly play with set and reset
-		previous = self.Q
-		for i in tqdm(range(1024), desc = "testing S and R"):
-			self.S = i & 1
-			self.R = i & 2
-			Q_expected, Qbar_expected = {
-				0:	(previous, not previous),	# !S, !R
-				1:	(True, False),	# S, !R
-				2:	(False, True),	# !S, R
-				3:	(True, True),	# S, R
-			}[i & 3]
-			self.check_Q(Q_expected, Qbar_expected)
-			previous = False
-
-
-class NAND_2:
-	# FIXME:  this is hard-coded for TTL I/O
-	def __init__(self, programmer, socket, in_pins, out_pin):
-		self.programmer = programmer
-		self.socket = socket
-
-		self.in_pins = in_pins
-		self.out_pin = out_pin
-
-		self.in_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, self.in_pins)
-		self.out_flag = allpro88.flag_ttl(self.socket, self.out_pin, default = None)
-
-	inp = devices.read_write_proxy("in_bus")
-	out = devices.read_write_proxy("out_flag")
-
-	def test(self):
-		# check input test vectors
-		for i in tqdm(range(1024), desc = "testing NAND"):
-			x = i & self.in_bus.max_word
-			self.inp = x
-			result = self.out
-			expected = x != self.in_bus.max_word
-			if result != expected:
-				raise ValueError("input vector %x expected %d got %d" % (x, expected, result))
-		# check output high and low voltages
-		self.inp = self.in_bus.max_word
-		v_low = self.out_flag.channel.measure_v(5)
-		self.inp = 0
-		v_high = self.out_flag.channel.measure_v(5)
-		print("output voltages:  low = %g V, high = %g V" % (v_low, v_high))
-		if v_low > 0.4 or v_high < 2.4:
-			raise ValueError("output voltages bad")
-
-	@staticmethod
-	def eval(val, input_mask, output_mask):
-		"""
-		Compute NAND evaluated for the bits of val selected using
-		input_mask.  The single-bit result is returned as the bit
-		defined by output_mask.  NOTE:  output_mask is not checked
-		to confirm that it is a single bit value.
-		"""
-		return output_mask if (val & input_mask != input_mask) else 0
-
-
-
-#
-# =============================================================================
-#
-#                                    Chips
-#
-# =============================================================================
-#
-
-
-class TC40H004P:
-	"""
-	Hex CMOS inverter.
-	"""
-	# FIXME:  only test at 5V!  must switch bus types to VDAC if other supply voltages are used
-	def __init__(self, programmer, Vdd = 5.0):
-		assert Vdd == 5.0, "FIXME:  other voltages not yet supported"
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP14"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				7:	0,
-				14:	Vdd
-			}
-		})
-		# inputs and outputs
-		self.inp_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (1, 3, 5, 9, 11, 13))
-		self.out_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 4, 6, 8, 10, 12))
-
-	inp = devices.read_write_proxy("inp_bus")
-	out = devices.read_write_proxy("out_bus")
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	def test(self):
-		for i in tqdm(range(len(self.inp_bus)), desc = "testing gates"):
-			self.inp = i
-			expected = (~self.inp) & 0x3f
-			result = self.out
-			print("input = 0x%02X, output = 0x%02X, expected + 0x%02X" % (i, result, expected))
-			if result != expected:
-				print("FAIL")
-
-
-class CD4013B:
-	"""
-	Dual D flip-flop.
-	"""
-	def __init__(self, programmer, Vdd = 5.0):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP14"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				7:	0,
-				14:	Vdd
-			}
-		})
-		# two D type flip-flops
-		self.flip_flops = [
-			D_flip_flop(self.programmer, self.socket, 5, 3, 6, 4, 1, 2),
-			D_flip_flop(self.programmer, self.socket, 9, 11, 8, 10, 13, 12)
-		]
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	def test(self):
-		for i, flip_flop in enumerate(self.flip_flops, 1):
-			print("testing flip flop %d" % i)
-			flip_flop.test()
-
-
-class HD14093BP:
-	"""
-	Quad 2-input NAND with Schmitt trigger inputs.
-	"""
-	def __init__(self, programmer, Vdd = 5.0):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP14"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				7:	0,
-				14:	Vdd
-			}
-		}, vth = 4.0)
-		# inputs and outputs
-		self.inp_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (1, 2, 5, 6, 8, 9, 12, 13))
-		self.out_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (3, 4, 10, 11))
-
-	inp = devices.read_write_proxy("inp_bus")
-	out = devices.read_write_proxy("out_bus")
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	def test(self):
-		for i in tqdm(range(len(self.inp_bus)), desc = "testing gates"):
-			self.inp = i
-			result = self.out
-			expected = 0
-			for input_mask, output_mask in ((0x3, 0x1), (0xc, 0x2), (0x30, 0x4), (0xc0, 0x8)):
-				expected |= NAND_2.eval(i, input_mask, output_mask)
-			print("input = 0x%02X, output = 0x%01X, expected + 0x%01X" % (i, result, expected))
-			if result != expected:
-				print("FAIL")
-
-
-class SN7400:
-	"""
-	Quad 2-input NAND
-	"""
-	def __init__(self, programmer, Vdd = 5.0):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP14"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				7:	0,
-				14:	Vdd
-			}
-		})
-		# four 2-input NAND gates
-		self.gates = [
-			NAND_2(self.programmer, self.socket, (1, 2), 3),
-			NAND_2(self.programmer, self.socket, (4, 5), 6),
-			NAND_2(self.programmer, self.socket, (10, 9), 8),
-			NAND_2(self.programmer, self.socket, (13, 12), 11)
-		]
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	def test(self):
-		for i, gate in enumerate(self.gates, 1):
-			print("testing gate %d" % i)
-			gate.test()
-
-
-class SN74244:
-	"""
-	Octal line driver
-	"""
-	def __init__(self, programmer, Vdd = 5.0):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP20"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				10:	0,
-				20:	Vdd
-			}
-		})
-		# control
-		self.output_enable_1_flag = allpro88.flag_ttl_active_low(self.socket, 1)
-		self.output_enable_2_flag = allpro88.flag_ttl_active_low(self.socket, 19)
-		# bus
-		self.A_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 4, 6, 8, 11, 13, 15, 17))
-		self.Y_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (18, 16, 14, 12, 9, 7, 5, 3))
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	output_enable_1 = devices.read_write_proxy("output_enable_1_flag")
-	output_enable_2 = devices.read_write_proxy("output_enable_2_flag")
-	A = devices.read_write_proxy("A_bus")
-	Y = devices.read_write_proxy("Y_bus")
-
-	def test(self):
-		highest_lo = 0.
-		lowest_hi = math.inf
-		for i in tqdm(range(4096), desc = "testing driver"):
-			# disable outputs
-			self.output_enable_1 = self.output_enable_2 = False
-
-			# drain charge from the output by grounding, then
-			# allow to float again
-			self.Y = 0
-			self.Y = None
-
-			# choose a random value, write to the input bus
-			val = random.randint(0, 255)
-			self.A = val
-
-			# confirm output voltages in floating state
-			volts_flt = [channel.measure_v() for channel in self.Y_bus.channels]
-			self.power.reset_vth()
-
-			# enable output, check value, and confirm voltages
-			self.output_enable_1 = self.output_enable_2 = True
-			out_val = self.Y
-			volts = [channel.measure_v() for channel in self.Y_bus.channels]
-			self.power.reset_vth()
-
-			if out_val != val:
-				#print("input = 0x%02X, output = 0x%02X" % (val, out_val))
-				raise ValueError("input = 0x%02X, output = 0x%02X" % (val, out_val))
-			#print(", ".join("%.3g V" % v for v in volts))
-			#print(", ".join("%.3g V" % v for v in volts_flt))
-			#if not all(1.25 <= v <= 1.6 for v in volts_in):
-			#	raise ValueError("input voltages out of range: %s" % ", ".join("%.3g V" % v for v in volts_in))
-			for bit, v in zip((0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80), volts):
-				if ((val & bit) and (v < 2.4)) or (not (val & bit) and (v > 0.4)):
-					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts)))
-				if val & bit:
-					if v < lowest_hi:
-						lowest_hi = v
-				else:
-					if v > highest_lo:
-						highest_lo = v
-		print("lowest high output = %.3g V, highest low output = %.3g V" % (lowest_hi, highest_lo))
-
-
-class SN74245:
-	"""
-	Octal bus transciever
-	"""
-	def __init__(self, programmer, Vdd = 5.0):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP20"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				10:	0,
-				20:	Vdd
-			}
-		})
-		# control
-		self.direction_flag = allpro88.flag_ttl(self.socket, 1)
-		self.output_enable_flag = allpro88.flag_ttl_active_low(self.socket, 19)
-		# bus
-		self.A_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 3, 4, 5, 6, 7, 8, 9))
-		self.B_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (18, 17, 16, 15, 14, 13, 12, 11))
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	# True = A->B;  False = B->A
-	direction = devices.read_write_proxy("direction_flag")
-	# True = drive output;  False = float output
-	output_enable = devices.read_write_proxy("output_enable_flag")
-	A = devices.read_write_proxy("A_bus")
-	B = devices.read_write_proxy("B_bus")
-
-	def test(self):
-		for i in tqdm(range(4096), desc = "testing transceiver"):
-			# disable outputs
-			self.output_enable = False
-
-			# choose a random value
-			val = random.randint(0, 255)
-
-			# choose a direction.  float the output bus, write the
-			# value to the input bus
-			self.direction = direction = random.choice((True, False))
-			if direction:
-				self.A = val
-				self.B = None
-			else:
-				self.A = None
-				self.B = val
-
-			# turn on the output and test.   confirm output
-			# voltages
-			self.output_enable = True
-			if direction:
-				out_val = self.B
-				volts_out = [channel.measure_v() for channel in self.B_bus.channels]
-			else:
-				out_val = self.A
-				volts_out = [channel.measure_v() for channel in self.A_bus.channels]
-			self.power.reset_vth()
-
-			#print("%s:  input = %02X, output = %02X" % ("A->B" if direction else "B->A", val, out_val))
-			if out_val != val:
-				raise ValueError("%s:  input = 0x%02X, output = 0x%02X" % ("A->B" if direction else "B->A", val, out_val))
-			for bit, v in zip((0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80), volts_out):
-				if ((val & bit) and (v < 2.4)) or (not (val & bit) and (v > 0.4)):
-					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts_out)))
-
-
-class SN74273:
-	"""
-	Octal D-type latch.
-	"""
-	def __init__(self, programmer, Vdd = 5.0):
-		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets["DIP20"]
-		# power pins
-		self.power = devices.power(self.programmer, self.socket, {
-			"default": {
-				10:	0,
-				20:	Vdd
-			}
-		})
-		# control
-		self.clear_flag = allpro88.flag_ttl_active_low(self.socket, 1)
-		self.clock_flag = allpro88.flag_ttl(self.socket, 11)
-		# bus
-		self.D_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (3, 4, 7, 8, 13, 14, 17, 18))
-		self.Q_bus = allpro88.bus_parallel_ttl(self.programmer, self.socket, (2, 5, 6, 9, 12, 15, 16, 19))
-
-	def __enter__(self):
-		self.power.on()
-		return self
-
-	def __exit__(self, exc_type, exc_val, exc_tb):
-		self.power.off()
-		# done.  if an exception has occured, continue processing
-		return False
-
-	clear = devices.read_write_proxy("clear_flag")
-	clock = devices.read_write_proxy("clock_flag")
-	D = devices.read_write_proxy("D_bus")
-	Q = devices.read_write_proxy("Q_bus")
-
-	def test(self):
-		# reset
-		self.clear = True
-		self.clear = False
-
-		for i in tqdm(range(4096), desc = "testing latch"):
-			# choose a random value
-			val = random.randint(0, 255)
-
-			# clock it into the latch
-			self.D = val
-			self.clock = True
-			self.clock = False
-
-			# zero then float the input
-			self.D = 0
-			self.D = None
-
-			# confirm the output
-			out_val = self.Q
-
-			# confirm (floating) input and output voltages
-			volts_in = [channel.measure_v() for channel in self.D_bus.channels]
-			volts_out = [channel.measure_v() for channel in self.Q_bus.channels]
-			self.power.reset_vth()
-
-			# test and report errors
-			if out_val != val:
-				raise ValueError("input = 0x%02X, output = 0x%02X" % (val, out_val))
-			if not all(1.25 <= v <= 1.6 for v in volts_in):
-				raise ValueError("input voltages out of range: %s" % ", ".join("%.3g V" % v for v in volts_in))
-			for bit, v in zip((0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80), volts_out):
-				if ((val & bit) and (v < 2.4)) or (not (val & bit) and (v > 0.4)):
-					raise ValueError("output voltages invalid: 0x%2x = %s" % (val, ", ".join("%.3g V" % v for v in volts_out)))
+def parse_command_line():
+	parser = argparse.ArgumentParser(
+		prog = "ap88_logic_tester",
+		description = "Test digital logic chips in an ALLPRO88.",
+		usage = "%(prog)s [optios] <logic family> <part name>",
+		epilog = "A logic family and part name are required.  The ALLPRO88 must be powered and the part inserted in its socket before the program is started.  Use -f, --list-logic-families to show a list of all supported logic family names.  Use -p, --list-parts to show a list of all support part names.\n\nThe choice of logic family sets the electrical characteristics, for example the input and output voltage thresholds and the supply voltage limits.  Selecting the wrong logic family can damage the part by exceeding its voltage limits.  The part name selects the logic behaviour to test.  Some manufacturers use unique naming schemes for parts, for example Motorola calls its version of a 4069 hex inverter an MC14069.  If the name of the part you wish to test is not in the database, there might be a functional equivalent to select instead."
+	)
+	parser.add_argument("-f", "--list-logic-families", action = "store_true", help = "List all supported logic families.")
+	parser.add_argument("-p", "--list-parts", action = "store_true", help = "List all supported part names.")
+
+	options, names = parser.parse_known_args()
+
+	if options.list_logic_families or options.list_parts:
+		# ignore the non-option arguments if a --list-xxx is given
+		logic_family, name = None, None
+	elif len(names) < 2:
+		raise ValueError("logic family and part name are required")
+	elif len(names) == 2:
+		logic_family, name = names
+	else:
+		raise ValueError("unrecogznized arguments after part name: \"%s\"" % names[2:])
+
+	return options, logic_family, name
 
 
 #
@@ -549,6 +70,49 @@ class SN74273:
 #
 
 
+options, logic_family, name = parse_command_line()
+
+
+database = allpro88.logic_tester.database()
+
+
+if options.list_logic_families:
+	longest_logic_family = max(map(len, allpro88.logic_tester.logic_families))
+	fmt = "%%%ds\t%%s" % longest_logic_family
+	print(fmt % ("Logic Family", "Description"))
+	print(fmt % ("------------", "-----------"))
+	for logic_family, logic_family_def in sorted(allpro88.logic_tester.logic_families.items()):
+		print(fmt % (logic_family, logic_family_def.description))
+
+if options.list_parts:
+	print("Part Name")
+	print("---------")
+	for entry in sorted(database.parts):
+		print(entry)
+
+if options.list_logic_families or options.list_parts:
+	sys.exit(0)
+
+
+device = database.get_part(name)
+device.set_logic_family(logic_family)
+
+
 with allpro88.allpro88() as programmer:
-	with SN7400(programmer) as device:
-		device.test()
+	print("\n\nTesting:  %s %s\n\tsocket: %s\n\tvoltage: %g V\n" % (logic_family, name, device.socket_name, device.voltage))
+	with device.config(programmer) as dut:
+		with tqdm() as dut.progress_bar:
+			results, state_0_highest, state_1_lowest = dut.test()
+
+
+if not any(results.values()):
+	print("passed")
+else:
+	for pinout, vectors in device.pinout_and_vectors:
+		failed_vector_indexes = results[pinout]
+		print("pinout \"%s\":  %s" % (pinout, "failed" if failed_vector_indexes else "passed"))
+		for i, expected_state, state in failed_vector_indexes:
+			print("\tvector %d:\n\t\texpected = %s,\n\t\tobserved = %s" % (i, expected_state, state))
+
+print("\nhighest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
+print("\nlowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))
