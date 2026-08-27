@@ -1028,8 +1028,12 @@ class allpro88:
 				sequences.append([i])
 		for sequence in sequences:
 			if len(sequence) > 2:
+				sequence[0] = str(sequence[0])
 				sequence[1:-1] = ["..."]
-		logger.info("channels installed (%d):  %s" % (len(channel_numbers), list(itertools.chain.from_iterable(sequences))))
+				sequence[-1] = str(sequence[-1])
+			else:
+				sequence[:] = map(str, sequence)
+		logger.info("channels installed (%d):  %s" % (len(channel_numbers), " ".join(list(itertools.chain.from_iterable(sequences)))))
 
 		# install calibration model (defaults if no calibration
 		# model is provided).  NOTE:  yes, testing for specific
