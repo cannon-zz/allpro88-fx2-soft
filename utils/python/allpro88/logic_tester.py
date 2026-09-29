@@ -48,6 +48,8 @@ class logic_family:
 	def __init__(self, description, Vcc_min, Vcc_max, Vih_min, Vil_max, Voh_min, Vol_max):
 		if Vcc_min <= 0. or Vcc_max <= 0. or Vih_min <= 0. or Vil_max <= 0. or Voh_min <= 0. or Vol_max <= 0.:
 			raise ValueError("require non-negative voltages")
+		if Vcc_min > Vcc_max or Vih_min < Vil_max or Voh_min < Vol_max:
+			raise ValueError("voltages out of order")
 		self.description = description
 		self.Vcc_min = Vcc_min
 		self.Vcc_max = Vcc_max
@@ -369,7 +371,7 @@ class logic_chip:
 		fmt = kwargs.pop("format", None)
 		if fmt != 1:
 			# hmm.  that's odd ...
-			pass
+			raise RuntimeError
 		return cls(**kwargs)
 
 
