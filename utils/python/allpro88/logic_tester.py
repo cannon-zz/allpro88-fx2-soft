@@ -162,12 +162,13 @@ class logic_chip:
 
 	def __init__(self, name = None, description = None, socket_name = None, pinout_vector_table = None, progress_bar = None):
 		"""
-		name:  the name of the part, e.g., \"74LS00\".
+		name:  the name of the part without the logic family, e.g.,
+		\"7400\".
 
 		description:  brief human-readable description of the part.
 
 		socket_name:  one of the valid socket names defined for
-		self.socket_module.
+		self.socket_module, e.g., \"DIP14\".
 
 		pinout_vector_table:  a sequence of the form
 
@@ -212,7 +213,7 @@ class logic_chip:
 		channel drivers are reconfigured.
 
 		parts with fixed inputs and outputs will have only a single
-		pintout and test vector sequence.  parts whose inputs and
+		pinout and test vector sequence.  parts whose inputs and
 		outputs are configurable, for example bidirectional bus
 		transceivers, can be tested by providing multiple pinouts.
 		often more than one pinout is required for each
@@ -391,6 +392,10 @@ class logic_chip:
 
 	@property
 	def voltage(self):
+		"""
+		The geometric mean of the lowest and highest allowed supply
+		voltages rounded to 1 digit to the right of the decimal.
+		"""
 		return round(math.exp(0.5 * (math.log(self.logic_family.Vcc_min) + math.log(self.logic_family.Vcc_max))), 1)
 
 
@@ -551,15 +556,30 @@ class database:
 	filename = os.path.join(allpro88.paths.ALLPRO88_DATA_PATH, "logic_tester_database.tar.gz")
 
 	def __init__(self, filename = None):
+		"""
+		Access the parts database.  If filename is None (the
+		default) then the default database file
+
+		%s
+
+		is used.
+		""" % type(self).filename
 		if filename is not None:
 			self.filename = filename
 		self.contents = tarfile.open(self.filename)
 
 	def get_part(self, name):
+		"""
+		Return a logic_chip instance for the part named name.
+		"""
 		return logic_chip.from_yaml_string(self.contents.extractfile(os.path.join("logic_tester_database", "%s.yml" % name)))
 
 	@property
 	def parts(self):
+		"""
+		Generator yielding sequence of all part names in the
+		database.
+		"""
 		for name in self.contents.getnames():
 			if not name.endswith(".yml"):
 				continue
