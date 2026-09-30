@@ -756,14 +756,15 @@ class socket_module_AP88_PLCC(socket_module):
 		self.programmer.write_addr(address, 1 if enabled else 0)
 
 # for the DIP and PLCC socket modules, provide socket definitions for DIP
-# packages smaller than ZIF DIP socket size.  these packages get inserted
-# into the ZIF DIP socket according to the diagram on the socket module's
-# case.  the drawing only shows a few package sizes, and only inserted
-# upright, but for completeness we generate definitions for all even counts
-# of pins starting with 2, and also dead-bug style, reversed, insertions.
+# packages smaller than the ZIF DIP socket size.  these packages get
+# inserted into the ZIF DIP socket according to the diagram on the socket
+# module's case.  the drawing only shows a few package sizes, and only
+# inserted upright, but for completeness we generate definitions for all
+# even counts of pins starting with 2, and also dead-bug style, reversed,
+# insertions.
 #
 # why we can't put this code inside the class definition requires going
-# down an extraordinarily deep rabit hole that I'm not sure I've fully
+# down an extraordinarily deep rabbit hole that I'm not sure I've fully
 # wrapped my head around.  apparently name resolution inside a class
 # definition code block is restricted to the current scope (and the global
 # scope).  a for loop code block does not introduce a new scope, but a
