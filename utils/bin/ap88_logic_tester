@@ -40,9 +40,10 @@ def parse_command_line():
 	parser = argparse.ArgumentParser(
 		prog = "ap88_logic_tester",
 		description = "Test digital logic chips in an ALLPRO88.",
-		usage = "%(prog)s [optios] <logic family> <part name>",
+		usage = "%(prog)s [options] <logic family> <part name>\n%(prog)s --circuit-cellar [options] <part name>",
 		epilog = "A logic family and part name are required.  The ALLPRO88 must be powered and the part inserted in its socket before the program is started.  Use -f, --list-logic-families to show a list of all supported logic family names.  Use -p, --list-parts to show a list of all supported part names.\n\nThe choice of logic family sets the electrical characteristics, for example the input and output voltage thresholds and the supply voltage limits.  Selecting the wrong logic family can damage the part by exceeding its voltage limits.  The part name selects the logic behaviour to test.  Some manufacturers use unique naming schemes for parts, for example Motorola calls its version of a 4069 hex inverter an MC14069.  If the name of the part you wish to test is not in the database, there might be a functional equivalent to select instead."
 	)
+	parser.add_argument("-c", "--circuit-cellar", action = "store_true", help = "Circuit Cellar IC Tester emulation mode.")
 	parser.add_argument("-f", "--list-logic-families", action = "store_true", help = "List all supported logic families.")
 	parser.add_argument("-p", "--list-parts", action = "store_true", help = "List all supported part names.")
 
@@ -51,12 +52,20 @@ def parse_command_line():
 	if options.list_logic_families or options.list_parts:
 		# ignore the non-option arguments if a --list-xxx is given
 		logic_family, name = None, None
+	elif options.circuit_cellar:
+		if len(names) != 1:
+			raise ValueError("require part name")
+		logic_family = "TTL LS"
+		name, = names
 	elif len(names) < 2:
 		raise ValueError("logic family and part name are required")
 	elif len(names) == 2:
 		logic_family, name = names
 	else:
 		raise ValueError("unrecogznized arguments after part name: \"%s\"" % names[2:])
+
+	if options.circuit_cellar and options.list_logic_families:
+		raise ValueError("--circuit-cellar mode does not support logic family selection")
 
 	return options, logic_family, name
 
@@ -73,7 +82,10 @@ def parse_command_line():
 options, logic_family, name = parse_command_line()
 
 
-database = allpro88.logic_tester.database()
+if options.circuit_cellar:
+	database = allpro88.logic_tester.circuit_cellar_database()
+else:
+	database = allpro88.logic_tester.database()
 
 
 if options.list_logic_families:
@@ -102,18 +114,28 @@ with allpro88.allpro88() as programmer:
 	print("\n\nTesting:  %s %s\n\t%s\n\tsocket: %s\n\tvoltage: %g V\n\tmin V_oh: %g V\n\tmax V_ol: %g V\n" % (logic_family, name, device.description, device.socket_name, device.voltage, device.logic_family.Voh_min, device.logic_family.Vol_max))
 	with device.config(programmer) as dut:
 		with tqdm() as dut.progress_bar:
-			results, state_0_highest, state_1_lowest = dut.test()
+			if options.circuit_cellar:
+				results = dut.test()
+			else:
+				results, state_0_highest, state_1_lowest = dut.test()
 
 
-if not any(results.values()):
-	print("\nPASSED")
+if options.circuit_cellar:
+	if results is None:
+		print("\nPASSED")
+	else:
+		print("\nFAILED:")
+		print(results)
 else:
-	print("\nFAILED:")
-	for pinout, vectors in device.pinout_and_vectors:
-		failed_vector_indexes = results[pinout]
-		print("pinout \"%s\":  %s" % (pinout, "failed" if failed_vector_indexes else "passed"))
-		for i, expected_state, state in failed_vector_indexes:
-			print("\tvector %d:  %s\n\t\tpinout   = %s\n\t\texpected = %s\n\t\tobserved = %s" % (i, ("failed" if expected_state != state else ""), pinout, expected_state, state))
+	if not any(results.values()):
+		print("\nPASSED")
+	else:
+		print("\nFAILED:")
+		for pinout, vectors in device.pinout_and_vectors:
+			failed_vector_indexes = results[pinout]
+			print("pinout \"%s\":  %s" % (pinout, "failed" if failed_vector_indexes else "passed"))
+			for i, expected_state, state in failed_vector_indexes:
+				print("\tvector %d:  %s\n\t\tpinout   = %s\n\t\texpected = %s\n\t\tobserved = %s" % (i, ("failed" if expected_state != state else ""), pinout, expected_state, state))
 
-print("\nhighest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
-print("\nlowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))
+	print("\nhighest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
+	print("\nlowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))

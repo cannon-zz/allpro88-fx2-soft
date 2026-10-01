@@ -16,11 +16,13 @@
 
 
 import functools
+import io
 import itertools
 import math
 import os
 import tarfile
 import yaml
+import zipfile
 
 
 import allpro88
@@ -628,3 +630,354 @@ class database:
 			path, name = os.path.split(name)
 			name, _ = os.path.splitext(name)
 			yield name
+
+
+#
+# =============================================================================
+#
+#                    Circuit Cellar IC Tester Compatibility
+#
+# =============================================================================
+#
+
+
+class circuit_cellar_logic_chip:
+	"""
+	Code to work with the test vector database supplied with the
+	Circuit Cellar IC Tester by Seven A. Ciarcia published in the
+	November and December 1987 issues of BYTE Magazine.  At the time of
+	writing, the part database is available in a Google Drive owned by
+	circuitcellar.com
+
+	https://drive.google.com/open?id=1xeU29a9ZSZfGGtYFe625S9jttg_Ra2Oy
+
+	The part test vector files are in the "ictpc.zip" file in the
+	zzzz-BYTE/BYTE-Nov-Dec-1987.zip archive.
+
+	This class represents one entry in the Circuit Cellar IC Tester
+	part database.
+
+	NOTE:  online sources I have read claim the database contained over
+	600 parts, but the file downloaded from the source above contains
+	only 238, a count which includes 20 parts that are duplicates of
+	others.  There might be another version out there.
+	"""
+	def __init__(self):
+		# name of the part
+		self.name = None
+		# brief human-readable description
+		self.description = None
+		# if this is a clone of another part, the name of that part
+		self.clone = None
+		# number of pins
+		self.socket_size = None
+		# pin number for the power supply return pin
+		self.pin_G = None
+		# pin number for the power supply pin
+		self.pin_V = None
+		# mapping character position to pin type
+		self.pin_types = {}
+		# mapping character position to pin number
+		self.pin_numbers = {}
+		# sequence of (stimulus, response) pairs.  each stimulus
+		# and response is a dictionary mapping pin number to state.
+		self.vectors = []
+
+		# other internal data not from the database
+		self.progress_bar = None
+
+	@classmethod
+	def from_tst(cls, fobj):
+		"""
+		Generator to parse the "test vector definition modules" in
+		a .TST file into a sequence of circuit_cellar_logic_chip
+		objects.
+		"""
+		self = cls()
+		stimulus = {}
+		response = {}
+		for line in fobj:
+			# remove comment text
+			i = line.find("*")
+			if i >= 0:
+				comment = line[i + 1:]
+				comment = comment.strip()
+				line = line[:i]
+			else:
+				comment = None
+
+			# remove leading and trailing whitespace and MSDOS
+			# CTRL-Z EOF mark
+			line = line.strip().strip(chr(0x1a))
+
+			# if blank, ignore
+			if not line:
+				continue
+
+			# select command
+
+			# part name.  must be first command.  name is
+			# everything after the command minus any comments
+			# and minus leading and trailing whitespace
+			if line[0] == "#":
+				assert self.name is None
+				self.name = line[1:].strip()
+				# assume the comment text on this line, if
+				# present, is the part description
+				self.description = comment
+				continue
+			assert self.name is not None
+
+			# equivalent part
+			if line[0] == "C":
+				self.clone = line[1:].strip()
+				continue
+
+			if self.clone is None:
+				# socket and power pins.  must be second
+				# command
+				if line[0] == "S":
+					assert self.socket_size is None
+					self.socket_size, self.pin_G, self.pin_V = map(int, line.split()[1:])
+					assert self.socket_size > 1 and not (self.socket_size & 1)
+					assert 1 <= self.pin_G <= self.socket_size and 1 <= self.pin_V <= self.socket_size
+					continue
+				assert self.socket_size is not None
+
+				# pin functions.  must be third command.
+				# position of pin type character sets the
+				# column in which to find the pin number
+				# and pin state in subsequent lines
+				if line[0] == "F":
+					assert not self.pin_types
+					for i, pin_type in enumerate(line[1:], 1):
+						if pin_type in "IOT":
+							self.pin_types[i] = pin_type
+						elif pin_type.isspace():
+							continue
+						else:
+							assert False
+					assert len(self.pin_types) + 2 <= self.socket_size
+					continue
+				assert self.pin_types
+
+				# pin numbers.  must be fourth column.  a
+				# pin number is a 1 or 2 digit integer, one
+				# of whose digits falls in the column for
+				# that pin
+				if line[0] == "P":
+					assert not self.pin_numbers
+					for i in self.pin_types:
+						self.pin_numbers[i] = int(line[max(1, i - 1): i + 2])
+					continue
+				assert self.pin_numbers
+
+				# stimulus & response pairs.  any number of
+				# these, but must come in pairs in that
+				# order.  pin states that are blank are
+				# carried over from whatever line set the
+				# state previously.
+				if line[0] == "I":
+					count = 0
+					for i, pin_number in self.pin_numbers.items():
+						if i < len(line) and line[i] in "01":
+							stimulus[pin_number] = int(line[i])
+							count += 1
+					assert count == len(line[1:].split())
+					# make sure all pins have states
+					# set
+					assert len(stimulus) == len(self.pin_types)
+					continue
+				if line[0] == "R":
+					response = dict(stimulus)
+					count = 0
+					for i, pin_number in self.pin_numbers.items():
+						if i < len(line) and line[i] in "01X":
+							response[pin_number] = line[i] if line[i] == "X" else int(line[i])
+							count += 1
+					assert count == len(line[1:].split())
+					self.vectors.append((dict(stimulus), dict(response)))
+					continue
+
+			# end of part.  yeild and reset for next part
+			if line[0] == "E":
+				yield self
+				self = cls()
+				stimulus = {}
+				response = {}
+				continue
+
+			# no other character is valid
+			assert False
+
+	@property
+	def socket_name(self):
+		return "DIP%d" % self.socket_size
+
+	@property
+	def pinout(self):
+		"""
+		Return a pinout specification string compatible with the
+		pinout strings used by logic_chip.
+		"""
+		# FIXME:  circuit cellar definitions include a "T" pin type
+		# for "tri-state", which are used for pins that can be
+		# inputs or outputs
+		pins = ["X"] * self.socket_size
+		pins[self.pin_G - 1] = "G"
+		pins[self.pin_V - 1] = "V"
+		for i, pin_number in self.pin_numbers.items():
+			pins[pin_number - 1] = self.pin_types[i]
+		return "".join(pins)
+
+	def set_logic_family(self, logic_family_name):
+		# Circuit Cellar IC Tester is for 5 V parts only
+		assert logic_family_name == "TTL LS"
+
+		try:
+			self.logic_family = logic_families[logic_family_name]
+		except KeyError:
+			raise ValueError("unknown logic family \"%s\"" % logic_family_name)
+
+	@property
+	def voltage(self):
+		assert self.logic_family.Vcc_min <= 5. <= self.logic_family.Vcc_max
+		return 5.
+
+	@property
+	def vth(self):
+		return round(geomean(self.logic_family.Vih_min, self.logic_family.Vil_max), 1)
+
+	@property
+	def voltage_maps(self):
+		# NOTE;  VPUL must be set.  the test code uses pull-up
+		# channel driver for logic 1
+		return {
+			"default": {
+				"VPUL": self.voltage,
+				self.pin_G: 0.,
+				self.pin_V: self.voltage
+			}
+		}
+
+	def config(self, programmer):
+		self.programmer = programmer
+		self.socket = programmer.socket_module.sockets[self.socket_name]
+		self.power = allpro88.devices.power(self.programmer, self.socket, self.voltage_maps, vth = self.vth)
+		return self
+
+	def __enter__(self):
+		self.power.on()
+		return self
+
+	def __exit__(self, exc_type, exc_val, exc_tb):
+		self.power.off()
+		for channel in self.socket.values():
+			channel.config = allpro88.PINCON.DISABLE
+		# done.  if an exception has occurred, continue processing
+		return False
+
+	def test(self):
+		"""
+		Software emulation of the stimulus-response circuit in
+		Figure 1 of Part I of the Circuit Cellar IC Tester
+		description in BYTE Magazine, November 1987.
+
+		Returns None on success, or if the part fails returns the
+		tuple
+
+		(index, stimulus, expected_response, observed_response)
+
+		where index is the (stimulus, response) pair that failed
+		counted from 0.
+		"""
+		# NOTE:  PULLDN driver has too much resistance to ground to
+		# pull pins of some TLL logic families to a logic low
+		# state.  plain TTL, F, and S series have been obsered to
+		# fail.  using the TTL low driver, with only 50 Ohm to
+		# ground, could damage parts when applied to active-high
+		# output pins.  for now, only CMOS and low-power TTL parts
+		# (L, LS, etc.) will work
+		input_0 = allpro88.PINCON.PULLDN
+		input_1 = allpro88.PINCON.PULLUP
+
+		if self.progress_bar is not None:
+			self.progress_bar.reset(len(self.vectors))
+
+		for i, (stimulus, expected_response) in enumerate(self.vectors):
+			# apply the stimulus vector to the pins of the
+			# part.  all pins are driven, including the part's
+			# output pins, but via pull-up and pull-down
+			# channel drivers, so the part's input pins should
+			# take on logic high and low voltages while the
+			# part's output pins overpower the pull-up and
+			# pull-down resistors and decide the voltages.
+			for pin, state in stimulus.items():
+				self.socket[pin].config = input_1 if state else input_0
+
+			# read the state of each pin of the stimulus.  the
+			# channel drivers for the pins whose states are
+			# found to not agree with the stimulus vector are
+			# switched to match the measured state.
+			observed_response = {}
+			for pin in stimulus:
+				observed_response[pin] = state = bool(self.socket[pin])
+				if state != stimulus[pin]:
+					self.socket[pin].config = input_1 if state else input_0
+
+			# compare observed to expected response
+			if observed_response != expected_response:
+				for pin in stimulus:
+					self.socket[pin].config = allpro88.PINCON.DISABLE
+				return i, stimulus, expected_response, observed_response
+
+			if self.progress_bar is not None:
+				self.progress_bar.update()
+
+		return None
+
+
+class circuit_cellar_database:
+	"""
+	Interface allowing retrieval of individual parts from the Circuit
+	Cellar IC Tester parts database.  To use this, find and download
+	the "ictpc.zip" file and place it in %s.
+	""" % allpro88.paths.ALLPRO88_DATA_PATH
+
+	filename = os.path.join(allpro88.paths.ALLPRO88_DATA_PATH, "ictpc.zip")
+
+	def __init__(self, filename = None):
+		"""
+		Access the parts database.  If filename is None (the
+		default) then the default database file
+
+		%s
+
+		is used.
+		""" % type(self).filename
+		if filename is not None:
+			self.filename = filename
+		self.contents = {}
+		archive = zipfile.ZipFile(self.filename)
+		for filename in archive.namelist():
+			if not filename.endswith(".TST"):
+				continue
+			self.contents.update((part.name, part) for part in circuit_cellar_logic_chip.from_tst(io.TextIOWrapper(archive.open(filename))))
+
+	def get_part(self, name):
+		"""
+		Return a circuit_cellar_logic_chip instance for the part
+		named name.
+		"""
+		part = self.contents[name]
+		while part.clone:
+			part = self.contents[part.clone]
+		return part
+
+	@property
+	def parts(self):
+		"""
+		Generator yielding sequence of all part names in the
+		database.
+		"""
+		return self.contents.keys()
