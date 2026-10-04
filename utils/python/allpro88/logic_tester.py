@@ -215,8 +215,11 @@ class logic_chip:
 		in each test vector, power supply and no-connection pins
 		must be "-";  an input must be one of "0", "1" and will be
 		driven low or high respectively;  an output must be one of
-		"0", "1" or "X" indicating that the part will drive it low
-		or high or leave it floating, respectively.
+		"0" or "1" indicating that the part will drive it low or
+		high, respectively, "X" indicating the part will leave it
+		floating, or a "U" indicating that the part will drive it
+		low or high (not floating) but which it will be is unknown
+		(used for testing ROMs).
 
 		the power and no-connection pins must be the same in all
 		pinouts.  the part will not be power cycled when switched
@@ -553,12 +556,19 @@ class logic_chip:
 
 				state[pin_number - 1] = "?" if sum((state_is_0, state_is_1, state_is_X)) != 1 else "0" if state_is_0 else "1" if state_is_1 else "X"
 
-				if vector[pin_number - 1] == "0":
+				if vector[pin_number - 1] == "0" or (vector[pin_number - 1] == "U" and state_is_0):
 					state_0_highest[pin_number] = max(state_0_highest.get(pin_number, 0.0), voltage_pull_up)
-				elif vector[pin_number - 1] == "1":
+				elif vector[pin_number - 1] == "1" or (vector[pin_number - 1] == "U" and state_is_1):
 					state_1_lowest[pin_number] = min(state_1_lowest.get(pin_number, math.inf), voltage_pull_dn)
 				elif vector[pin_number - 1] != "X":
 					raise ValueError("invalid output state \"%s\" for pin %d in vector \"%s\"" % (vector[pin_number - 1], pin_number, vector))
+
+				# if the expected state was "U", and we did
+				# observe a definite logic state, then
+				# replace that state with the "U" code so
+				# the test vector comparison passes
+				if vector[pin_number - 1] == "U" and state[pin_number - 1] in "01":
+					state[pin_number - 1] = "U"
 
 			state = "".join(state)
 			if state != vector:
