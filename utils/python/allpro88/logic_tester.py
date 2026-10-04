@@ -28,6 +28,13 @@ import allpro88.devices
 import allpro88.paths
 
 
+def geomean(*vals):
+	"""
+	Return the geometric mean of the arguments.
+	"""
+	return math.exp(sum(math.log(val) for val in vals) / len(vals))
+
+
 #
 # =============================================================================
 #
@@ -381,16 +388,6 @@ class logic_chip:
 		except KeyError:
 			raise ValueError("unknown logic family \"%s\"" % logic_family_name)
 
-		# define a voltage map using the 0th pinout
-		# FIXME:  code only works with 5 V logic
-		assert self.voltage == 5.0, self.voltage
-		self.voltage_maps = {"default": {"VPUL": self.voltage}}
-		for i, pin_type in enumerate(self.pinout_vector_table[0], 1):
-			if pin_type == "V":
-				self.voltage_maps["default"][i] = self.voltage
-			elif pin_type == "G":
-				self.voltage_maps["default"][i] = 0.
-
 
 	@property
 	def voltage(self):
@@ -398,7 +395,25 @@ class logic_chip:
 		The geometric mean of the lowest and highest allowed supply
 		voltages rounded to 1 digit to the right of the decimal.
 		"""
-		return round(math.exp(0.5 * (math.log(self.logic_family.Vcc_min) + math.log(self.logic_family.Vcc_max))), 1)
+		# FIXME:  hard-coded for 5 V parts until we can figure out
+		# how threshold voltages are generically related to vcc
+		assert self.logic_family.Vcc_min <= 5. <= self.logic_family.Vcc_max
+		return 5.
+		return round(geomean(self.logic_family.Vcc_min, self.logic_family.Vcc_max), 1)
+
+
+	@property
+	def voltage_maps(self):
+		# define a voltage map using the 0th pinout
+		# NOTE;  VPUL must be set.  the test code uses pull-up channel
+		# driver for logic 1
+		voltage_map = {"VPUL": self.voltage}
+		for i, pin_type in enumerate(self.pinout_vector_table[0], 1):
+			if pin_type == "V":
+				voltage_map[i] = self.voltage
+			elif pin_type == "G":
+				voltage_map[i] = 0.
+		return {"default": voltage_map}
 
 
 	def config(self, programmer):
@@ -406,6 +421,8 @@ class logic_chip:
 		self.socket = programmer.socket_module.sockets[self.socket_name]
 		if len(self.socket) != len(self.pinout_vector_table[0]):
 			raise ValueError("socket %s has %d pins, this part's pinout has %d" % (self.socket_name, len(self.socket), len(self.pinout_vector_table[0])))
+		# NOTE:  vth is not used, pin states are determined by
+		# voltage measurements
 		self.power = allpro88.devices.power(self.programmer, self.socket, self.voltage_maps)
 		return self
 
@@ -442,6 +459,19 @@ class logic_chip:
 		return self
 
 
+	def read_inputs(self, n = 3):
+		"""
+		Returns a dictionary containing the voltages measured on
+		each of the input pins.  Confirms that the pull-up and
+		pull-down channel drivers are setting the input states
+		correctly, that the part does not have shorts on its input
+		pins.
+		"""
+		voltages = dict((i, channel.measure_v(n)) for i, channel in self.inputs.items())
+		self.power.reset_vth()
+		return voltages
+
+
 	def read_outputs(self, n = 3):
 		"""
 		Returns two dictionaries containing the voltages measured
@@ -472,14 +502,18 @@ class logic_chip:
 
 
 	def apply_vector_sequence(self, vectors):
-		# FIXME:  temporarily hard-coded for TTL parts
 		# FIXME:  the plan is to progressively increase the input_0
 		# voltage and decrease the input_1 voltage until the part
 		# fails a run-through of its test vectors, to measure the
 		# highest allowed logic-low and lowest allowed logic high
 		# input voltages.
+
+		# NOTE:  PULLDN driver has too much resistance to ground to
+		# pull pins of some TLL logic families to a logic low
+		# state.  plain TTL, F, and S series have been obsered to
+		# fail
 		input_0 = allpro88.PINCON.LOGICL
-		input_1 = allpro88.PINCON.LOGICH
+		input_1 = allpro88.PINCON.PULLUP
 
 		failed_vector_indexes = []
 		state_0_highest = {}
@@ -488,17 +522,23 @@ class logic_chip:
 		for vector_index, vector in enumerate(vectors):
 			state = ["-"] * len(vector)
 
-			# remember:  pins are counted from 1, strings are
-			# indexed from 0
+			# set input pin states.  remember:  pins are counted
+			# from 1, strings are indexed from 0
 			for pin_number, channel in self.inputs.items():
-				state[pin_number - 1] = vector[pin_number - 1]
-				if state[pin_number - 1] == "0":
+				if vector[pin_number - 1] == "0":
 					channel.config = input_0
-				elif state[pin_number - 1] == "1":
+				elif vector[pin_number - 1] == "1":
 					channel.config = input_1
 				else:
 					raise ValueError("invalid state \"%s\" for input pin %d in vector \"%s\"" % (state[pin_number - 1], pin_number, vector))
 
+			# read-back the input voltages.  helps diagnose the
+			# cause of a failure by testing for shorts on input
+			# pins.
+			for pin_number, voltage in self.read_inputs().items():
+				state[pin_number - 1] = "0" if voltage <= self.logic_family.Vil_max else "1" if voltage >= self.logic_family.Vih_min else "?"
+
+			# read output states
 			voltages_pull_up, voltages_pull_dn = self.read_outputs()
 
 			for pin_number in self.outputs:

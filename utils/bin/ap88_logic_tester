@@ -99,20 +99,21 @@ device.set_logic_family(logic_family)
 
 
 with allpro88.allpro88() as programmer:
-	print("\n\nTesting:  %s %s\n\tsocket: %s\n\tvoltage: %g V\n" % (logic_family, name, device.socket_name, device.voltage))
+	print("\n\nTesting:  %s %s\n\t%s\n\tsocket: %s\n\tvoltage: %g V\n\tmin V_oh: %g V\n\tmax V_ol: %g V\n" % (logic_family, name, device.description, device.socket_name, device.voltage, device.logic_family.Voh_min, device.logic_family.Vol_max))
 	with device.config(programmer) as dut:
 		with tqdm() as dut.progress_bar:
 			results, state_0_highest, state_1_lowest = dut.test()
 
 
 if not any(results.values()):
-	print("passed")
+	print("\nPASSED")
 else:
+	print("\nFAILED:")
 	for pinout, vectors in device.pinout_and_vectors:
 		failed_vector_indexes = results[pinout]
 		print("pinout \"%s\":  %s" % (pinout, "failed" if failed_vector_indexes else "passed"))
 		for i, expected_state, state in failed_vector_indexes:
-			print("\tvector %d:\n\t\texpected = %s,\n\t\tobserved = %s" % (i, expected_state, state))
+			print("\tvector %d:  %s\n\t\tpinout   = %s\n\t\texpected = %s\n\t\tobserved = %s" % (i, ("failed" if expected_state != state else ""), pinout, expected_state, state))
 
 print("\nhighest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
 print("\nlowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))
