@@ -67,6 +67,8 @@ def parse_command_line():
 	if options.circuit_cellar and options.list_logic_families:
 		raise ValueError("--circuit-cellar mode does not support logic family selection")
 
+	options.package_name = "A"
+
 	return options, logic_family, name
 
 
@@ -111,8 +113,12 @@ device.set_logic_family(logic_family)
 
 
 with allpro88.allpro88() as programmer:
-	print("\n\nTesting:  %s %s\n\t%s\n\tsocket: %s\n\tvoltage: %g V\n\tmin V_oh: %g V\n\tmax V_ol: %g V\n" % (logic_family, name, device.description, device.socket_name, device.voltage, device.logic_family.Voh_min, device.logic_family.Vol_max))
-	with device.config(programmer) as dut:
+	# FIXME:  allow package variant to be selected
+	with device.config(programmer, options.package_name) as dut:
+		print("\n\nTesting:  %s %s\n\t%s\n\tsocket: %s\n\tvoltage: %g V\n\tmin V_oh: %g V\n\tmax V_ol: %g V\n" % (logic_family, name, dut.description, dut.package["socket_name"], dut.voltage, dut.logic_family.Voh_min, dut.logic_family.Vol_max))
+		print("Package \"%s\":" % options.package_name)
+		dut.print_package(dut.package)
+		print()
 		with tqdm() as dut.progress_bar:
 			if options.circuit_cellar:
 				results = dut.test()

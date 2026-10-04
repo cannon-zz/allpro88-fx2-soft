@@ -171,34 +171,48 @@ class logic_chip:
 	# compatible socket module
 	socket_module = "AP88 PLCC"
 
-	def __init__(self, name = None, description = None, socket_name = None, pinout_vector_table = None, progress_bar = None):
+	def __init__(self, name = None, description = None, packages = None, vector_labels = None, test_vectors = None, progress_bar = None):
 		"""
 		name:  the name of the part without the logic family, e.g.,
 		\"7400\".
 
 		description:  brief human-readable description of the part.
 
-		socket_name:  one of the valid socket names defined for
-		self.socket_module, e.g., \"DIP14\".
+		packages:  a dictionary mapping package variant names
+		(usually meaningless letters, e.g., "A", "B", etc.) to
+		package type (socket name, e.g., "DIP14") and pinout.  A
+		pinout is a sequence of whitespace delimited arbitrary
+		non-whitespace labels in order by pin number.  the labels
+		are used to map test vector entries to pin numbers, and the
+		reserved labels "G", "V", and "X" indicate ground, power,
+		and non-connected pins, respectively.  only one set of
+		labels can be used, so all package variants must use the
+		same labels for their corresponding pins, but a package
+		variant is allowed to not use all the labels that other
+		package variants use --- those pins will be ignored in the
+		test vectors.
 
-		pinout_vector_table:  a sequence of the form
+		vector_labels:  a sequence of the labels used in the
+		package definitions, indicating the order of those pins in
+		the test vectors.  the "G", "V", and "X" labels need not
+		appear, but if they do their value must be set to "-" in
+		all test vectors.
 
-		(pinout, (vector, vector, ..., vector), pinout, (...), ...)
+		test_vectors:  a sequence of the form
+
+		(pintrait, (vector, vector, ..., vector), pintrait, (...), ...)
 
 		progress_bar:  an optional tqdm compatible progress bar.
 		at this time, only .reset() and .update() will be called.
 
-		the pinouts and vectors are strings, all equal in length to
-		the number of pins the socket socket_name has.  each
-		character in a pinout string is a character selected from
-		pin_types, and defines the function of that pin, in order.
-		NOTE:  pin numbers are counted from 1, while character
-		index in a Python string is counted from 0, so don't forget
-		to add 1 to the string index when matching pin functions
-		from the pinout string with pin numbers in the socket.
-		each pinout string is followed by a sequence of test vector
+		the pintraits and vectors are strings, all equal in length
+		to the number of entries in vector_labels.  each character
+		in a pintrait string is a character selected from
+		pin_types, and defines the function of the pin whose label
+		is in the corresponding position in vector_labels.  each
+		pintrait string is followed by a sequence of test vector
 		strings specifying pin states.  the socket channel drivers
-		will be configured according to the first pinout, and the
+		will be configured according to the first pintrait, and the
 		test vectors in the sequence that follows it applied one by
 		one, first setting the states of input pins then testing
 		the states of output pins.  the order in which input pins
@@ -206,36 +220,34 @@ class logic_chip:
 		before others then a sequence of test vectors must be
 		provided to affect the input state changes in the required
 		order.  when the vector sequence is complete, the channel
-		drivers are configured according to the next pinout, the
+		drivers are configured according to the next pintrait, the
 		next sequence of test vectors applied in order, and so on
 		until the entire sequence is exhausted.  at the end of a
 		test vector sequence, the channel drivers are left in their
 		final states.
 
-		in each test vector, power supply and no-connection pins
-		must be "-";  an input must be one of "0", "1" and will be
-		driven low or high respectively;  an output must be one of
-		"0" or "1" indicating that the part will drive it low or
-		high, respectively, "X" indicating the part will leave it
-		floating, or a "U" indicating that the part will drive it
-		low or high (not floating) but which it will be is unknown
-		(used for testing ROMs).
+		in each test vector, an input must be one of "0", "1" and
+		will be driven low or high respectively;  an output must be
+		one of "0" or "1" indicating that the part will drive it
+		low or high, respectively, "X" indicating the part will
+		leave it floating, or a "U" indicating that the part will
+		drive it low or high (not floating) but which it do is
+		unknown (used for testing ROMs).
 
-		the power and no-connection pins must be the same in all
-		pinouts.  the part will not be power cycled when switched
-		from one pinout configuration to the next, only the I/O pin
+		the part will not be power cycled when switched from one
+		pintrait configuration to the next, only the I/O pin
 		channel drivers are reconfigured.
 
 		parts with fixed inputs and outputs will have only a single
-		pinout and test vector sequence.  parts whose inputs and
+		pintrait and test vector sequence.  parts whose inputs and
 		outputs are configurable, for example bidirectional bus
-		transceivers, can be tested by providing multiple pinouts.
-		often more than one pinout is required for each
+		transceivers, can be tested by providing multiple pintraits.
+		often more than one pintrait is required for each
 		configuration to safely sequence such parts between
 		configruations.  it is essential that the final vector for
-		each pinout leave the part in a state that is safe for the
+		each pintrait leave the part in a state that is safe for the
 		next poinout's channel driver configuration, and it might
-		require more than one pinout change applied in a sequence
+		require more than one pintrait change applied in a sequence
 		to affect the reconfiguration safely.  recall that input
 		pins have their states set in a random order.
 
@@ -250,25 +262,25 @@ class logic_chip:
 		this could lead to a situation in which both the part and
 		the ALLPRO88 channel drivers are driving voltages onto the
 		same pins leading to a short-circuit risk.  a sequence of
-		pinout configurations can be used to initialize the part
+		pintrait configurations can be used to initialize the part
 		safely.  the part should begin in a disabled configuration,
-		starting with a pinout in which the enable and direction
+		starting with a pintrait in which the enable and direction
 		select pins are inputs and set in the first test vector as
 		needed to tri-state the bus I/O pins, which are all marked
-		as outputs in the pinout and set to the "X" state in that
-		first vector.  next a pinout corresponding to the part
+		as outputs in the pintrait and set to the "X" state in that
+		first vector.  next a pintrait corresponding to the part
 		being configured for one direction or another is given in
 		which the data I/O pins are now inputs or outputs as needed
-		but for the first test vector of the new pinout the part
+		but for the first test vector of the new pintrait the part
 		remains disabled with the output pins still in the "X"
 		state but now "0"/"1" input states given for the input pins
 		--- since the part is stll disabled it is safe for the
 		ALLPRO88 to drive those pins.  finally in the second test
-		vector for the new pinout the part is enabled and the
+		vector for the new pintrait the part is enabled and the
 		output states marked accordingly.  to change directionm, in
 		the final vector of the sequence the part is again disabled
 		and the outputs marked with "X".  that is followed by a new
-		pinout and single test vector like the first one:  all I/O
+		pintrait and single test vector like the first one:  all I/O
 		pins are marked as outputs, and the single test vector
 		keeps the part disabled and requires all data I/O pins to
 		be "X".  that leaves all I/O pin channel drivers disabled
@@ -283,8 +295,9 @@ class logic_chip:
 
 		self.name = name
 		self.description = description
-		self.socket_name = socket_name
-		self.pinout_vector_table = pinout_vector_table
+		self.packages = packages
+		self.vector_labels = vector_labels
+		self.test_vectors = test_vectors
 
 		#
 		# optional progress bar shown during test (some parts take
@@ -295,7 +308,7 @@ class logic_chip:
 		self.progress_bar = progress_bar
 
 		#
-		# temporarily hold configuration information for the pinout
+		# temporarily hold configuration information for the pintrait
 		# being tested
 		#
 
@@ -314,77 +327,111 @@ class logic_chip:
 		# configuration validation
 		#
 
-		if not self.pinout_vector_table:
-			raise ValueError("empty pinout_vector_table")
-		if len(self.pinout_vector_table) & 1:
-			raise ValueError("invalid pinout_vector_table")
+		if not self.packages:
+			raise ValueError("no package definitions")
+		all_pin_labels = set()
+		for name, package in self.packages.items():
+			if "socket_name" not in package or "pinout" not in package:
+				raise ValueError("package definition \"%s\" incomplete")
+			pin_labels = set(package["pinout"])
+			if "G" not in pin_labels or "V" not in pin_labels:
+				raise ValueError("package definition \"%s\" missing power connections")
+			all_pin_labels |= pin_labels
+		all_pin_labels -= set("GVX")
 
-		non_io_pins = self.non_io_pins(self.pinout_vector_table[0])
-		for pinout, vectors in self.pinout_and_vectors:
-			# check for invalid pin types, missing power
-			# supply pins, or incompatible pinout
-			if set(pinout) > set(pin_types):
-				raise ValueError("unrecognized pin types %s in pinout" % ", ".join(set(pinout) - set(pin_types)))
-			if "V" not in pinout:
-				raise ValueError("no power supply pin (V) in pinout \"%s\"" % pinout)
-			if "G" not in pinout:
-				raise ValueError("no power supply return pin (G) in pinout \"%s\"" % pinout)
-			if self.non_io_pins(pinout) != non_io_pins:
-				raise ValueError("power supply and/or non-connected pins in wrong position in pinout \"%s\"" % pinout)
+		if set(self.vector_labels) != all_pin_labels:
+			raise ValueError("vector_labels does not match labels in package definitions")
 
-			# confirm consistency of vectors with pinout
-			n = len(pinout)
-			non_signal_pins = set(i for i, pin_type in enumerate(pinout, 1) if pin_type in ("V", "G", "X"))
-			input_pins = set(i for i, pin_type in enumerate(pinout, 1) if pin_type == "I")
-			output_pins = set(i for i, pin_type in enumerate(pinout, 1) if pin_type == "O")
-			if non_signal_pins | input_pins | output_pins != set(range(1, n + 1)):
-				# impossible
-				raise RuntimeError
+		if not self.test_vectors:
+			raise ValueError("empty test_vectors")
+		if len(self.test_vectors) & 1:
+			raise ValueError("invalid test_vectors")
+
+		for pintrait, vectors in self.pinout_and_vectors:
+			# check for invalid pin types or pintrait
+			# incompatible with vector_labels
+			if set(pintrait) > set("IOX"):
+				raise ValueError("unrecognized pin types %s in pintrait" % ", ".join(set(pintrait) - set("IOX")))
+			if len(pintrait) != len(self.vector_labels):
+				raise ValueError("pintrain \"%s\" has wrong length" % pintrait)
+
+			# confirm consistency of vectors with pintrait
+			nc_pins = set(i for i, pin_type in enumerate(pintrait, 1) if pin_type == "X")
+			input_pins = set(i for i, pin_type in enumerate(pintrait, 1) if pin_type == "I")
+			output_pins = set(i for i, pin_type in enumerate(pintrait, 1) if pin_type == "O")
 			for vector in vectors:
-				if len(vector) != n:
+				if len(vector) != len(self.vector_labels):
 					raise ValueError("incorrect vector length \"%s\":  require %d pins" % (vector, n))
 				# strings indexed from 0, pins counted from 1
-				if set(vector[i - 1] for i in non_signal_pins) != set("-") or \
+				if set(vector[i - 1] for i in nc_pins) > set("-") or \
 				   set(vector[i - 1] for i in input_pins) > set("01") or \
 				   set(vector[i - 1] for i in output_pins) > set("01X"):
-					raise ValueError("vector \"%s\" invalid state for input, output, or non-signal pin in pinout \"%s\"" % (vector, pinout))
+					raise ValueError("vector \"%s\" invalid state for input, output, or non-signal pin in pintrait \"%s\"" % (vector, pintrait))
 
 
 	@property
 	def pinout_and_vectors(self):
-		return itertools.batched(self.pinout_vector_table, 2)
-
-
-	@staticmethod
-	def non_io_pins(pinout):
-		"""
-		Replace all I/O pins in a pinout with "-".  Used to test if
-		two pinouts have the same number of pins and if power and
-		no-connection pins are in the same positions.
-		"""
-		for pin_type in set(pin_types) - {"V", "G", "X"}:
-			pinout = pinout.replace(pin_type, "-")
-		return pinout
+		return itertools.batched(self.test_vectors, 2)
 
 
 	def to_yaml_string(self):
-		return yaml.safe_dump((
-			("format", 1),
-			("name", self.name),
-			("description", self.description),
-			("socket_name", self.socket_name),
-			("pinout_vector_table", self.pinout_vector_table),
-		), sort_keys = False)
+		packages = dict((name, dict(package)) for name, package in self.packages.items())
+		for package in packages.values():
+			package["pinout"] = " ".join(package["pinout"])
+		return yaml.safe_dump({
+			"format": 1,
+			"name": self.name,
+			"description": self.description,
+			"packages": packages,
+			"vector_labels": " ".join(self.vector_labels),
+			"test_vectors": self.test_vectors,
+		}, default_flow_style = False, sort_keys = False)
 
 
 	@classmethod
 	def from_yaml_string(cls, string):
-		kwargs = dict(yaml.safe_load(string))
+		kwargs = yaml.safe_load(string)
 		fmt = kwargs.pop("format", None)
 		if fmt != 1:
 			# hmm.  that's odd ...
 			raise RuntimeError
+		for package in kwargs["packages"].values():
+			package["pinout"] = package["pinout"].split()
+		kwargs["vector_labels"] = kwargs["vector_labels"].split()
 		return cls(**kwargs)
+
+
+	@staticmethod
+	def print_package(package):
+		socket_name = package["socket_name"]
+		pinout = package["pinout"]
+
+		if socket_name.startswith("DIP"):
+			assert not len(pinout) % 2
+			assert len(pinout) >= 4
+
+			widest_label = max(len(label) for label in pinout)
+			l_label_fmt = "%%%ds" % widest_label
+			r_label_fmt = "%%-%ds" % widest_label
+			widest_pin_number = len(str(len(pinout) + 1))
+			l_pin_number_fmt = "%%%dd" % widest_pin_number
+			r_pin_number_fmt = "%%-%dd" % widest_pin_number
+			cap = " " * widest_label + " +-" + "-" * 2 * widest_pin_number + "------+"
+			print(cap)
+			fmt = "%s | %s     %s | %s" % (l_label_fmt, l_pin_number_fmt, r_pin_number_fmt, r_label_fmt)
+			for n in range(len(pinout) // 2, 0, -1):
+				r_pin_number = n
+				l_pin_number = len(pinout) + 1 - r_pin_number
+				print(fmt % (pinout[l_pin_number - 1], l_pin_number, r_pin_number, pinout[r_pin_number - 1]))
+				if n == 3:
+					fmt = "%s | %s  _  %s | %s" % (l_label_fmt, l_pin_number_fmt, r_pin_number_fmt, r_label_fmt)
+				elif n == 2:
+					fmt = "%s | %s / \\ %s | %s" % (l_label_fmt, l_pin_number_fmt, r_pin_number_fmt, r_label_fmt)
+			print(cap)
+		elif socket_name.startswith("PLCC"):
+			assert not len(pinout) % 4
+		else:
+			raise ValueError(socket_name)
 
 
 	def set_logic_family(self, logic_family_name):
@@ -409,27 +456,36 @@ class logic_chip:
 
 	@property
 	def voltage_maps(self):
-		# define a voltage map using the 0th pinout
+		# define a voltage map using the 0th pintrait
 		# NOTE;  VPUL must be set.  the test code uses pull-up channel
 		# driver for logic 1
 		voltage_map = {"VPUL": self.voltage}
-		for i, pin_type in enumerate(self.pinout_vector_table[0], 1):
-			if pin_type == "V":
+		for i, pin_label in enumerate(self.package["pinout"], 1):
+			if pin_label == "V":
 				voltage_map[i] = self.voltage
-			elif pin_type == "G":
+			elif pin_label == "G":
 				voltage_map[i] = 0.
 		return {"default": voltage_map}
 
 
-	def config(self, programmer):
+	def config(self, programmer, package):
 		self.programmer = programmer
-		self.socket = programmer.socket_module.sockets[self.socket_name]
-		if len(self.socket) != len(self.pinout_vector_table[0]):
-			raise ValueError("socket %s has %d pins, this part's pinout has %d" % (self.socket_name, len(self.socket), len(self.pinout_vector_table[0])))
+		self.package = self.packages[package]
+		self.socket = programmer.socket_module.sockets[self.package["socket_name"]]
+		if len(self.socket) != len(self.package["pinout"]):
+			raise ValueError("socket \"%s\" has %d pins, but package \"%s\" has a pinout with %d" % (self.package["socket_name"], len(self.socket), package, len(self.package["pinout"])))
 		# NOTE:  vth is not used, pin states are determined by
 		# voltage measurements
 		self.power = allpro88.devices.power(self.programmer, self.socket, self.voltage_maps)
 		return self
+
+
+	def label_index_to_pin_number(self, i):
+		return self.package["pinout"].index(self.vector_labels[i]) + 1
+
+
+	def label_to_channel(self, label):
+		return self.socket[self.package["pinout"].index(label) + 1]
 
 
 	def __enter__(self):
@@ -445,22 +501,24 @@ class logic_chip:
 		return False
 
 
-	def set_pinout(self, pinout):
+	def set_pintrait(self, pintrait):
+		# .inputs and .outputs map index within test vector string
+		# to corresponding channel driver
 		self.inputs = {}
 		self.outputs = {}
-		for i, pin_type in enumerate(pinout, 1):
-			if pin_type in ("V", "G", "X"):
-				# power or not connected
+		for i, (label, pin_type) in enumerate(zip(self.vector_labels, pintrait)):
+			if pin_type == "X":
+				# not connected
 				continue
 			elif pin_type == "I":
 				# input
-				self.inputs[i] = self.socket[i]
+				self.inputs[i] = self.label_to_channel(label)
 			elif pin_type == "O":
 				# output
-				self.outputs[i] = self.socket[i]
+				self.outputs[i] = self.label_to_channel(label)
 				self.outputs[i].config = allpro88.PINCON.DISABLE
 			else:
-				raise ValueError("invalid pinout \"%s\"" % pinout)
+				raise ValueError("invalid pintrait \"%s\"" % pintrait)
 		return self
 
 
@@ -527,48 +585,50 @@ class logic_chip:
 		for vector_index, vector in enumerate(vectors):
 			state = ["-"] * len(vector)
 
-			# set input pin states.  remember:  pins are counted
-			# from 1, strings are indexed from 0
-			for pin_number, channel in self.inputs.items():
-				if vector[pin_number - 1] == "0":
+			# set input pin states.
+			for i, channel in self.inputs.items():
+				if vector[i] == "0":
 					channel.config = input_0
-				elif vector[pin_number - 1] == "1":
+				elif vector[i] == "1":
 					channel.config = input_1
 				else:
-					raise ValueError("invalid state \"%s\" for input pin %d in vector \"%s\"" % (state[pin_number - 1], pin_number, vector))
+					# impossible
+					raise RuntimeError
 
 			# read-back the input voltages.  helps diagnose the
 			# cause of a failure by testing for shorts on input
 			# pins.
-			for pin_number, voltage in self.read_inputs().items():
-				state[pin_number - 1] = "0" if voltage <= self.logic_family.Vil_max else "1" if voltage >= self.logic_family.Vih_min else "?"
+			for i, voltage in self.read_inputs().items():
+				state[i] = "0" if voltage <= self.logic_family.Vil_max else "1" if voltage >= self.logic_family.Vih_min else "?"
 
 			# read output states
 			voltages_pull_up, voltages_pull_dn = self.read_outputs()
 
-			for pin_number in self.outputs:
-				voltage_pull_up = voltages_pull_up[pin_number]
-				voltage_pull_dn = voltages_pull_dn[pin_number]
+			for i in self.outputs:
+				pin_number = self.label_index_to_pin_number(i)
+
+				voltage_pull_up = voltages_pull_up[i]
+				voltage_pull_dn = voltages_pull_dn[i]
 
 				state_is_0 = voltage_pull_up <= self.logic_family.Vol_max
 				state_is_1 = voltage_pull_dn >= self.logic_family.Voh_min
 				state_is_X = voltage_pull_dn <= self.logic_family.Vol_max and voltage_pull_up >= self.logic_family.Voh_min
 
-				state[pin_number - 1] = "?" if sum((state_is_0, state_is_1, state_is_X)) != 1 else "0" if state_is_0 else "1" if state_is_1 else "X"
+				state[i] = "?" if sum((state_is_0, state_is_1, state_is_X)) != 1 else "0" if state_is_0 else "1" if state_is_1 else "X"
 
-				if vector[pin_number - 1] == "0" or (vector[pin_number - 1] == "U" and state_is_0):
+				if vector[i] == "0" or (vector[i] == "U" and state_is_0):
 					state_0_highest[pin_number] = max(state_0_highest.get(pin_number, 0.0), voltage_pull_up)
-				elif vector[pin_number - 1] == "1" or (vector[pin_number - 1] == "U" and state_is_1):
+				elif vector[i] == "1" or (vector[i] == "U" and state_is_1):
 					state_1_lowest[pin_number] = min(state_1_lowest.get(pin_number, math.inf), voltage_pull_dn)
-				elif vector[pin_number - 1] != "X":
+				elif vector[i] != "X":
 					raise ValueError("invalid output state \"%s\" for pin %d in vector \"%s\"" % (vector[pin_number - 1], pin_number, vector))
 
 				# if the expected state was "U", and we did
 				# observe a definite logic state, then
 				# replace that state with the "U" code so
 				# the test vector comparison passes
-				if vector[pin_number - 1] == "U" and state[pin_number - 1] in "01":
-					state[pin_number - 1] = "U"
+				if vector[i] == "U" and state[i] in "01":
+					state[i] = "U"
 
 			state = "".join(state)
 			if state != vector:
@@ -585,11 +645,11 @@ class logic_chip:
 		state_0_highest = {}
 		state_1_lowest = {}
 		if self.progress_bar is not None:
-			self.progress_bar.reset(sum(len(vectors) for pinout, vectors in self.pinout_and_vectors))
-		for pinout, vectors in self.pinout_and_vectors:
-			self.set_pinout(pinout)
+			self.progress_bar.reset(sum(len(vectors) for pintrait, vectors in self.pinout_and_vectors))
+		for pintrait, vectors in self.pinout_and_vectors:
+			self.set_pintrait(pintrait)
 			failed_vector_indexes, this_state_0_highest, this_state_1_lowest = self.apply_vector_sequence(vectors)
-			results[pinout] = failed_vector_indexes
+			results[pintrait] = failed_vector_indexes
 			for pin_number, voltage in this_state_0_highest.items():
 				state_0_highest[pin_number] = max(state_0_highest.get(pin_number, 0.0), voltage)
 			for pin_number, voltage in this_state_1_lowest.items():
@@ -825,10 +885,10 @@ class circuit_cellar_logic_chip:
 		return "DIP%d" % self.socket_size
 
 	@property
-	def pinout(self):
+	def pintrait(self):
 		"""
-		Return a pinout specification string compatible with the
-		pinout strings used by logic_chip.
+		Return a pintrait specification string compatible with the
+		pintrait strings used by logic_chip.
 		"""
 		# FIXME:  circuit cellar definitions include a "T" pin type
 		# for "tri-state", which are used for pins that can be
@@ -870,7 +930,7 @@ class circuit_cellar_logic_chip:
 			}
 		}
 
-	def config(self, programmer):
+	def config(self, programmer, package = None):
 		self.programmer = programmer
 		self.socket = programmer.socket_module.sockets[self.socket_name]
 		self.power = allpro88.devices.power(self.programmer, self.socket, self.voltage_maps, vth = self.vth)
