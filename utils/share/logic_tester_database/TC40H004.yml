@@ -1,11 +1,11 @@
 format: 1
-name: '4004'
-description: Hex inverter
+name: 'TC40H004'
+description: Hex inverter, C2MOS
 packages:
   A:
     socket_name: DIP14
-    pinout: A B C D E F G H I J K L M V
-vector_labels: A B C D E F H I J K L M
+    pinout: 1A 1Y 2A 2Y 3A 3Y G 4Y 4A 5Y 5A 6Y 6A V
+vector_labels: 1A 1Y 2A 2Y 3A 3Y 4Y 4A 5Y 5A 6Y 6A
 test_vectors:
 - IOIOIOOIOIOI
 - - '010101101010'
