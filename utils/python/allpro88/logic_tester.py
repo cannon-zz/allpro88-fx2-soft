@@ -406,16 +406,17 @@ class logic_chip:
 		socket_name = package["socket_name"]
 		pinout = package["pinout"]
 
+		widest_label = max(len(label) for label in pinout)
+		l_label_fmt = "%%%ds" % widest_label
+		r_label_fmt = "%%-%ds" % widest_label
+		widest_pin_number = len(str(len(pinout) + 1))
+		l_pin_number_fmt = "%%%dd" % widest_pin_number
+		r_pin_number_fmt = "%%-%dd" % widest_pin_number
+
 		if socket_name.startswith("DIP"):
 			assert not len(pinout) % 2
 			assert len(pinout) >= 4
 
-			widest_label = max(len(label) for label in pinout)
-			l_label_fmt = "%%%ds" % widest_label
-			r_label_fmt = "%%-%ds" % widest_label
-			widest_pin_number = len(str(len(pinout) + 1))
-			l_pin_number_fmt = "%%%dd" % widest_pin_number
-			r_pin_number_fmt = "%%-%dd" % widest_pin_number
 			cap = " " * widest_label + " +-" + "-" * 2 * widest_pin_number + "------+"
 			print(cap)
 			fmt = "%s | %s     %s | %s" % (l_label_fmt, l_pin_number_fmt, r_pin_number_fmt, r_label_fmt)
@@ -430,7 +431,49 @@ class logic_chip:
 			print(cap)
 		elif socket_name.startswith("PLCC"):
 			assert not len(pinout) % 4
-			print("FIXME")
+			pinnumbers = list(range(1, len(pinout) + 1))
+
+			# top
+			n = (len(pinout) // 4) // 2
+			pinnumbers = pinnumbers[-n:] + pinnumbers[:-n]
+			t_pinnumbers = pinnumbers[:len(pinnumbers) // 4][::-1]
+			del pinnumbers[:len(pinnumbers) // 4]
+			labels = [l_label_fmt % pinout[n - 1] for n in t_pinnumbers]
+			t_pinnumbers = [r_pin_number_fmt % n for n in t_pinnumbers]
+			fmt = " " * (widest_label + 3 + widest_pin_number) + "%s"
+			for row in map(" ".join, zip(*labels)):
+				print(fmt % row)
+			print(" " * (widest_label + 3) + "-" * (2 * widest_pin_number + 2 * len(labels)) + "+")
+			fmt = " " * widest_label + "  /" + " " * widest_pin_number + "%s" + " " * widest_pin_number + " |"
+			for row in map(" ".join, zip(*t_pinnumbers)):
+				print(fmt % row)
+				fmt = " " * widest_label + " | " + " " * widest_pin_number + "%s" + " " * widest_pin_number + " |"
+
+			# sides
+			n = len(pinout) // 4
+			l_pinnumbers = pinnumbers[:n]
+			del pinnumbers[:n]
+			r_pinnumbers = pinnumbers[-n:][::-1]
+			del pinnumbers[-n:]
+			l_labels = [l_label_fmt % pinout[n - 1] for n in l_pinnumbers]
+			l_pinnumbers = [r_pin_number_fmt % n for n in l_pinnumbers]
+			r_labels = [r_label_fmt % pinout[n - 1] for n in r_pinnumbers]
+			r_pinnumbers = [l_pin_number_fmt % n for n in r_pinnumbers]
+			fmt = "%s | %s" + " " * (len(t_pinnumbers) * 2 - 1) + "%s | %s"
+			for row in zip(l_labels, l_pinnumbers, r_pinnumbers, r_labels):
+				print(fmt % row)
+
+			# bottom
+			b_pinnumbers = pinnumbers
+			labels = [r_label_fmt % pinout[n - 1] for n in b_pinnumbers]
+			b_pinnumbers = [l_pin_number_fmt % n for n in b_pinnumbers]
+			fmt = " " * widest_label + " | " + " " * widest_pin_number + "%s" + " " * widest_pin_number + " |"
+			for row in map(" ".join, zip(*b_pinnumbers)):
+				print(fmt % row)
+			print(" " * (widest_label + 1) + "+" + "-" * (2 * widest_pin_number + 1 + 2 * len(labels)) + "+")
+			fmt = " " * (widest_label + 3 + widest_pin_number) + "%s"
+			for row in map(" ".join, zip(*labels)):
+				print(fmt % row)
 		else:
 			raise ValueError(socket_name)
 
