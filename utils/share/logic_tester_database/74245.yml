@@ -5,7 +5,7 @@ packages:
   A:
     socket_name: DIP20
     pinout: DIR A1 A2 A3 A4 A5 A6 A7 A8 G B8 B7 B6 B5 B4 B3 B2 B1 OE V
-  A:
+  B:
     socket_name: PLCC20
     pinout: DIR A1 A2 A3 A4 A5 A6 A7 A8 G B8 B7 B6 B5 B4 B3 B2 B1 OE V
 vector_labels: DIR A1 A2 A3 A4 A5 A6 A7 A8 B8 B7 B6 B5 B4 B3 B2 B1 OE
