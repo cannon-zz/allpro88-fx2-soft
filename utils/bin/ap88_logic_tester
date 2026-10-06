@@ -55,7 +55,7 @@ def parse_command_line():
 	elif options.circuit_cellar:
 		if len(names) != 1:
 			raise ValueError("require part name")
-		logic_family = "TTL LS"
+		logic_family = "TTL-LS"
 		name, = names
 	elif len(names) < 2:
 		raise ValueError("logic family and part name are required")
