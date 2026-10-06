@@ -1,6 +1,6 @@
 format: 1
 name: '74125'
-description: Quadruple bus buffer with 3-state outputs
+description: Quad bus buffer with 3-state outputs
 packages:
   A:
     socket_name: DIP14
