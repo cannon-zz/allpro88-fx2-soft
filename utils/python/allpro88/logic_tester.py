@@ -430,6 +430,7 @@ class logic_chip:
 			print(cap)
 		elif socket_name.startswith("PLCC"):
 			assert not len(pinout) % 4
+			print("FIXME")
 		else:
 			raise ValueError(socket_name)
 

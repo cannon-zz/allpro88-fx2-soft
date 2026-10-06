@@ -40,36 +40,42 @@ def parse_command_line():
 	parser = argparse.ArgumentParser(
 		prog = "ap88_logic_tester",
 		description = "Test digital logic chips in an ALLPRO88.",
-		usage = "%(prog)s [options] <logic family> <part name>\n%(prog)s --circuit-cellar [options] <part name>",
-		epilog = "A logic family and part name are required.  The ALLPRO88 must be powered and the part inserted in its socket before the program is started.  Use -f, --list-logic-families to show a list of all supported logic family names.  Use -p, --list-parts to show a list of all supported part names.\n\nThe choice of logic family sets the electrical characteristics, for example the input and output voltage thresholds and the supply voltage limits.  Selecting the wrong logic family can damage the part by exceeding its voltage limits.  The part name selects the logic behaviour to test.  Some manufacturers use unique naming schemes for parts, for example Motorola calls its version of a 4069 hex inverter an MC14069.  If the name of the part you wish to test is not in the database, there might be a functional equivalent to select instead."
+		usage = "%(prog)s [options] <logic family> <part name> <package>\n%(prog)s --circuit-cellar [options] <part name>",
+		epilog = "In normal operation, a logic family, part name, and package name are required.  The ALLPRO88 must be powered and the part inserted in its socket before the program is started.  Use -f, --list-logic-families to show a list of all supported logic family names.  Use -p, --list-parts to show a list of all supported part names.  For a given part, use -d, --list-packages to show a list of the package variants and their names defined for that part.\n\nThe choice of logic family sets the electrical characteristics, for example the input and output voltage thresholds and the supply voltage limits.  Selecting the wrong logic family can damage the part by exceeding its voltage limits.  Only the input and output voltage levels and some limited I/O pin load handling capatiblity are tested.  The ALLPRO88 does not provide the facilities required for complete verification of manufacturer specifications like propagation time and so on.\n\nThe part name selects the logic behaviour to test.\n\nMost parts are available in a variety of packages, and the package name selects a socket and pinout combination.  Care must be taken in selecting the package as the wrong choice can cause power to be applied to the wrong pins of the part.\n\nSome manufacturers use unique naming schemes for parts, for example Motorola calls its version of a 4069 hex inverter an MC14069.  If the name of the part you wish to test is not in the database, there might be a functional equivalent to select instead."
 	)
 	parser.add_argument("-c", "--circuit-cellar", action = "store_true", help = "Circuit Cellar IC Tester emulation mode.")
 	parser.add_argument("-f", "--list-logic-families", action = "store_true", help = "List all supported logic families.")
 	parser.add_argument("-p", "--list-parts", action = "store_true", help = "List all supported part names.")
+	parser.add_argument("-d", "--list-packages", metavar = "part_name", help = "List the package variants defined for part \"part_name\".")
 
 	options, names = parser.parse_known_args()
 
-	if options.list_logic_families or options.list_parts:
-		# ignore the non-option arguments if a --list-xxx is given
-		logic_family, name = None, None
-	elif options.circuit_cellar:
-		if len(names) != 1:
+	if options.circuit_cellar:
+		# swith to circuit cellar mode
+		logic_family, package_name = "TTL-LS", None
+		if options.list_logic_families or options.list_packages:
+			raise ValueError("--circuit-cellar mode does not support logic family or package selection")
+		if options.list_parts:
+			# ignore the non-option arguments if --list-parts
+			# is given
+			name = None
+		elif len(names) < 1:
 			raise ValueError("require part name")
-		logic_family = "TTL-LS"
-		name, = names
-	elif len(names) < 2:
-		raise ValueError("logic family and part name are required")
-	elif len(names) == 2:
-		logic_family, name = names
+		elif len(names) > 1:
+			raise ValueError("unrecogznized arguments after part name: \"%s\"" % names[2:])
+		else:
+			name, = names
+	elif options.list_logic_families or options.list_parts or options.list_packages:
+		# ignore the non-option arguments if a --list-xxx is given
+		logic_family, name, package_name = None, None, None
+	elif len(names) < 3:
+		raise ValueError("logic family, part name, and package are required")
+	elif len(names) > 3:
+		raise ValueError("unrecogznized arguments after package: \"%s\"" % names[3:])
 	else:
-		raise ValueError("unrecogznized arguments after part name: \"%s\"" % names[2:])
+		logic_family, name, package_name = names
 
-	if options.circuit_cellar and options.list_logic_families:
-		raise ValueError("--circuit-cellar mode does not support logic family selection")
-
-	options.package_name = "A"
-
-	return options, logic_family, name
+	return options, logic_family, name, package_name
 
 
 #
@@ -81,7 +87,7 @@ def parse_command_line():
 #
 
 
-options, logic_family, name = parse_command_line()
+options, logic_family, name, package_name = parse_command_line()
 
 
 if options.circuit_cellar:
@@ -99,12 +105,24 @@ if options.list_logic_families:
 		print(fmt % (logic_family, logic_family_def.description))
 
 if options.list_parts:
-	print("Part Name")
-	print("---------")
-	for entry in sorted(database.parts):
-		print(entry)
+	part_names = list(database.parts)
+	fmt = "%%%ds\t%%s" % max(map(len, part_names))
+	print(fmt % ("Part Name", "Description"))
+	#print(fmt % ("         ", "Packages"))
+	print(fmt % ("---------", "-----------"))
+	for name in sorted(part_names):
+		part = database.get_part(name)
+		print(fmt % (name, part.description))
+		#print(fmt % ("", ", ".join(sorted(package["socket_name"] for package in part.packages.values()))))
 
-if options.list_logic_families or options.list_parts:
+if options.list_packages:
+	part = database.get_part(options.list_packages)
+	for package_name, package in sorted(part.packages.items()):
+		print("package \"%s\" (%s):" % (package_name, package["socket_name"]))
+		part.print_package(package)
+		print()
+
+if options.list_logic_families or options.list_parts or options.list_packages:
 	sys.exit(0)
 
 
@@ -114,9 +132,9 @@ device.set_logic_family(logic_family)
 
 with allpro88.allpro88() as programmer:
 	# FIXME:  allow package variant to be selected
-	with device.config(programmer, options.package_name) as dut:
+	with device.config(programmer, package_name) as dut:
 		print("\n\nTesting:  %s %s\n\t%s\n\tsocket: %s\n\tvoltage: %g V\n\tmin V_oh: %g V\n\tmax V_ol: %g V\n" % (logic_family, name, dut.description, dut.package["socket_name"], dut.voltage, dut.logic_family.Voh_min, dut.logic_family.Vol_max))
-		print("Package \"%s\":" % options.package_name)
+		print("Package \"%s\":" % package_name)
 		dut.print_package(dut.package)
 		print()
 		with tqdm() as dut.progress_bar:
