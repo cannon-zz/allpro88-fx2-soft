@@ -1,5 +1,4 @@
 format: 1
-name: '7401'
 description: Quad 2-input NAND gate, open-collector outputs
 packages:
   A:

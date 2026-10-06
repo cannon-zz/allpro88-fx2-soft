@@ -1,5 +1,4 @@
 format: 1
-name: '74244'
 description: Octal line driver with 3-state outputs
 packages:
   A:

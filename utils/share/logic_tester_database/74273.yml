@@ -1,5 +1,4 @@
 format: 1
-name: '74273'
 description: Octal D-type flip-flop with clear
 packages:
   A:

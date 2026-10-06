@@ -1,5 +1,4 @@
 format: 1
-name: '7405'
 description: Hex inverter, open-collector outputs
 packages:
   A:

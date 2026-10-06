@@ -1,5 +1,4 @@
 format: 1
-name: '7402'
 description: Quad 2-input NOR gate
 packages:
   A:

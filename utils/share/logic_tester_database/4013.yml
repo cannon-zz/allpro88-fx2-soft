@@ -1,5 +1,4 @@
 format: 1
-name: '4013'
 description: Dual D-type flip-flop
 packages:
   A:

@@ -1,5 +1,4 @@
 format: 1
-name: '74245'
 description: Octal bus transceiver with 3-state outputs
 packages:
   A:

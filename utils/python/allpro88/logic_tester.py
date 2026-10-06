@@ -330,12 +330,12 @@ class logic_chip:
 		if not self.packages:
 			raise ValueError("no package definitions")
 		all_pin_labels = set()
-		for name, package in self.packages.items():
+		for package_name, package in self.packages.items():
 			if "socket_name" not in package or "pinout" not in package:
-				raise ValueError("package definition \"%s\" incomplete")
+				raise ValueError("package definition \"%s\" incomplete" % package_name)
 			pin_labels = set(package["pinout"])
 			if "G" not in pin_labels or "V" not in pin_labels:
-				raise ValueError("package definition \"%s\" missing power connections")
+				raise ValueError("package definition \"%s\" missing power connections" % package_name)
 			all_pin_labels |= pin_labels
 		all_pin_labels -= set("GVX")
 
@@ -375,12 +375,11 @@ class logic_chip:
 
 
 	def to_yaml_string(self):
-		packages = dict((name, dict(package)) for name, package in self.packages.items())
+		packages = dict((package_name, dict(package)) for package_name, package in self.packages.items())
 		for package in packages.values():
 			package["pinout"] = " ".join(package["pinout"])
 		return yaml.safe_dump({
 			"format": 1,
-			"name": self.name,
 			"description": self.description,
 			"packages": packages,
 			"vector_labels": " ".join(self.vector_labels),
@@ -389,7 +388,7 @@ class logic_chip:
 
 
 	@classmethod
-	def from_yaml_string(cls, string):
+	def from_yaml_string(cls, name, string):
 		kwargs = yaml.safe_load(string)
 		fmt = kwargs.pop("format", None)
 		if fmt != 1:
@@ -398,7 +397,7 @@ class logic_chip:
 		for package in kwargs["packages"].values():
 			package["pinout"] = package["pinout"].split()
 		kwargs["vector_labels"] = kwargs["vector_labels"].split()
-		return cls(**kwargs)
+		return cls(name = name, **kwargs)
 
 
 	@staticmethod
@@ -730,7 +729,7 @@ class database:
 		"""
 		Return a logic_chip instance for the part named name.
 		"""
-		return logic_chip.from_yaml_string(self.contents.extractfile(os.path.join("logic_tester_database", "%s.yml" % name)))
+		return logic_chip.from_yaml_string(name, self.contents.extractfile(os.path.join("logic_tester_database", "%s.yml" % name)))
 
 	@property
 	def parts(self):

@@ -1,5 +1,4 @@
 format: 1
-name: '7414'
 description: Hex Schmitt-trigger inverter
 packages:
   A:
