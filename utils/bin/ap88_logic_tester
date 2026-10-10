@@ -18,6 +18,7 @@
 
 
 import argparse
+import itertools
 import math
 import random
 import sys
@@ -151,15 +152,13 @@ if options.circuit_cellar:
 		print("\nFAILED:")
 		print(results)
 else:
-	if not any(results.values()):
+	if not any(results[1::2]):
 		print("\nPASSED")
 	else:
 		print("\nFAILED:")
-		for pinout, vectors in device.pinout_and_vectors:
-			failed_vector_indexes = results[pinout]
-			print("pinout \"%s\":  %s" % (pinout, "failed" if failed_vector_indexes else "passed"))
-			for i, expected_state, state in failed_vector_indexes:
-				print("\tvector %d:  %s\n\t\tpinout   = %s\n\t\texpected = %s\n\t\tobserved = %s" % (i, ("failed" if expected_state != state else ""), pinout, expected_state, state))
+		for pintrait_index, (pintrait, failed_vector_indexes) in enumerate(itertools.batched(results, 2)):
+			for vector_index, expected_state, state in failed_vector_indexes:
+				print("pintrait %d / vector %d:  %s\n\tpintrait = %s\n\texpected = %s\n\tobserved = %s" % (pintrait_index, vector_index, ("failed" if expected_state != state else ""), pintrait, expected_state, state))
 
 	print("\nhighest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
 	print("\nlowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))

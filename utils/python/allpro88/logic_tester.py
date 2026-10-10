@@ -687,15 +687,15 @@ class logic_chip:
 
 
 	def test(self):
-		results = {}
+		results = []
 		state_0_highest = {}
 		state_1_lowest = {}
 		if self.progress_bar is not None:
 			self.progress_bar.reset(sum(len(vectors) for pintrait, vectors in self.pinout_and_vectors))
-		for pintrait, vectors in self.pinout_and_vectors:
+		for pintrait, vectors in self.pintrait_and_vectors:
 			self.set_pintrait(pintrait)
 			failed_vector_indexes, this_state_0_highest, this_state_1_lowest = self.apply_vector_sequence(vectors)
-			results[pintrait] = failed_vector_indexes
+			results += [pintrait, failed_vector_indexes]
 			for pin_number, voltage in this_state_0_highest.items():
 				state_0_highest[pin_number] = max(state_0_highest.get(pin_number, 0.0), voltage)
 			for pin_number, voltage in this_state_1_lowest.items():
