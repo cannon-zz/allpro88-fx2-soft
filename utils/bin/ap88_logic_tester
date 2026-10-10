@@ -108,12 +108,12 @@ if options.list_parts:
 	part_names = list(database.parts)
 	fmt = "%%%ds\t%%s" % max(map(len, part_names))
 	print(fmt % ("Part Name", "Description"))
-	#print(fmt % ("         ", "Packages"))
+	print(fmt % ("         ", "Packages"))
 	print(fmt % ("---------", "-----------"))
 	for name in sorted(part_names):
 		part = database.get_part(name)
 		print(fmt % (name, part.description))
-		#print(fmt % ("", ", ".join(sorted(package["socket_name"] for package in part.packages.values()))))
+		print(fmt % ("", ", ".join(sorted(package["socket_name"] for package in part.packages.values()))))
 
 if options.list_packages:
 	part = database.get_part(options.list_packages)
