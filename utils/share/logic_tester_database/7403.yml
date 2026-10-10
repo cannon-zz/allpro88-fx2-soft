@@ -1,4 +1,4 @@
-# verified
+# verified (package A)
 format: 1
 description: Quad 2-input NAND gate, open-collector outputs
 packages:
