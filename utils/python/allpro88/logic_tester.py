@@ -86,7 +86,10 @@ logic_families = {
 	"CMOS":		logic_family("CMOS (1968)",
 		5.0,     5.0,     2.0,     0.8,     2.4,     0.4),
 	"C2MOS":	logic_family("Toshiba clocked CMOS (1973)",
-		2.0,     8.0,     4.0,     1.0,     4.7,     0.1),
+	# C2MOS drives its outputs to nearly the voltage rails, but only if
+	# unloaded.  when loaded, a logic low output can be as high as 0.4
+	# V and a logic high output can be as low as 3.5 V
+		2.0,     8.0,     4.0,     1.0,     3.5,     0.5),
 	"CMOS-AC":	logic_family("advanced CMOS",
 		3.0,     5.0,     3.5,     1.0,     4.7,     0.1),
 	"CMOS-ACT":	logic_family("advanced CMOS (TTL compatible)",
