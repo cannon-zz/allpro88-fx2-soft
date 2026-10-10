@@ -412,7 +412,7 @@ class logic_chip:
 		l_pin_number_fmt = "%%%dd" % widest_pin_number
 		r_pin_number_fmt = "%%-%dd" % widest_pin_number
 
-		if socket_name.startswith("DIP"):
+		if socket_name.startswith("DIP") or socket_name.startswith("RDIP"):
 			assert not len(pinout) % 2
 			assert len(pinout) >= 4
 
