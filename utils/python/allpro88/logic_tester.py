@@ -350,7 +350,7 @@ class logic_chip:
 		if len(self.test_vectors) & 1:
 			raise ValueError("invalid test_vectors")
 
-		for pintrait, vectors in self.pinout_and_vectors:
+		for pintrait, vectors in self.pintrait_and_vectors:
 			# check for invalid pin types or pintrait
 			# incompatible with vector_labels
 			if set(pintrait) > set("IOX"):
@@ -373,7 +373,7 @@ class logic_chip:
 
 
 	@property
-	def pinout_and_vectors(self):
+	def pintrait_and_vectors(self):
 		return itertools.batched(self.test_vectors, 2)
 
 
@@ -701,7 +701,7 @@ class logic_chip:
 		state_0_highest = {}
 		state_1_lowest = {}
 		if self.progress_bar is not None:
-			self.progress_bar.reset(sum(len(vectors) for pintrait, vectors in self.pinout_and_vectors))
+			self.progress_bar.reset(sum(len(vectors) for pintrait, vectors in self.pintrait_and_vectors))
 		for pintrait, vectors in self.pintrait_and_vectors:
 			self.set_pintrait(pintrait)
 			failed_vector_indexes, this_state_0_highest, this_state_1_lowest = self.apply_vector_sequence(vectors)
