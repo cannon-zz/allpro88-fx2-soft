@@ -356,7 +356,7 @@ class logic_chip:
 			if set(pintrait) > set("IOX"):
 				raise ValueError("unrecognized pin types %s in pintrait" % ", ".join(set(pintrait) - set("IOX")))
 			if len(pintrait) != len(self.vector_labels):
-				raise ValueError("pintrain \"%s\" has wrong length" % pintrait)
+				raise ValueError("pintrait \"%s\" has wrong length" % pintrait)
 
 			# confirm consistency of vectors with pintrait
 			nc_pins = set(i for i, pin_type in enumerate(pintrait, 1) if pin_type == "X")
