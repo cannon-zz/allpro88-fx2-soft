@@ -937,8 +937,12 @@ class circuit_cellar_logic_chip:
 			assert False
 
 	@property
-	def socket_name(self):
-		return "DIP%d" % self.socket_size
+	def packages(self):
+		return {
+			"A": {
+				"socket_name": "DIP%d" % self.socket_size
+			}
+		}
 
 	@property
 	def pintrait(self):
