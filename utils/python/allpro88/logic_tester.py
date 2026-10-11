@@ -37,6 +37,23 @@ def geomean(*vals):
 	return math.exp(sum(math.log(val) for val in vals) / len(vals))
 
 
+def iterbits(n):
+	"""
+	Generator yielding all 2**n n-tuples of booleans from (False, ...,
+	False) to (True, ..., True).
+	"""
+	return itertools.product(*((False, True),) * n)
+
+
+def bits_to_str(*bits, lo = "0", hi = "1"):
+	"""
+	Return a string of "0" and "1" from the boolean values of the
+	arguments.  The lo and hi keyword arguments can be used to override
+	the characters used for False and True states.
+	"""
+	return "".join(hi if b else lo for b in bits)
+
+
 #
 # =============================================================================
 #
