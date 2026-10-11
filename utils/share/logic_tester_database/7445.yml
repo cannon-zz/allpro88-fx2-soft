@@ -1,0 +1,26 @@
+format: 1
+description: 4-line to 10-line decoder (1-of-10), BCD input, open-collector outputs
+packages:
+  A:
+    socket_name: DIP16
+    pinout: 0 1 2 3 4 5 6 G 7 8 9 D C B A V
+vector_labels: D C B A 9 8 7 6 5 4 3 2 1 0
+test_vectors:
+- IIIIOOOOOOOOOO
+- - 0000XXXXXXXXX0
+  - 0001XXXXXXXX0X
+  - 0010XXXXXXX0XX
+  - 0011XXXXXX0XXX
+  - 0100XXXXX0XXXX
+  - 0101XXXX0XXXXX
+  - 0110XXX0XXXXXX
+  - 0111XX0XXXXXXX
+  - 1000X0XXXXXXXX
+  - 10010XXXXXXXXX
+  - 1010XXXXXXXXXX
+  - 1011XXXXXXXXXX
+  - 1100XXXXXXXXXX
+  - 1101XXXXXXXXXX
+  - 1110XXXXXXXXXX
+  - 1111XXXXXXXXXX
+
