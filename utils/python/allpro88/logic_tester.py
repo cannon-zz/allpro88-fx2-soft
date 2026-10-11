@@ -600,14 +600,16 @@ class logic_chip:
 		# simultaneously affects the behaviour
 		voltages_pull_up = {}
 		voltages_pull_dn = {}
+		voltages_open = {}
 		for i, channel in self.outputs.items():
 			channel.config = allpro88.PINCON.PULLUP
 			voltages_pull_up[i] = channel.measure_v(n)
 			channel.config = allpro88.PINCON.PULLDN
 			voltages_pull_dn[i] = channel.measure_v(n)
 			channel.config = allpro88.PINCON.DISABLE
+			voltages_open[i] = channel.measure_v(n)
 		self.power.reset_vth()
-		return voltages_pull_up, voltages_pull_dn
+		return voltages_pull_up, voltages_pull_dn, voltages_open
 
 
 	def apply_vector_sequence(self, vectors):
@@ -648,18 +650,26 @@ class logic_chip:
 				state[i] = "0" if voltage <= self.logic_family.Vil_max else "1" if voltage >= self.logic_family.Vih_min else "?"
 
 			# read output states
-			voltages_pull_up, voltages_pull_dn = self.read_outputs()
+			voltages_pull_up, voltages_pull_dn, voltages_open = self.read_outputs()
 
 			for i in self.outputs:
 				pin_number = self.label_index_to_pin_number(i)
 
 				voltage_pull_up = voltages_pull_up[i]
 				voltage_pull_dn = voltages_pull_dn[i]
+				voltage_open = voltages_open[i]
 
 				state_is_0 = voltage_pull_up <= self.logic_family.Vol_max
 				state_is_1 = voltage_pull_dn >= self.logic_family.Voh_min
 				state_is_X = voltage_pull_dn <= self.logic_family.Vol_max and voltage_pull_up >= self.logic_family.Voh_min
 
+				state_open_is_0 = voltage_open <= self.logic_family.Vol_max
+				state_open_is_1 = voltage_open >= self.logic_family.Voh_min
+				state_open_is_X = not (state_open_is_0 or state_open_is_1)
+
+				# FIXME:  consider using the open state to
+				# handle logic families like C2MOS that
+				# have extremely weak output drive ability
 				state[i] = "?" if sum((state_is_0, state_is_1, state_is_X)) != 1 else "0" if state_is_0 else "1" if state_is_1 else "X"
 
 				if vector[i] == "0" or (vector[i] == "U" and state_is_0):
