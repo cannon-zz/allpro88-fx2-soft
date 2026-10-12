@@ -1,0 +1,31 @@
+format: 1
+description: BCD to 7-segment decoder
+packages:
+  A:
+    socket_name: DIP14
+    pinout: B C ~BI D A e G d c b a g f V
+  B:
+    socket_name: PLCC20
+    pinout: X B C ~BI X D X A e G X d c b X a X g f V
+vector_labels: ~BI D C B A a b c d e f g
+test_vectors:
+- IIIIIOOOOOOO
+- - '000000000000'
+  - '100001111110'
+  - '100001111110'
+  - '100010110000'
+  - '100101101101'
+  - '100111111001'
+  - '101000110011'
+  - '101011011011'
+  - '101100011111'
+  - '101110001111'
+  - '110001111111'
+  - '110011110011'
+  - '110100001101'
+  - '110110011001'
+  - '111000100011'
+  - '111011001011'
+  - '111100001111'
+  - '111110000000'
+
