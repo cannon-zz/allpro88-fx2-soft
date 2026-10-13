@@ -63,7 +63,7 @@ def parse_command_line():
 		elif len(names) < 1:
 			raise ValueError("require part name")
 		elif len(names) > 1:
-			raise ValueError("unrecogznized arguments after part name: \"%s\"" % names[2:])
+			raise ValueError("unrecogznized arguments after part name: \"%s\"" % names[1:])
 		else:
 			name, = names
 	elif options.list_logic_families or options.list_parts or options.list_packages:
