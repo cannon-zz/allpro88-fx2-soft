@@ -111,10 +111,14 @@ if options.list_parts:
 	print(fmt % ("Part Name", "Description"))
 	print(fmt % ("         ", "Packages"))
 	print(fmt % ("---------", "-----------"))
+	n_parts = len(part_names)
+	n_packages = 0
 	for name in sorted(part_names):
 		part = database.get_part(name)
 		print(fmt % (name, part.description))
 		print(fmt % ("", ", ".join(sorted(package["socket_name"] for package in part.packages.values()))))
+		n_packages += len(part.packages)
+	print("Total:  %d parts in %d packages" % (n_parts, n_packages))
 
 if options.list_packages:
 	part = database.get_part(options.list_packages)
