@@ -191,12 +191,14 @@ class logic_chip:
 	# compatible socket module
 	socket_module = "AP88 PLCC"
 
-	def __init__(self, name = None, description = None, packages = None, vector_labels = None, test_vectors = None, progress_bar = None):
+	def __init__(self, name = None, description = None, comment = None, packages = None, vector_labels = None, test_vectors = None, progress_bar = None):
 		"""
 		name:  the name of the part without the logic family, e.g.,
 		\"7400\".
 
 		description:  brief human-readable description of the part.
+
+		comment:  human-readable comments, hints, and explanations.
 
 		packages:  a dictionary mapping package variant names
 		(usually meaningless letters, e.g., "A", "B", etc.) to
@@ -315,6 +317,7 @@ class logic_chip:
 
 		self.name = name
 		self.description = description
+		self.comment = comment
 		self.packages = packages
 		self.vector_labels = vector_labels
 		self.test_vectors = test_vectors
@@ -401,6 +404,7 @@ class logic_chip:
 		return yaml.safe_dump({
 			"format": 1,
 			"description": self.description,
+			"comment": self.comment,
 			"packages": packages,
 			"vector_labels": " ".join(self.vector_labels),
 			"test_vectors": self.test_vectors,
@@ -416,6 +420,8 @@ class logic_chip:
 			raise RuntimeError
 		for package in kwargs["packages"].values():
 			package["pinout"] = package["pinout"].split()
+			if "comment" not in package:
+				package["comment"] = None
 		kwargs["vector_labels"] = kwargs["vector_labels"].split()
 		return cls(name = name, **kwargs)
 

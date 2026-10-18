@@ -1,13 +1,6 @@
-# the 1X and ~1X inputs are not normal digital logic inputs.  if used, they
-# are meant to be connected to the collector and emitter, respectively, of
-# an NPN transistor in the output stage of a 7460.  we do not attempt to
-# provide suitable input signals here, leaving them floating as per the
-# datasheet.  the function of these pins is not confirmed by these tests.
-# however, since these inputs make direct connections to the logic chip's
-# internal signal lines, if the chip's gates are working then unless the 1X
-# or ~1X inputs are physically disconnected they must also be working.
 format: 1
 description: Dual 4-input NOR with strobe, expandable
+comment: The 1X and ~1X inputs are not normal digital logic inputs.  If used, they are meant to be connected to the collector and emitter, respectively, of an NPN transistor in the output stage of a 7460.  We do not attempt to provide suitable input signals here, leaving them floating as per the datasheet.  The function of these pins is not confirmed by these tests.  However, since these inputs make direct connections to the logic chip's internal signal lines, if the chip's gates are working then unless the 1X or ~1X inputs are physically disconnected they must also be working.
 packages:
   A:
     socket_name: DIP16

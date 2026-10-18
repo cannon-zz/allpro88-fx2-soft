@@ -1,8 +1,6 @@
-# 7454 is the same as 7453 but instead of the X and ~X inputs has two pins
-# that must be left disconnected.  since we don't test the X and ~X pin
-# functions here we can use this file for both parts
 format: 1
 description: 4-wide AND-OR-invert gates, expandable ('53), not TTL-H TTL-L TTL-LS
+comment: 7454 is the same as 7453 but instead of the X and ~X inputs has two pins that must be left disconnected.  Since we don't test the X and ~X pin functions here we can use this file for both parts.
 packages:
   A:
     socket_name: DIP14

@@ -122,8 +122,13 @@ if options.list_parts:
 
 if options.list_packages:
 	part = database.get_part(options.list_packages)
+	print("name:  \"%s\"\ndescription:  %s\n" % (part.name, part.description))
+	if part.comment is not None:
+		print("%s\n" % part.comment)
 	for package_name, package in sorted(part.packages.items()):
 		print("package \"%s\" (%s):" % (package_name, package["socket_name"]))
+		if package["comment"] is not None:
+			print("%s" % package["comment"])
 		part.print_package(package)
 		print()
 

@@ -1,20 +1,18 @@
-# the X and ~X pins are disconnected in the test vectors, therefore use
-# package A for TTL-L and TTL-LS parts.  the PLCC pinout labels two of the
-# not-connected pins X and ~X for compatibility with the test vectors.
-# these are hacks to avoid creating a separate file just for the L and LS
-# parts
 format: 1
 description: 2-wide 4-input AND-OR-invert gates, expandable (TTL-H)
+comment: The X and ~X pins are disconnected in the test vectors, therefore use package A for TTL-L and TTL-LS parts.  The PLCC20 pinout labels two of the not-connected pins "x" and "~x" for compatibility with the test vectors.  These are hacks to avoid creating a separate part definition file just for the L and LS parts.
 packages:
   A:
     socket_name: DIP14
     pinout: A B C D x X G Y ~x E F g H V
+    comment: Also use this for DIP14 TTL-L and TTL-LS parts.  The "x" and "~x" pins are not connected on L and LS parts, but these test vectors do not test their function and leave them floating.
   B:
     socket_name: DIP14
     pinout: A B C V E F g H x X G Y ~x D
   C:
-    socket_name: PLCC
+    socket_name: PLCC20
     pinout: X A B C X D x X X G X Y ~x E X F X g H V
+    comment:  The "x" and "~x" labels are placed so the same test vectors can be used for this package.  There are no "x" and "~x" pins on PLCC20 packages, but these test vectors do not test their function and leave them floating.
 vector_labels: x ~x A B C D E F g H Y
 test_vectors:
 - XXIIIIIIIIO

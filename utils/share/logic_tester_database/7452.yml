@@ -1,17 +1,6 @@
-# both parts include three 2-input AND gates and one 3-input AND gate, the
-# four of which are combined in a 4-input OR gate.  for some reason,
-# different labels have been used for the pin functions of the different
-# package variants.  for example, in the 1985 TTL Data Book the inputs of
-# the 3-input AND gate are labelled C, D, and E for the package with power
-# on pins 14 and 7, but are labelled G, H and I for the package with power
-# on pins 4 and 11.  the labels of the J and N package variants in this
-# file match the datasheet.  the labels for the W package have been changed
-# to match the labels of the other package so that the same test vectors
-# can be used for both packages.  if this was not done, the two packages
-# would have to be treated here as two distinct parts with their own test
-# vectors.
 format: 1
 description: 4-wide AND-OR gates, expandable
+comment: Both parts include three 2-input AND gates and one 3-input AND gate, the four of which are combined in a 4-input OR gate.  For some reason, different labels have been used for the pin functions of the different package variants.  For example, in the 1985 TTL Data Book the inputs of the 3-input AND gate are labelled C, D, and E for the package with power on pins 14 and 7, but are labelled G, H and I for the package with power on pins 4 and 11.  The labels of the J and N package variants in this file match the datasheet.  The labels for the W package have been changed to match the labels of the other package so that the same test vectors can be used for both packages.  If this was not done, the two packages would have to be treated here as two distinct parts with their own test vectors.
 packages:
   J,N:
     socket_name: DIP14

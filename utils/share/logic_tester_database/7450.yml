@@ -1,12 +1,6 @@
-# 1X and ~1X inputs are not normal logic inputs, they are to be connected
-# to the collector and emitter, respectively, of an NPN transistor in the
-# output stage of a 7460.  they are left floating if not used.  their
-# function is not tested here, but since they connect directly to internal
-# circuits within the gates the assumption is that unless they are
-# physically disconnected if the gates are behaving correctly then the
-# functions of these pins must also be working.
 format: 1
 description: Dual 2-wide 2-input AND-OR-invert gates, expandable
+comment: The 1X and ~1X inputs are not normal logic inputs, they are to be connected to the collector and emitter, respectively, of an NPN transistor in the output stage of a 7460.  They are left floating if not used.  Their function is not tested here, but since they connect directly to internal circuits within the gates the assumption is that unless they are physically disconnected if the gates are behaving correctly then the functions of these pins must also be working.
 packages:
   A:
     socket_name: DIP14
