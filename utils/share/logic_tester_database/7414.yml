@@ -1,10 +1,10 @@
-# verified (package A)
 format: 1
 description: Hex Schmitt-trigger inverter
 packages:
   A:
     socket_name: DIP14
     pinout: 1A 1Y 2A 2Y 3A 3Y G 4Y 4A 5Y 5A 6Y 6A V
+    verified: true
   B:
     socket_name: PLCC20
     pinout: X 1A 1Y 2A X 2Y X 3A 3Y G X 4Y 4A 5Y X 5A X 6Y 6A V

@@ -1,10 +1,10 @@
-# verified (package A)
 format: 1
 description: Dual 4-input AND gate
 packages:
   A:
     socket_name: DIP14
     pinout: 1A 1B X 1C 1D 1Y G 2Y 2A 2B X 2C 2D V
+    verified: true
   B:
     socket_name: DIP14
     pinout: 1A 1Y X V X 2A 2B 2C 2D 2Y G 1B 1C 1D

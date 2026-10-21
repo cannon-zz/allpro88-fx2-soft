@@ -422,6 +422,8 @@ class logic_chip:
 			package["pinout"] = package["pinout"].split()
 			if "comment" not in package:
 				package["comment"] = None
+			if "verified" not in package:
+				package["verified"] = False
 		kwargs["vector_labels"] = kwargs["vector_labels"].split()
 		return cls(name = name, **kwargs)
 

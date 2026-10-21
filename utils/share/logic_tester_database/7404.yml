@@ -1,10 +1,10 @@
-# verified (package A)
 format: 1
 description: Hex inverter
 packages:
   A:
     socket_name: DIP14
     pinout: 1A 1Y 2A 2Y 3A 3Y G 4Y 4A 5Y 5A 6Y 6A V
+    verified: true
   B:
     socket_name: DIP14
     pinout: 1A 2Y 2A V 3A 3Y 4A 4Y 5A 5Y G 6Y 6A 1Y

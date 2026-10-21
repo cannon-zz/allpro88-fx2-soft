@@ -1,10 +1,10 @@
-# verified (package A)
 format: 1
 description: Hex buffer, open-collector outputs
 packages:
   A:
     socket_name: DIP14
     pinout: 1A 1Y 2A 2Y 3A 3Y G 4Y 4A 5Y 5A 6Y 6A V
+    verified: true
 vector_labels: 1A 1Y 2A 2Y 3A 3Y 4A 4Y 5A 5Y 6A 6Y
 test_vectors:
 - IOIOIOIOIOIO
