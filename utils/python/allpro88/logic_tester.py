@@ -37,12 +37,14 @@ def geomean(*vals):
 	return math.exp(sum(math.log(val) for val in vals) / len(vals))
 
 
-def iterbits(n):
+def iterbits(n, reverse = False):
 	"""
 	Generator yielding all 2**n n-tuples of booleans from (False, ...,
 	False) to (True, ..., True).
 	"""
-	return itertools.product(*((False, True),) * n)
+	# force to False or True
+	reverse = bool(reverse)
+	return itertools.product(*((reverse, not reverse),) * n)
 
 
 def bits_to_str(*bits, lo = "0", hi = "1"):
