@@ -1,10 +1,10 @@
 format: 1
 description: AND-gated J-K positive-edge-triggered flip-flop with preset
-comment: null
+comment: Note that 54L71 and 54H71 are different parts.  Use this for 54H71.
 packages:
   A:
     socket_name: DIP14
-    pinout: J1A J1B J2B ~PRE Q G ~Q K1A K1B K2A K2B CLK V
+    pinout: J1A J1B J2A J2B ~PRE Q G ~Q K1A K1B K2A K2B CLK V
     verified: false
   B:
     socket_name: DIP14
