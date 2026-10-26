@@ -792,6 +792,17 @@ smm2365 = tmm2365p
 ###
 
 
+part = d2716
+
+
 with allpro88.allpro88() as programmer:
-	with m27c256(programmer, "read") as device:
-		open("dump.dat", "wb").write(device.read())
+	with part(programmer, "read") as device:
+		data = device.read()
+		open("dump.dat", "wb").write(data)
+	for i in range(2):
+		with part(programmer, "read") as device:
+			if data != device.read():
+				print("verify failed")
+				sys.exit(1)
+print("verify succeeded")
+sys.exit(0)
