@@ -310,6 +310,10 @@ class nmc27c16q(m27cx_width8_pulse_ce):
 	Tpw = 100 # us
 
 
+class d2716(nmc27c16q):
+	Tpw = 50 # us
+
+
 class hn462716(nmc27c16q):
 	voltage_maps = {
 		"read": {
