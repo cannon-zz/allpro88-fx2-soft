@@ -439,8 +439,8 @@ class logic_chip:
 		l_label_fmt = "%%%ds" % widest_label
 		r_label_fmt = "%%-%ds" % widest_label
 		widest_pin_number = len(str(len(pinout) + 1))
-		l_pin_number_fmt = "%%%dd" % widest_pin_number
-		r_pin_number_fmt = "%%-%dd" % widest_pin_number
+		l_pin_number_fmt = "%%-%dd" % widest_pin_number
+		r_pin_number_fmt = "%%%dd" % widest_pin_number
 
 		if socket_name.startswith("DIP") or socket_name.startswith("RDIP"):
 			assert not len(pinout) % 2
@@ -468,7 +468,7 @@ class logic_chip:
 			t_pinnumbers = pinnumbers[:len(pinnumbers) // 4][::-1]
 			del pinnumbers[:len(pinnumbers) // 4]
 			labels = [l_label_fmt % pinout[n - 1] for n in t_pinnumbers]
-			t_pinnumbers = [r_pin_number_fmt % n for n in t_pinnumbers]
+			t_pinnumbers = [l_pin_number_fmt % n for n in t_pinnumbers]
 			fmt = " " * (widest_label + 3 + widest_pin_number) + "%s"
 			for row in map(" ".join, zip(*labels)):
 				print(fmt % row)
@@ -485,9 +485,9 @@ class logic_chip:
 			r_pinnumbers = pinnumbers[-n:][::-1]
 			del pinnumbers[-n:]
 			l_labels = [l_label_fmt % pinout[n - 1] for n in l_pinnumbers]
-			l_pinnumbers = [r_pin_number_fmt % n for n in l_pinnumbers]
+			l_pinnumbers = [l_pin_number_fmt % n for n in l_pinnumbers]
 			r_labels = [r_label_fmt % pinout[n - 1] for n in r_pinnumbers]
-			r_pinnumbers = [l_pin_number_fmt % n for n in r_pinnumbers]
+			r_pinnumbers = [r_pin_number_fmt % n for n in r_pinnumbers]
 			fmt = "%s | %s" + " " * (len(t_pinnumbers) * 2 - 1) + "%s | %s"
 			for row in zip(l_labels, l_pinnumbers, r_pinnumbers, r_labels):
 				print(fmt % row)
@@ -495,7 +495,7 @@ class logic_chip:
 			# bottom
 			b_pinnumbers = pinnumbers
 			labels = [r_label_fmt % pinout[n - 1] for n in b_pinnumbers]
-			b_pinnumbers = [l_pin_number_fmt % n for n in b_pinnumbers]
+			b_pinnumbers = [r_pin_number_fmt % n for n in b_pinnumbers]
 			fmt = " " * widest_label + " | " + " " * widest_pin_number + "%s" + " " * widest_pin_number + " |"
 			for row in map(" ".join, zip(*b_pinnumbers)):
 				print(fmt % row)
