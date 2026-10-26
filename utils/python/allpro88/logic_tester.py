@@ -167,20 +167,6 @@ logic_families = {
 
 
 #
-# pin types
-#
-
-
-pin_types = {
-	"V":	"supply voltage",
-	"G":	"supply return",
-	"X":	"no connection",
-	"I":	"input",
-	"O":	"output"
-}
-
-
-#
 # =============================================================================
 #
 #                                  Logic Chip
@@ -205,22 +191,21 @@ class logic_chip:
 		packages:  a dictionary mapping package variant names
 		(usually meaningless letters, e.g., "A", "B", etc.) to
 		package type (socket name, e.g., "DIP14") and pinout.  A
-		pinout is a sequence of whitespace delimited arbitrary
-		non-whitespace labels in order by pin number.  the labels
-		are used to map test vector entries to pin numbers, and the
-		reserved labels "G", "V", and "X" indicate ground, power,
-		and non-connected pins, respectively.  only one set of
-		labels can be used, so all package variants must use the
-		same labels for their corresponding pins, but a package
-		variant is allowed to not use all the labels that other
-		package variants use --- those pins will be ignored in the
-		test vectors.
+		pinout is a sequence of non-whitespace labels in order by
+		pin number.  the labels are used to map test vector entries
+		to pin numbers, and the reserved labels "G", "V", and "X"
+		indicate ground, power, and non-connected pins,
+		respectively.  only one set of labels can be used, so all
+		package variants must use the same labels for their
+		corresponding pins, but a package variant is allowed to not
+		use all the labels that other package variants use ---
+		those pins will be ignored in the test vectors.
 
-		vector_labels:  a sequence of the labels used in the
-		package definitions, indicating the order of those pins in
-		the test vectors.  the "G", "V", and "X" labels need not
-		appear, but if they do their value must be set to "-" in
-		all test vectors.
+		vector_labels:  a sequence of the labels appearing in the
+		package definition pinouts, used to map the values in each
+		pintrait and test vector string to the corresponding pins
+		on the device under test.  the reserved "G", "V", and "X"
+		labels must not appear.
 
 		test_vectors:  a sequence of the form
 
@@ -231,9 +216,10 @@ class logic_chip:
 
 		the pintraits and vectors are strings, all equal in length
 		to the number of entries in vector_labels.  each character
-		in a pintrait string is a character selected from
-		pin_types, and defines the function of the pin whose label
-		is in the corresponding position in vector_labels.  each
+		in a pintrait string defines the function of the pin whose
+		label is in the corresponding position in vector_labels.
+		an input pin is marked "I", an output pin marked "O", and
+		pins that are to be left disconnected are marked "X".  each
 		pintrait string is followed by a sequence of test vector
 		strings specifying pin states.  the socket channel drivers
 		will be configured according to the first pintrait, and the
@@ -254,9 +240,11 @@ class logic_chip:
 		will be driven low or high respectively;  an output must be
 		one of "0" or "1" indicating that the part will drive it
 		low or high, respectively, "X" indicating the part will
-		leave it floating, or a "U" indicating that the part will
-		drive it low or high (not floating) but which it do is
-		unknown (used for testing ROMs).
+		leave it floating, "?" indicating that the part will drive
+		it low or high (not floating) but which it will do is
+		unknown (e.g., used for testing ROM output pins), or "-"
+		indicating the pin's state is to be ignored.  pins marked
+		"X" in the pintrait must be marked "-" in the test vector.
 
 		the part will not be power cycled when switched from one
 		pintrait configuration to the next, only the I/O pin
@@ -364,8 +352,10 @@ class logic_chip:
 			all_pin_labels |= pin_labels
 		all_pin_labels -= set("GVX")
 
-		if set(self.vector_labels) != all_pin_labels:
-			raise ValueError("vector_labels does not match labels in package definitions")
+		if all_pin_labels - set(self.vector_labels):
+			raise ValueError("vector_labels missing labels {%s} appearing in package definitions" % ", ".join(all_pin_labels - set(self.vector_labels)))
+		if set(self.vector_labels) - all_pin_labels:
+			raise ValueError("vector_labels has labels {%s} not appearing in package definitions" % ", ".join(set(self.vector_labels) - all_pin_labels))
 
 		if not self.test_vectors:
 			raise ValueError("empty test_vectors")
@@ -375,7 +365,7 @@ class logic_chip:
 		for pintrait, vectors in self.pintrait_and_vectors:
 			# check for invalid pin types or pintrait
 			# incompatible with vector_labels
-			if set(pintrait) > set("IOX"):
+			if set(pintrait) - set("IOX"):
 				raise ValueError("unrecognized pin types %s in pintrait" % ", ".join(set(pintrait) - set("IOX")))
 			if len(pintrait) != len(self.vector_labels):
 				raise ValueError("pintrait \"%s\" has wrong length" % pintrait)
@@ -386,11 +376,11 @@ class logic_chip:
 			output_pins = set(i for i, pin_type in enumerate(pintrait, 1) if pin_type == "O")
 			for vector in vectors:
 				if len(vector) != len(self.vector_labels):
-					raise ValueError("incorrect vector length \"%s\":  require %d pins" % (vector, n))
+					raise ValueError("incorrect vector length \"%s\":  require %d pins" % (vector, len(self.vector_labels)))
 				# strings indexed from 0, pins counted from 1
-				if set(vector[i - 1] for i in nc_pins) > set("-") or \
-				   set(vector[i - 1] for i in input_pins) > set("01") or \
-				   set(vector[i - 1] for i in output_pins) > set("01X"):
+				if set(vector[i - 1] for i in nc_pins) - set("-") or \
+				   set(vector[i - 1] for i in input_pins) - set("01") or \
+				   set(vector[i - 1] for i in output_pins) - set("01?X-"):
 					raise ValueError("vector \"%s\" invalid state for input, output, or non-signal pin in pintrait \"%s\"" % (vector, pintrait))
 
 
@@ -680,7 +670,11 @@ class logic_chip:
 			voltages_pull_up, voltages_pull_dn, voltages_open = self.read_outputs()
 
 			for i in self.outputs:
-				pin_number = self.label_index_to_pin_number(i)
+				# if the expected state is "-" then ignore
+				# this pin.  leave the observed state "-"
+				# so the state vector test passes.
+				if vector[i] == "-":
+					continue
 
 				voltage_pull_up = voltages_pull_up[i]
 				voltage_pull_dn = voltages_pull_dn[i]
@@ -699,19 +693,20 @@ class logic_chip:
 				# have extremely weak output drive ability
 				state[i] = "?" if sum((state_is_0, state_is_1, state_is_X)) != 1 else "0" if state_is_0 else "1" if state_is_1 else "X"
 
-				if vector[i] == "0" or (vector[i] == "U" and state_is_0):
+				pin_number = self.label_index_to_pin_number(i)
+				if vector[i] == "0" or (vector[i] == "?" and state_is_0):
 					state_0_highest[pin_number] = max(state_0_highest.get(pin_number, 0.0), voltage_pull_up)
-				elif vector[i] == "1" or (vector[i] == "U" and state_is_1):
+				elif vector[i] == "1" or (vector[i] == "?" and state_is_1):
 					state_1_lowest[pin_number] = min(state_1_lowest.get(pin_number, math.inf), voltage_pull_dn)
 				elif vector[i] != "X":
 					raise ValueError("invalid output state \"%s\" for pin %d in vector \"%s\"" % (vector[pin_number - 1], pin_number, vector))
 
-				# if the expected state was "U", and we did
+				# if the expected state was "?", and we did
 				# observe a definite logic state, then
-				# replace that state with the "U" code so
+				# replace the observed state with "?" so
 				# the test vector comparison passes
-				if vector[i] == "U" and state[i] in "01":
-					state[i] = "U"
+				if vector[i] == "?" and state[i] in "01":
+					state[i] = "?"
 
 			state = "".join(state)
 			if state != vector:
