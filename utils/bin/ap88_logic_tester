@@ -169,5 +169,5 @@ else:
 			for vector_index, expected_state, state in failed_vector_indexes:
 				print("pintrait %d / vector %d:  %s\n\tpintrait = %s\n\texpected = %s\n\tobserved = %s" % (pintrait_index, vector_index, ("failed" if expected_state != state else ""), pintrait, expected_state, state))
 
-	print("\nhighest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
-	print("\nlowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))
+	print("\nwith pull-up applied, highest logic low output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_0_highest.items())))
+	print("\nwith pull-down applied, lowest logic high output voltages:\n%s" % "\n".join("\t%d: %g V" % (pin_number, voltage) for pin_number, voltage in sorted(state_1_lowest.items())))
