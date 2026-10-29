@@ -1481,7 +1481,6 @@ class allpro88:
 		# system ID code to enable or disable the appropriate
 		# features.  someone with an ALLPRO non-88 would need to do
 		# some research on that.
-
 		return self.read_addr(0x0300) & 0xf
 
 	@property
@@ -1496,9 +1495,10 @@ class allpro88:
 		#
 		#	ALLPRO 88 = 0x03
 		#	ALLPRO C  = 0x02
-		#	ALLPRO B  = 0X01
+		#	ALLPRO B  = 0x01
 		#
-		# I don't know what the "C" and "B" variants are.
+		# I don't know what the "C" and "B" variants are.  should
+		# we guess there was an "A" that was ID 0x00?
 		names = {
 			0x01:	"ALLPRO B",
 			0x02:	"ALLPRO C",
