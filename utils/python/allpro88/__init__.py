@@ -1430,20 +1430,29 @@ class allpro88:
 			if not 0 <= socket_module_id <= 255:
 				raise ValueError("invalid environment variable ALLPRO88_SOCKET_MODULE=\"%s\":  require base 16 integer between 0x00 and 0xff inclusively" % os.getenv("ALLPRO88_SOCKET_MODULE"))
 			return socket_module_id
-		# FIXME:  addresses 0x0280 through 0x02ff inclusively
-		# comprise a 128 byte I/O window reserved for use by the
-		# socket module.  the PLCC socket module will respond with
-		# the ID byte when any address in that range is read.  I'm
-		# sure there's a correct address, the address where Logical
-		# Devices' DOS software would look for the ID, but I don't
-		# know what it is.  I tried reverse-compiling an ALLPRO88
-		# DOS program so see if I could see where it reads the
-		# socket module ID byte from, but gave up.  I'm retrieving
-		# the ID byte from 0x0280 because that's what was in
-		# kevtris' notes, but I think both of us only have access
-		# to the PLCC socket module, we don't have examples of
-		# other's, so I think what the correct address should be
-		# remains an open question.
+		# addresses 0x0280 through 0x02ff inclusively comprise a
+		# 128 byte I/O window reserved for use by the socket
+		# module.  the PLCC socket module will respond with the ID
+		# byte when any address in that range is read.  kevtris'
+		# notes say to retrieve this from 0x280, but actually any
+		# address in the socket module window will work.  if we
+		# want to make our own socket modules, and we'd like to
+		# have write and read capabilities at some addresses, what
+		# is the correct address for the ID byte?  where did
+		# Logical Devices' own tools look for that number?  not
+		# knowing that number has been *the* reason I haven't tried
+		# making my own socket module.  well, nick tOri of
+		# reversing.pl fame
+		#
+		# https://reversing.pl/index.html
+		#
+		# found a kind soul at Logical Devices who provided ...
+		# wait for it ... the SOURCE CODE for "DIAG4.EXE", one of
+		# the original diagnostic programmes.  actual source code.
+		# from that we find the magic number, the address where
+		# Logical Devices' own software is hard-coded to look for
+		# the module ID:  0x280.  for example, on line 395 of
+		# DIAGHDWR.C.
 		return self.read_addr(0x0280)
 
 
@@ -1534,6 +1543,10 @@ class allpro88:
 
 	vsr = dacregister(address = 0x0300)
 	vth = dacregister(address = 0x0301)
+	# DIAG4.EXE source code shows Logic Devices used a 200 ms delay.
+	# 50 ms seems long based on my measurements, but maybe it would be
+	# better to add a much larger safety margin?  I don't know, it's a
+	# big difference.
 	vadj = dacregister(address = 0x0302, transient = 0.05)
 	vadjth = dacregister(address = 0x0303)
 	# must call .load_dacs() for vpul changes
