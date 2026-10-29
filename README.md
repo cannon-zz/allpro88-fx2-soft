@@ -122,4 +122,6 @@ https://github.com/djmuhlestein/fx2lib.git
 
 and is periodically synchronized with that project.  Relevant patches will be contributed back to that project.
 
-This wouldn't have been possible without the kind generous work of these people!
+More recently (2026-10), I learned of nick tOri's web site https://reversing.pl and his ALLPRO88 work, documented at https://reversing.pl/narzedzia/ap88/ap88.html.  He found a magical fairy (I can only assume) at Logical Devices (still in business, by the way) who shared the original source code for their DOS applications with him.  You can find it on his web site.  From that I've learned the correct address for the socket module ID byte, and that asserting the !RESET line isn't necessarily enough to reset all socket modules they've sold.  I've also learned the settling time delays they chose to allow for their power supplies:  substantially longer than I've put into this code, delays I based on experimental observations of my own systems, soo ... that's something I might have to watch out for.  Anyway, amazing.
+
+This project wouldn't have been possible without the kind generous work of these people!  Especially a huge thank you to Logical Devices for letting us peek into the original source code.
