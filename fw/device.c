@@ -670,6 +670,22 @@ static void allpro88_hard_reset(void)
 	allpro88_xfer_PINDACs();
 
 	/*
+	 * Logical Devices' software leaves the pin drivers in "pull-down"
+	 * mode, not floating.  pull-down mode prevents static charges from
+	 * building up on the pins before you go and touch a part to them.
+	 */
+
+	for(channel = 0; channel < 88; channel++)
+		allpro88_write(allpro88_channel_addr(channel), PINCON_PULLDN);
+
+	/*
+	 * NOTE:  some socket modules require on-board registers to be
+	 * manipulated following a reset.  that must be handled host-side
+	 * by the socket module handling code.  we do nothing special for
+	 * socket modules here other than what pulling /RESET low does.
+	 */
+
+	/*
 	 * zero the address bus (leave /RESET high).
 	 */
 
@@ -678,13 +694,13 @@ static void allpro88_hard_reset(void)
 
 
 /*
- * test for installed pin drivers, and record a bit map.  because this test
- * requires the main power supplies to be enabled and pin drivers
- * configured for ground potential this is done only at power-on when there
- * should not be a part installed in a socket.  it is not repeated as part
- * of the hardware reset sequence, because that is normally executed each
- * time the host connects to the programmer, often at a time when a part
- * has been inserted into a socket.
+ * test for installed pin drivers, and record a bit map.  this test is only
+ * performed at initial power-on reset, it is not repeated with every
+ * subsequent hardware reset.  it is possible that a part inserted into a
+ * socket during this test could confuse the test if that part is placing
+ * voltages onto output pins.  the user will be told some channels are
+ * missing, and will need to remove the part from the socket and
+ * power-cycle the programmer to correct the scan.
  *
  * installed_channel_drivers is a bit mask, with bits 0 through 10,
  * inclusively, indicating the presence of the corresponding 8-channel
@@ -716,9 +732,10 @@ static void scan_installed_channel_drivers(void)
 	 * of the 8 channels on each board to test if that board is
 	 * present.  after setting VTH to about 1 V (see above), to test a
 	 * channel for its presence, we set the channel to pull-down (0 V)
-	 * mode, and compare the voltage on the pin to VTH.  channels that
-	 * are present and functioning will report a 0 in the LSB of the
-	 * data byte indicating that they see a voltage below VTH.  missing
+	 * mode (hardware reset sequence has put them into that state), and
+	 * compare the voltage on the pin to VTH.  channels that are
+	 * present and functioning will report a 0 in the LSB of the data
+	 * byte indicating that they see a voltage below VTH.  missing
 	 * channels will not respond to the read operation, so the pull-up
 	 * resistors on the data-bus will set the bus to 0xff, making it
 	 * seem as if the voltage on the pin is above threhsold.  setting
@@ -734,20 +751,18 @@ static void scan_installed_channel_drivers(void)
 
 	installed_channel_drivers = 0;
 	for(channel = 80; channel >= 0; channel -= 8) {
-		const WORD addr = allpro88_channel_addr(channel);
-		allpro88_write(addr, PINCON_PULLDN);
 		/* let bus relax.  for channels that aren't installed,
 		 * we're relying on the data bus' pull-up resistors to set
 		 * the bits high.  experiments show that we seem to be able
 		 * to read back the bus too quickly for the pull-up
 		 * resistor time constant:  if we immediately do the port
-		 * read, we still still see the value of PINCON_PULLDN on
-		 * the data bus.  adding a small delay fixes */
+		 * read and the channel is missing we still still see the
+		 * last value placed on the bus.  adding a small delay
+		 * fixes */
 		delay(1 /* ms */);
 		installed_channel_drivers <<= 1;
-		if(!(allpro88_read(addr) & 1))
+		if(!(allpro88_read(allpro88_channel_addr(channel)) & 1))
 			installed_channel_drivers |= 1;
-		allpro88_write(addr, PINCON_DISABLE);
 	}
 
 	/* zero dacs and turn off power supply */

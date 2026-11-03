@@ -990,7 +990,9 @@ class allpro88:
 		else:
 			raise ValueError("USB device not found (vid:pid = %04X:%04X)" % (self.idVendor, self.idProduct))
 
-		# firmware resets itself and the programmer.
+		# firmware resets itself and the programmer.  NOTE:
+		# hardware reset leaves all pin drivers in pull-down mode,
+		# with about 5.4 kOhm to ground.
 		self.device.set_configuration()
 
 		# initialize channel proxy list.  NOTE:  this step must be
@@ -1380,6 +1382,13 @@ class allpro88:
 		and so on remain valid, although without reconfiguring the
 		ALLPRO88 hardware it's unlikely existing bus definitions
 		will behave as expected.
+
+		Hardware reset clears all configuration registers to 0,
+		which turns off all power supplies and disables all bypass
+		capacitors, all voltage DACs are set to 0, finally all pin
+		configuration registers are set to pull-down mode (all pins
+		connected to ground via 5.4 kOhm resistors), and left in
+		that state.
 		"""
 		self.write_commands("R")
 
