@@ -301,17 +301,30 @@ class power:
 		"""
 		Turn power supplies off.
 		"""
-		# set VPUL and pin dacs to 0
+		# we remove power by unceremoniously pulling the plug on
+		# the main VADJ power supply, because we don't want the
+		# part to be in a situation where logic inputs are being
+		# driven by TTL drivers or other VDAC drivers but the power
+		# supply pins have been turned off.  it's normal for
+		# active-low logic inputs to be left in the high state as
+		# their final configuration when cutting power, and also
+		# normal for parts to be damaged when logic inputs are at
+		# voltages above their supply voltage
+
+		# set main dacs to 0
+		self.programmer.vadj = 0
+		self.programmer.vth = 0
+		# cut main power
+		self.programmer.pcr_enable = False
+
+		# set VPUL and pin dacs to 0, and clock them
 		self.programmer.vpul = 0
 		if self.active_voltage_map_name is not None:
 			for pin in self.active_voltage_map:
 				if pin != "VPUL":
 					self.socket[pin].vdac = 0
-		# clock the VPUL and pin driver dacs to remove power from
-		# the part, changing all voltages simultaneously.
 		self.programmer.load_dacs()
-		# now that power has been removed, it is safe to disable
-		# pins
+		# disable power pins
 		if self.active_voltage_map_name is not None:
 			for pin in self.active_voltage_map:
 				if pin != "VPUL":
@@ -320,11 +333,6 @@ class power:
 					pin.config = allpro88.PINCON.DISABLE
 		# no active voltage map
 		self.active_voltage_map_name = None
-		# set main dacs to 0
-		self.programmer.vadj = 0
-		self.programmer.vth = 0
-		# cut main power
-		self.programmer.pcr_enable = False
 
 
 #
