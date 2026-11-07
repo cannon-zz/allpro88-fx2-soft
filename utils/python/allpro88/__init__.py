@@ -491,8 +491,6 @@ class channel_proxy:
 		# measured DAC counts and calibrating that to a voltage is
 		# identical to calibrating each DAC count to a voltage
 		# individually and taking the median of those.
-		# FIXME:  if n is large this will exceed the USB packet
-		# buffer size
 		measurements = self.programmer.write_commands(*("M%02X" % self.channel,) * n)
 		return self.programmer.vth.cal(self.programmer, numpy.median(measurements))
 
@@ -818,9 +816,9 @@ class bus_parallel:
 		enable the part, while any other value will disable it.
 		Using the bitwise inverse of the "enable" value is often a
 		convenient value to use for the disabled state, but that
-		will trigger an overflow error without awkward additional
-		step to clip the bits to the bus width.  ignore_overflow
-		can be used to simplify this code.
+		will trigger an overflow error without an awkward
+		additional step to clip the bits to the bus width.
+		ignore_overflow can be used to simplify this code.
 
 		pull = one of "up" or "down" to add pull-up or pull-down
 		resistors, respectively, to the bus, or None (the default)
@@ -1222,7 +1220,8 @@ class allpro88:
 		the bus index that is returned is marked as in-use, and
 		bus_obj (default None) is associated with that index in the
 		internal bus dictionary.  Calling code may use that to
-		associate external objects with the bus.
+		associate external objects with the bus:
+		self.bus[bus_number] will be set equal to bus_obj.
 		"""
 		# NOTE:  the range() must match the size of the bus
 		# definition array in the firmware source
