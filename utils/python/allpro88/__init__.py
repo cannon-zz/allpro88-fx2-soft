@@ -189,6 +189,40 @@ class CLKGEN_MODE(IntEnum):
 #
 # =============================================================================
 #
+#                               USB I/O Helpers
+#
+# =============================================================================
+#
+
+
+# big endian = byte order is most- to least-significant;  matches the order
+# of numerals in written numbers
+#
+# little endian = byte order is least- to most-significant
+#
+# the order selected here must match the byte packing order chosen by the
+# firmware
+
+
+def to_bytes(i, n = 1):
+	"""
+	Convenience wrapper of int.to_bytes() that sets the correct
+	endianness and defaults to a width of 1.
+	"""
+	return i.to_bytes(n, byteorder = "big")
+
+
+def from_bytes(b):
+	"""
+	Convenience wrapper of int.from_bytes() that sets the correct
+	endianness.
+	"""
+	return int.from_bytes(b, byteorder = "big")
+
+
+#
+# =============================================================================
+#
 #                           Channel Driver Interface
 #
 # =============================================================================
@@ -474,12 +508,12 @@ class channel_proxy:
 		# first check n
 		n = int(n)
 		if n < 1:
-			raise ValueError("require n integer >= 1 (got %d)" % n)
-		if n > 100:
+			raise ValueError("require n >= 1 (got %d)" % n)
+		if n > 220:
 			# because we pack all voltage read commands into a
 			# single USB packet, there is a limit to how many
 			# readings we can take.  I think the exact limit is
-			# 128 readings:  4 bytes per command = 512 bytes,
+			# 256 readings:  2 bytes per command = 512 bytes,
 			# the maximum packet size.  set the limit a bit
 			# lower in case I can't count correctly.
 			raise ValueError("n too large")
@@ -491,7 +525,11 @@ class channel_proxy:
 		# measured DAC counts and calibrating that to a voltage is
 		# identical to calibrating each DAC count to a voltage
 		# individually and taking the median of those.
-		measurements = self.programmer.write_commands(*("M%02X" % self.channel,) * n)
+		# NOTE: because the results are single-byte integers, casting the
+		# bytes object to a tuple affects the correct byte-to-int
+		# type conversion
+
+		measurements = tuple(self.programmer.write_commands(*(b"M" + to_bytes(self.channel),) * n))
 		return self.programmer.vth.cal(self.programmer, numpy.median(measurements))
 
 	def pulse(self, microseconds, config, final_config):
@@ -526,7 +564,7 @@ class channel_proxy:
 			# enough, the pulse could be implemented in
 			# software, here, on the host side.
 			raise ValueError("pulse duration too long:  %d us" % microseconds)
-		self.programmer.write_commands("P%02X%04X%02X%02X" % (self.channel, microseconds, config, final_config))
+		self.programmer.write_commands(b"P" + to_bytes(self.channel) + to_bytes(microseconds, 2) + to_bytes(config) + to_bytes(final_config))
 
 	@property
 	def bypass(self):
@@ -849,8 +887,9 @@ class bus_parallel:
 		# get an unallocated bus
 		self.bus_number = self.programmer.get_unused_bus(self)
 		# send the bus definition command to the programmer
-		command = "B%1XP:%02X%02X%02X%02X" % (self.bus_number, active | pull, inactive | pull, flt | pull, len(pin_numbers))
-		command += "".join("%02X" % socket[pin_number].channel for pin_number in pin_numbers)
+		command = b"B" + to_bytes(self.bus_number) + b"P:" + to_bytes(active | pull) + to_bytes(inactive | pull) + to_bytes(flt | pull) + to_bytes(len(pin_numbers))
+		for pin_number in pin_numbers:
+			command += to_bytes(socket[pin_number].channel)
 		self.programmer.write_commands(command)
 		# set initial state
 		for channel in self.channels:
@@ -873,7 +912,9 @@ class bus_parallel:
 		voltage comparators.  The "high"/"low" states are defined
 		by the VTH voltage.
 		"""
-		word, = self.programmer.write_commands("B%01XP?" % self.bus_number)
+		word = from_bytes(self.programmer.write_commands(b"B" + to_bytes(self.bus_number) + b"P?"))
+		if not (0 <= word <= self.max_word):
+			raise ValueError("0x0 <= word <= 0x%X: 0x%X" % (self.max_word, word))
 		return word
 
 	def write(self, word):
@@ -882,19 +923,20 @@ class bus_parallel:
 		states according to the bits of the integer word.  If word
 		is None then all pins are set to the flt state.
 		"""
+		command = b"B" + to_bytes(self.bus_number) + b"P"
 		# float the bus if word is None
 		if word is None:
-			command = "B%01XP-" % self.bus_number
+			command += b"-"
 		# otherwise do a range check
 		elif not (self.ignore_overflow or (0 <= word <= self.max_word)):
 			raise ValueError("0x0 <= word <= 0x%X: 0x%X" % (self.max_word, word))
 		# and set the bus equal to word
 		elif len(self.pin_numbers) <= 8:
-			command = "B%1XP=%02X" % (self.bus_number, word & self.max_word)
+			command += b"=" + to_bytes(word & self.max_word)
 		elif len(self.pin_numbers) <= 16:
-			command = "B%1XP=%04X" % (self.bus_number, word & self.max_word)
+			command += b"=" + to_bytes(word & self.max_word, 2)
 		else:
-			command = "B%1XP=%08X" % (self.bus_number, word & self.max_word)
+			command += b"=" + to_bytes(word & self.max_word, 4)
 		self.programmer.write_commands(command)
 
 	def __len__(self):
@@ -1288,17 +1330,16 @@ class allpro88:
 	def write_commands(self, *cmds):
 		"""
 		Write a sequence of commands to the USB interface, and
-		retrieve, parse and return the responses in order.  Not all
-		commands generate responses.  If multiple commands are
-		transmitted at once, then it is left as an excercise for
-		the calling code to associate items in the response
-		sequence with their respective commands.
+		retrieve and return the response(s) as a single bytes
+		sequence.  Not all commands generate responses.  If
+		multiple commands are transmitted at once, then it is left
+		as an excercise for the calling code to split the bytes
+		sequence as needed and associate individual responses with
+		their respective commands.
 		"""
-		# append a \n to each command, and write the ascii bytes to
-		# the USB device.  all commands end in \n.  we append it
-		# here to simplify calling code.
+		# concatenate the commands and write to the USB device
 
-		self.device.write(self.ep_addr_out, ("\n".join(cmds) + "\n").encode("ascii"))
+		self.device.write(self.ep_addr_out, b"".join(cmds))
 
 		# every "out" packet generates a response "in" packet.
 		# even if we know the commands did not generate responses,
@@ -1308,10 +1349,11 @@ class allpro88:
 		n = self.device.read(self.ep_addr_in, self.buf)
 
 		# not all commands generate a response.  every command with
-		# a response responds with a single base 16 integer
-		# followed by a newline character.
+		# a response responds with a single integer of some width.
+		# the calling code is responsible for separating them out
+		# of the response bytes
 
-		return tuple(int(resp, 16) for resp in self.buf[:n].tobytes().decode("ascii").split())
+		return self.buf[:n].tobytes()
 
 
 	#
@@ -1340,7 +1382,7 @@ class allpro88:
 		"""
 		assert 0 <= addr <= 0x0fff
 		assert 0 <= val <= 0xff
-		self.write_commands("=%04X%02X" % (addr, val))
+		self.write_commands(b"=" + to_bytes(addr, 2) + to_bytes(val))
 
 
 	def read_addr(self, addr):
@@ -1348,7 +1390,7 @@ class allpro88:
 		Read value from register.
 		"""
 		assert 0 <= addr <= 0x0fff
-		val, = self.write_commands("?%04X" % addr)
+		val = from_bytes(self.write_commands(b"?" + to_bytes(addr, 2)))
 		assert 0 <= val <= 0xff
 		return val
 
@@ -1359,7 +1401,7 @@ class allpro88:
 		Tuple of installed channel drivers.
 		"""
 		# retrieve the bit map of installed channel groups
-		channel_group_bit_map, = self.write_commands("C")
+		channel_group_bit_map = from_bytes(self.write_commands(b"C"))
 		# populate the tuple of installed channel drivers
 		channels_installed = tuple(channel for i, channel in enumerate(self.channels) if (1 << (i // 8)) & channel_group_bit_map)
 		return channels_installed
@@ -1367,11 +1409,10 @@ class allpro88:
 
 	def echo(self, val):
 		"""
-		Echo a 4 digit number (USB loop-back test).
+		Echo a 2 byte number (USB loop-back test).
 		"""
 		assert 0 <= val <= 0xffff
-		val, = self.write_commands("E%04X" % val)
-		return val
+		return from_bytes(self.write_commands(b"E" + to_bytes(val, 2)))
 
 
 	def reset(self):
@@ -1389,7 +1430,7 @@ class allpro88:
 		connected to ground via 5.4 kOhm resistors), and left in
 		that state.
 		"""
-		self.write_commands("R")
+		self.write_commands(b"R")
 
 
 	#
@@ -1601,7 +1642,7 @@ class allpro88:
 		power supply's current sense voltage, and report it as a
 		fraction of the power supply's maximum output current.
 		"""
-		vdac, = self.write_commands("V")
+		vdac = from_bytes(self.write_commands(b"V"))
 
 		# VADJTH is generated by U3 on analogue control 1, an
 		# AD7226.  this chip's voltage output is Vref * (DAC value)

@@ -80,7 +80,7 @@ USB device files default to being readable and writable only by root.  The udev 
 
 Connectivity can be tested using the `ap88_loopback` programme.  With the ALLPRO88 plugged in and powered, running this programme will confirm that communication with the programmer is working.  It does some I/O operations, confirms that they do the right thing, and reports the command processing speed.
 
-Confirm that the calibration state, the installed socket module, and the list of installed channels reported by this tool are all what you expect these things to be.  The loop-back command processing speed should be about 10,000 iterations per second.
+Confirm that the calibration state, the installed socket module, and the list of installed channels reported by this tool are all what you expect these things to be.  The loop-back command processing speed should be about 12,000 iterations per second.
 
 ### Self Test
 
@@ -102,11 +102,10 @@ When completed, the calibration process will write the calibration data to a fil
 
 ## To Do
 
-- Make it faster.
-	- A minipro can dump 64k words in 0.5 s.  Would require ~10x increase in I/O ops/second.
-	- Transfer numeric values as raw binary instead of ASCII hex.
+- Make it faster.  A minipro can dump 64k words in 0.5 s.  That would require ~100x increase in I/O ops/second, which can't be done, but still it can be made faster than it is now.
 	- Move WAKEUP pin VBUS monitoring to interrupt handler.
 	- Non-DAC write waveform can omit the 0.5 us pause.
+	- Batching commands
 
 ## Credit
 

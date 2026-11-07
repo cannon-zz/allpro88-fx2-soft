@@ -60,72 +60,45 @@
 /*
  * ============================================================================
  *
- *                               C-ish Library
+ *                                Numeric I/O
  *
  * ============================================================================
  */
 
 
 /*
- * TRUE = an error occurred in a function call
+ * read integers of various widths from the USB buffer.  assumes XAUTODAT1
+ * is set to the address of the source.
  */
-
-
-static BOOL errno = FALSE;
-
-
-/*
- * convert upper-case base 16 strings of various fixed lengths to numerical
- * values.  sets errno to TRUE if the input is not a valid upper case base
- * 16 number, and in that case the return value is undefined.  assumes
- * AUTOPTR1 is set to the address of the source.
- */
-
-
-inline static BYTE hex_to_val(unsigned char digit)
-{
-	digit -= '0';
-	if(digit > 9) {
-		digit -= 'A' - '0';
-		if(digit > 0xF - 0xA) {
-			errno = TRUE;
-			return 0;
-		}
-		digit += 0xA;
-	}
-	return digit;
-}
 
 
 inline static BYTE str_to_byte(void)
 {
-	return hex_to_val(XAUTODAT1) << 4 | hex_to_val(XAUTODAT1);
+	return XAUTODAT1;
 }
 
 
-static WORD str_to_word(void)
+inline static WORD str_to_word(void)
 {
 	return MAKEWORD(str_to_byte(), str_to_byte());
 }
 
 
-static DWORD str_to_dword(void)
+inline static DWORD str_to_dword(void)
 {
 	return MAKEDWORD(str_to_word(), str_to_word());
 }
 
 
 /*
- * write integers to base 16 strings of various fixed lengths.  assumes
- * AUTOPTR2 is set to the address of the destination.
+ * write integers of various widths to the USB buffer.  assumes AUTODAT2 is
+ * set to the address of the destination.
  */
 
 
 inline static void puts_byte(BYTE val)
 {
-	static const char hex_digit[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
-	XAUTODAT2 = hex_digit[val >> 4];
-	XAUTODAT2 = hex_digit[val & 0xf];
+	XAUTODAT2 = val;
 }
 
 
@@ -136,21 +109,10 @@ inline static void puts_word(WORD val)
 }
 
 
-static void puts_dword(DWORD val)
+inline static void puts_dword(DWORD val)
 {
 	puts_word(MSW(val));
 	puts_word(LSW(val));
-}
-
-
-/*
- * write a newline character.  assumes AUTOPTR2 is set to the destination.
- */
-
-
-inline static void newline(void)
-{
-	XAUTODAT2 = '\n';
 }
 
 
@@ -1342,19 +1304,16 @@ static BOOL bus_parallel_define(BYTE bus_number)
 	bus[bus_number].parallel.state_float = str_to_byte();
 	bus[bus_number].parallel.width = width = str_to_byte();
 	/* check for error */
-	if(errno || width < 1 || width > 32)
+	if(width < 1 || width > 32)
 		goto error;
 	/* parse channel numbers */
 	for(i = 0; i < width; i++) {
 		BYTE channel = str_to_byte();
 		/* check for error */
-		if(errno || channel > 87)
+		if(channel > 87)
 			goto error;
 		bus[bus_number].parallel.bit_addr[i] = allpro88_channel_addr(channel);
 	}
-	/* check for correct end of string */
-	if(XAUTODAT1 != '\n')
-		goto error;
 	/* fill unused addresses with a safe value, just in case */
 	for(; i < 32; i++)
 		bus[bus_number].parallel.bit_addr[i] = bus[bus_number].parallel.bit_addr[0];
@@ -1633,23 +1592,22 @@ inline static BOOL in_buffer_not_full(void)
 /*
  * parse commands from "out" end-point
  *
- * command format.  all numbers are in base 16, only upper-case numerals
- * are recognized, and the numbers must be the width indicated (with
- * leading 0's as needed).  all commands are terminated by newline, \n,
- * 0x0a.  a packet may contain multiple commands, their outputs will be
- * concatenated into a single response packet.  commands may not straddle
- * packet boundaries.
+ * command format.  all numbers are big-endian binary with the width in
+ * bytes as indicated.  a packet may contain multiple commands, they are
+ * concatenated in the buffer, and their outputs will be concatenated into
+ * a single response packet.  commands may not straddle packet boundaries.
  *
- * =XXXXYY	write YY to address XXXX
- * ?XXXX	read address XXXX, report the value as YY
+ *
+ * =XXY		write Y to address XX
+ * ?XX		read address XX, report the value as YY
  * BXT<cmd>	bus commands, use bus number X for command.  bus type, T,
  *		is one of 'P' (parallel bus), FIXME add more
- * C		report 16-bit installed-channel-group bit map as XXXX
- * EXXXX	echo the number XXXX (loop-back test)
- * MXX		run voltage measurement sequence on channel XX, report VTH
- *		DAC as YY
- * PXXYYYYAABB	pulse channel XX to state AA for YYYY microseconds,
- *		returning to state BB
+ * C		report 16-bit installed-channel-group bit map as XX
+ * EXX		echo the number XX (loop-back test)
+ * MX		run voltage measurement sequence on channel X, report VTH
+ *		DAC as Y
+ * PXYYAB	pulse channel X to state A for YY microseconds, returning
+ *		to state B
  * R		execute hardware reset (of ALLPRO88, this does not reset
  *		the USB interface board)
  * V  		run VADJ voltage measurement sequence report VADJTH DAC as
@@ -1659,90 +1617,77 @@ inline static BOOL in_buffer_not_full(void)
  *
  * P (parallel bus) commands:
  *
- * :ttffzzwwC1..CN	define bus
- *	tt : pin configuration register value for "true" state
- *	ff : pin configuration register value for "false" state
- *	zz : pin configuration register value for "float" state
- *	ww : width of bus in bits, 0x01 <= width <= 0x20
- *	C1..CN : channel number for bit n (least significant to most
- *		significant).  must supply exactly as many as the bus width
- *		(no more, no less).
+ * :tfzwC1..CN	define bus
+ *	t : pin configuration register value for "true" state
+ *	f : pin configuration register value for "false" state
+ *	z : pin configuration register value for "float" state
+ *	w : width of bus in bits, 0x01 <= width <= 0x20
+ *	C1..CN : single-byte channel numbers for bits 1 to n (least
+ *	         significant to most significant).  must supply exactly as
+ *	         many as the bus width (no more, no less).
  *
- * =XX..XX	set the bus to XX..XX.  the bits to use are determined by
- *		the bus width, using the least significant portion of the
- *		supplied number.  for bus widths <= 8 a two-digit number is
- *		required;  otherwise for bus widths <= 16 a four-digit
- *		number is required;  otherwise an eight-digit number is
- *		required.
+ * =X..X	set the bus to X..X.  the width in bytes determined by the
+ *		bus width, and for buses whose widths are not multiples of
+ *		8 the least significant portion of the supplied number will
+ *		be used.  for bus widths <= 8 a 1-byte number is required;
+ *		otherwise for bus widths <= 16 a 2-byte number is required;
+ *		otherwise a 4-byte number is required.
  *
- * ?		read the bus, report the value.  the number of digits in
- *		the number reported depends on the width of the bus.  for
- *		bus widths <= 8 a two-digit number is reported;  otherwise
- *		for bus widths <= 16 a four-digit number is reported;
- *		otherwise an eight-digit number is reported.  in all cases,
- *		unused high bits are set to 0.
+ * ?		read the bus, report the value.  the number of bytes in the
+ *		number reported depends on the width of the bus.  for bus
+ *		widths <= 8 a 1-byte number is reported;  otherwise for bus
+ *		widths <= 16 a 2-byte number is reported; otherwise a
+ *		4-byte number is reported.  in all cases, unused high bits
+ *		are set to 0.
  *
  * -		set all bus pins to "float" state
  *
- * response format.  all numbers are in hexadecimal format.  responses are
- * separated by newline, \n, 0x0a, characters.  each packet of commands
- * produces one packet of responses, which might be empty (zero length).
- * the responses are in the order of the commands that produced them.
+ * response format.  all numbers are in big-endian binary format.
+ * responses are concatenated.  each packet of commands produces one packet
+ * of responses, which might be empty (zero length).  the responses are in
+ * the order of the commands that produced them.
  */
 
 
 inline static BOOL do_command(void)
 {
-	errno = FALSE;
-	switch(XAUTODAT1) {
+	switch(str_to_byte()) {
 	/*
 	 * write byte to address
 	 */
 
-	case '=': {
-		/* decode address and byte */
-		WORD addr = str_to_word();
-		BYTE val = str_to_byte();
-		/* check for error and correct end of string */
-		if(errno || XAUTODAT1 != '\n')
-			goto error;
-		/* write byte to address */
-		allpro88_write(addr, val);
+	case '=':
+		/* decode address and byte, write byte to address */
+		allpro88_write(str_to_word(), str_to_byte());
 		break;
-	}
 
 	/*
 	 * read byte from address
 	 */
 
-	case '?': {
-		/* decode address */
-		WORD addr = str_to_word();
-		/* check for error and correct end of string */
-		if(errno || XAUTODAT1 != '\n')
-			goto error;
-		/* read from address, print byte into response */
-		puts_byte(allpro88_read(addr));
-		newline();
+	case '?':
+		/* deocde address, read from address, print byte into
+		 * response */
+		puts_byte(allpro88_read(str_to_word()));
 		break;
-	}
 
 	/*
 	 * bus commands
 	 */
 
 	case 'B': {
-		BYTE bus_number = hex_to_val(XAUTODAT1);
-		if(errno)
-			goto error;
-		switch(XAUTODAT1) {
+		/* retrieve bus number */
+		BYTE bus_number = str_to_byte();
+		/* retrieve bus type code */
+		switch(str_to_byte()) {
 		/*
 		 * parallel bus
 		 */
 
 		case 'P': {
 			BYTE width = bus[bus_number].parallel.width;
-			switch(XAUTODAT1) {
+			/* retrieve bus command */
+			switch(str_to_byte()) {
 			/*
 			 * define bus
 			 */
@@ -1757,9 +1702,6 @@ inline static BOOL do_command(void)
 			 */
 
 			case '?':
-				/* check for correct end of string */
-				if(XAUTODAT1 != '\n')
-					goto error;
 				/* report the value on the bus */
 				if(!width)
 					goto error;
@@ -1769,7 +1711,6 @@ inline static BOOL do_command(void)
 					puts_word(bus_parallel_read_word(bus_number));
 				else
 					puts_dword(bus_parallel_read_dword(bus_number));
-				newline();
 				break;
 
 			/*
@@ -1779,31 +1720,12 @@ inline static BOOL do_command(void)
 			case '=':
 				if(!width)
 					goto error;
-				else if(width <= 8) {
-					/* decode the number to write */
-					BYTE value = str_to_byte();
-					/* check for error and correct end of string */
-					if(errno || XAUTODAT1 != '\n')
-						goto error;
-					/* set the bus state */
-					bus_parallel_write_byte(bus_number, value);
-				} else if(width <= 16) {
-					/* decode the number to write */
-					WORD value = str_to_word();
-					/* check for error and correct end of string */
-					if(errno || XAUTODAT1 != '\n')
-						goto error;
-					/* set the bus state */
-					bus_parallel_write_word(bus_number, value);
-				} else {
-					/* decode the number to write */
-					DWORD value = str_to_dword();
-					/* check for error and correct end of string */
-					if(errno || XAUTODAT1 != '\n')
-						goto error;
-					/* set the bus state */
-					bus_parallel_write_dword(bus_number, value);
-				}
+				else if(width <= 8)
+					bus_parallel_write_byte(bus_number, str_to_byte());
+				else if(width <= 16)
+					bus_parallel_write_word(bus_number, str_to_word());
+				else
+					bus_parallel_write_dword(bus_number, str_to_dword());
 				break;
 
 			/*
@@ -1811,7 +1733,7 @@ inline static BOOL do_command(void)
 			 */
 
 			case '-':
-				if(!width || XAUTODAT1 != '\n')
+				if(!width)
 					goto error;
 				bus_parallel_float(bus_number);
 				break;
@@ -1840,70 +1762,43 @@ inline static BOOL do_command(void)
 	 * report installed channel-driver bit map
 	 */
 
-	case 'C': {
-		/* check for correct end of string */
-		if(XAUTODAT1 != '\n')
-			goto error;
+	case 'C':
 		puts_word(installed_channel_drivers);
-		newline();
 		break;
-	}
 
 	/*
 	 * loop-back test
 	 */
 
-	case 'E': {
-		/* decode the 16 bit number to echo */
-		WORD value = str_to_word();
-		/* check for error and correct end of string */
-		if(errno || XAUTODAT1 != '\n')
-			goto error;
-		/* echo the number */
-		puts_word(value);
-		newline();
+	case 'E':
+		/* echo the 16 bit number */
+		puts_word(str_to_word());
 		break;
-	}
 
 	/*
 	 * pin voltage measurement
 	 */
 
-	case 'M': {
-		/* decode the 8 bit channel number */
-		BYTE channel = str_to_byte();
-		/* check for error and correct end of string */
-		if(errno || XAUTODAT1 != '\n')
-			goto error;
-		/* measure the voltage, report the VTH DAC value */
-		puts_byte(allpro88_measure_pin_voltage(channel));
-		newline();
+	case 'M':
+		/* decode the 8 bit channel number, measure the voltage,
+		 * report the VTH DAC value */
+		puts_byte(allpro88_measure_pin_voltage(str_to_byte()));
 		break;
-	}
 
 	/*
 	 * pulse
 	 */
 
-	case 'P': {
-		BYTE channel = str_to_byte();
-		WORD microseconds = str_to_word();
-		BYTE config = str_to_byte();
-		BYTE final_config = str_to_byte();
-		if(errno || XAUTODAT1 != '\n')
-			goto error;
-		pulse(channel, microseconds, config, final_config);
+	case 'P':
+		/* channel, microseconds, config, final_config */
+		pulse(str_to_byte(), str_to_word(), str_to_byte(), str_to_byte());
 		break;
-	}
 
 	/*
 	 * hardware reset
 	 */
 
 	case 'R':
-		/* check for correct end of string */
-		if(XAUTODAT1 != '\n')
-			goto error;
 		/* execute hardware reset */
 		allpro88_hard_reset();
 		break;
@@ -1913,12 +1808,8 @@ inline static BOOL do_command(void)
 	 */
 
 	case 'V':
-		/* check for correct end of string */
-		if(XAUTODAT1 != '\n')
-			goto error;
 		/* measure the voltage, report the VADJTH DAC value */
 		puts_byte(allpro88_measure_vadj_voltage());
-		newline();
 		break;
 
 	/*
