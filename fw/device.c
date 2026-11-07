@@ -569,16 +569,16 @@ inline static void allpro88_set_SPARE(BYTE dac0, BYTE dac1)
 
 
 /*
- * start address for the control registers for a channel
+ * start address for the control registers for a channel.
+ * channel 0 starts at 0x0000, 1 at 0x0010, etc., up to channel
+ * 0x27 which starts at 0x0270, then channel 0x28 starts at 0x0400,
+ * and they continue in order from there, upto and including
+ * channel 0x57
  */
 
 
 static WORD allpro88_channel_addr(BYTE channel)
 {
-	/* channel 0 starts at 0x0000, 1 at 0x0010, etc., up to channel
-	 * 0x27 which starts at 0x0270, then channel 0x28 starts at 0x0400,
-	 * and they continue in order from there, upto and including
-	 * channel 0x57 */
 	if(channel > 0x27)
 		channel += 0x18;
 	return (WORD) channel << 4;
@@ -1515,7 +1515,7 @@ static void bus_parallel_write_dword(BYTE bus_number, DWORD value)
 static void pulse(BYTE channel, WORD microseconds, BYTE config, BYTE final_config)
 {
 	WORD addr = allpro88_channel_addr(channel);
-	(microseconds);	/* silence unreference parameter warning */
+	(microseconds);	/* silence unreferenced parameter warning */
 	/* measured shortest pulse duration is about 4 us, so subtract that
 	 * much off the count.  need to do this in assembly, because the
 	 * SDCC optimizer thinks microseconds is unused and removes all the
@@ -1961,12 +1961,10 @@ inline static void parse_out_buffer(void)
 	 * bus size is large produce responses longer than themselves.  in
 	 * most cases there's no reason to queue large numbers of these
 	 * into a single command packet (why queue up a sequence of
-	 * requests to retrieve the installed pin driver map?), also the
-	 * host-side library no longer has the ability to queue multiple
-	 * commands into a single packet at all (although 3rd party code
-	 * could still try).  for these reasons, no effort has been put
-	 * into protecting against this failure mode, but ... if some easy
-	 * way to do it presents itself, that would be nice.
+	 * requests to retrieve the installed pin driver map?), so no
+	 * effort has been put into protecting against this failure mode,
+	 * but ... if some easy way to do it presents itself, that would be
+	 * nice.
 	 */
 
 	while(MAKEWORD(AUTOPTRH1, AUTOPTRL1) < out_end) {
