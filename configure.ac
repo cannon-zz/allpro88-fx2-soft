@@ -49,6 +49,14 @@ PYTHON_LIBS=[`echo "$PYTHON_LIBS" | sed -e "s?-L/usr/lib[^[:space:]]*??g"`]
 
 
 #
+# Check for Python modules
+#
+
+
+AX_PYTHON_MODULE([usb], [fatal])
+
+
+#
 # Output configure information
 #
 
