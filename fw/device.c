@@ -91,8 +91,8 @@ inline static DWORD str_to_dword(void)
 
 
 /*
- * write integers of various widths to the USB buffer.  assumes AUTODAT2 is
- * set to the address of the destination.
+ * write integers of various widths to the USB buffer.  assumes XAUTODAT2
+ * is set to the address of the destination.
  */
 
 
@@ -718,9 +718,8 @@ static void scan_installed_channel_drivers(void)
 		 * the bits high.  experiments show that we seem to be able
 		 * to read back the bus too quickly for the pull-up
 		 * resistor time constant:  if we immediately do the port
-		 * read and the channel is missing we still still see the
-		 * last value placed on the bus.  adding a small delay
-		 * fixes */
+		 * read and the channel is missing we still see the last
+		 * value placed on the bus.  adding a small delay fixes */
 		delay(1 /* ms */);
 		installed_channel_drivers <<= 1;
 		if(!(allpro88_read(allpro88_channel_addr(channel)) & 1))
@@ -750,7 +749,7 @@ static void scan_installed_channel_drivers(void)
  * in each iteration of the loop seemed to
  * slightly improve the magnitude of the residual over having none at all,
  * but the test seemed to work almost perfectly even without any NOPs at
- * all, which I don't understand.  What's here, how, should meet the timing
+ * all, which I don't understand.  What's here, now, should meet the timing
  * requirements, although it's not yet as fast as it could be if written by
  * hand in assembly.
  *
